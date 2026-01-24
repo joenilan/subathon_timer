@@ -11,6 +11,131 @@ import * as tmi from 'tmi.js';
 import crypto from "crypto";
 const USE_MOCK = !!process.env.USE_FDGT_MOCK;
 
+class AppState {
+  twitch: tmi.Client;
+  db: sqlite.Database;
+  io: socketio.Server;
+
+  isStarted: boolean;
+  startedAt: number;
+
+  endingAt: number;
+  baseTime: number;
+
+  randomTarget = "definitelynotyannis";
+  randomTargetIsMod = false;
+
+  spins: Map<string, any> = new Map();
+
+  constructor(twitch: tmi.Client, db: sqlite.Database, io: socketio.Server,
+              isStarted: boolean, startedAt: number, endingAt: number, baseTime: number) {
+    this.twitch = twitch;
+    this.db = db;
+    this.io = io;
+    this.isStarted = isStarted;
+    this.startedAt = startedAt;
+    this.endingAt = endingAt;
+    this.baseTime = baseTime;
+
+    setInterval(async () => {
+      if(!this.isStarted || this.endingAt < Date.now()) return;
+      await db.run(`INSERT INTO graph VALUES(?, ?);`, [Date.now(), this.endingAt]);
+      // Keep only the latest 120 records
+      await db.run('DELETE FROM graph WHERE timestamp IN (SELECT timestamp FROM graph ORDER BY timestamp DESC LIMIT -1 OFFSET 120);');
+      await this.broadcastGraph();
+    }, 1000*60);
+  }
+
+  async updateBaseTime(newBaseTime: number) {
+    this.baseTime = newBaseTime;
+    this.io.emit('update_incentives', {
+      'tier_1': Math.round(this.baseTime * cfg.time.multipliers.tier_1),
+      'tier_2': Math.round(this.baseTime * cfg.time.multipliers.tier_2),
+      'tier_3': Math.round(this.baseTime * cfg.time.multipliers.tier_3),
+      'bits': Math.round(this.baseTime * cfg.time.multipliers.bits),
+      'donation': Math.round(this.baseTime * cfg.time.multipliers.donation),
+      'follow': Math.round(this.baseTime * cfg.time.multipliers.follow)
+    });
+    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['base_time', newBaseTime]);
+  }
+
+  async start(seconds: number) {
+    this.isStarted = true;
+    this.startedAt = Date.now();
+    this.forceTime(seconds);
+    this.io.emit('update_uptime', {'started_at': this.startedAt});
+    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
+  }
+
+  async updateStartedAt(newStartedAt: number) {
+    this.startedAt = newStartedAt
+    this.io.emit('update_uptime', {'started_at': this.startedAt});
+    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
+  }
+
+  forceTime(seconds: number) {
+    this.endingAt = Date.now() + (seconds * 1000);
+    this.io.emit('update_timer', {'ending_at': this.endingAt, 'forced': true});
+  }
+
+  addTime(seconds: number) {
+    if(seconds == null) {
+      return
+    }
+    this.endingAt = this.endingAt + (seconds * 1000);
+    this.io.emit('update_timer', {'ending_at': this.endingAt});
+
+  }
+
+  displayAddTimeUpdate(seconds: number, reason: string) {
+    this.io.emit('time_add_reason', {'seconds_added': seconds, 'reason': reason})
+  }
+
+  async executeSpinResult(spinId: string) {
+    if(!this.spins.has(spinId)) return;
+    const spin = this.spins.get(spinId);
+    this.spins.delete(spinId);
+
+    if(spin.res.type === 'time') {
+      this.addTime(spin.res.value);
+      this.displayAddTimeUpdate(spin.res.value, `${spin.sender} (wheel)`)
+    } else if(spin.res.type === 'timeout') {
+      if(spin.res.target === 'random') {
+        const target = this.randomTarget;
+        const targetIsMod = this.randomTargetIsMod;
+        await this.twitch.timeout(cfg.channel, target, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
+        if(targetIsMod) {
+          console.log(`Remodding ${target} in ${(1000*spin.res.value) + 5000}ms`);
+          setTimeout(async () => {
+            await this.twitch.mod(cfg.channel, target).catch(err => console.log('Could not remod user after wheel TO!', err));
+          }, (1000*spin.res.value) + 5000);
+        }
+      } else if(spin.res.target === 'sender') {
+        const wasMod = spin.res.mod;
+        await this.twitch.timeout(cfg.channel, spin.sender, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
+        if(wasMod) {
+          console.log(`Remodding ${spin.sender} in ${(1000*spin.res.value) + 5000}ms`);
+          setTimeout(async () => {
+            await this.twitch.mod(cfg.channel, spin.sender).catch(err => console.log('Could not remod user after wheel TO!', err));
+          }, (1000*spin.res.value) + 5000);
+        }
+      }
+    }
+  }
+
+  async broadcastGraph() {
+    const res = await this.db.all('SELECT timestamp,ending_at FROM graph ORDER BY timestamp DESC LIMIT 50;');
+    const graphArray : any[] = Array.from({length: 60}, (_, n) => {
+      if(res.length === 0) return 0;
+      else if(n < 60 - res.length) return res[res.length - 1].ending_at - res[res.length - 1].timestamp;
+      else return res[60-(1+n)].ending_at - res[60-(1+n)].timestamp;
+    });
+    this.io.emit('update_graph', {data: graphArray});
+  }
+
+
+}
+
 (async () => {
   // open the database
   const db = await sqlite.open({
@@ -356,131 +481,6 @@ function registerStreamelementsEvents(state: AppState) {
     const { channelId } = data;
     console.log(`streamelements: successfully connected to channel ${channelId}`)
   });
-
-}
-
-class AppState {
-  twitch: tmi.Client;
-  db: sqlite.Database;
-  io: socketio.Server;
-
-  isStarted: boolean;
-  startedAt: number;
-
-  endingAt: number;
-  baseTime: number;
-
-  randomTarget = "definitelynotyannis";
-  randomTargetIsMod = false;
-
-  spins: Map<string, any> = new Map();
-
-  constructor(twitch: tmi.Client, db: sqlite.Database, io: socketio.Server,
-              isStarted: boolean, startedAt: number, endingAt: number, baseTime: number) {
-    this.twitch = twitch;
-    this.db = db;
-    this.io = io;
-    this.isStarted = isStarted;
-    this.startedAt = startedAt;
-    this.endingAt = endingAt;
-    this.baseTime = baseTime;
-
-    setInterval(async () => {
-      if(!this.isStarted || this.endingAt < Date.now()) return;
-      await db.run(`INSERT INTO graph VALUES(?, ?);`, [Date.now(), this.endingAt]);
-      // Keep only the latest 120 records
-      await db.run('DELETE FROM graph WHERE timestamp IN (SELECT timestamp FROM graph ORDER BY timestamp DESC LIMIT -1 OFFSET 120);');
-      await this.broadcastGraph();
-    }, 1000*60);
-  }
-
-  async updateBaseTime(newBaseTime: number) {
-    this.baseTime = newBaseTime;
-    this.io.emit('update_incentives', {
-      'tier_1': Math.round(this.baseTime * cfg.time.multipliers.tier_1),
-      'tier_2': Math.round(this.baseTime * cfg.time.multipliers.tier_2),
-      'tier_3': Math.round(this.baseTime * cfg.time.multipliers.tier_3),
-      'bits': Math.round(this.baseTime * cfg.time.multipliers.bits),
-      'donation': Math.round(this.baseTime * cfg.time.multipliers.donation),
-      'follow': Math.round(this.baseTime * cfg.time.multipliers.follow)
-    });
-    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['base_time', newBaseTime]);
-  }
-
-  async start(seconds: number) {
-    this.isStarted = true;
-    this.startedAt = Date.now();
-    this.forceTime(seconds);
-    this.io.emit('update_uptime', {'started_at': this.startedAt});
-    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
-  }
-
-  async updateStartedAt(newStartedAt: number) {
-    this.startedAt = newStartedAt
-    this.io.emit('update_uptime', {'started_at': this.startedAt});
-    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
-  }
-
-  forceTime(seconds: number) {
-    this.endingAt = Date.now() + (seconds * 1000);
-    this.io.emit('update_timer', {'ending_at': this.endingAt, 'forced': true});
-  }
-
-  addTime(seconds: number) {
-    if(seconds == null) {
-      return
-    }
-    this.endingAt = this.endingAt + (seconds * 1000);
-    this.io.emit('update_timer', {'ending_at': this.endingAt});
-
-  }
-
-  displayAddTimeUpdate(seconds: number, reason: string) {
-    this.io.emit('time_add_reason', {'seconds_added': seconds, 'reason': reason})
-  }
-
-  async executeSpinResult(spinId: string) {
-    if(!this.spins.has(spinId)) return;
-    const spin = this.spins.get(spinId);
-    this.spins.delete(spinId);
-
-    if(spin.res.type === 'time') {
-      this.addTime(spin.res.value);
-      this.displayAddTimeUpdate(spin.res.value, `${spin.sender} (wheel)`)
-    } else if(spin.res.type === 'timeout') {
-      if(spin.res.target === 'random') {
-        const target = this.randomTarget;
-        const targetIsMod = this.randomTargetIsMod;
-        await this.twitch.timeout(cfg.channel, target, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
-        if(targetIsMod) {
-          console.log(`Remodding ${target} in ${(1000*spin.res.value) + 5000}ms`);
-          setTimeout(async () => {
-            await this.twitch.mod(cfg.channel, target).catch(err => console.log('Could not remod user after wheel TO!', err));
-          }, (1000*spin.res.value) + 5000);
-        }
-      } else if(spin.res.target === 'sender') {
-        const wasMod = spin.res.mod;
-        await this.twitch.timeout(cfg.channel, spin.sender, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
-        if(wasMod) {
-          console.log(`Remodding ${spin.sender} in ${(1000*spin.res.value) + 5000}ms`);
-          setTimeout(async () => {
-            await this.twitch.mod(cfg.channel, spin.sender).catch(err => console.log('Could not remod user after wheel TO!', err));
-          }, (1000*spin.res.value) + 5000);
-        }
-      }
-    }
-  }
-
-  async broadcastGraph() {
-    const res = await this.db.all('SELECT timestamp,ending_at FROM graph ORDER BY timestamp DESC LIMIT 50;');
-    const graphArray : any[] = Array.from({length: 60}, (_, n) => {
-      if(res.length === 0) return 0;
-      else if(n < 60 - res.length) return res[res.length - 1].ending_at - res[res.length - 1].timestamp;
-      else return res[60-(1+n)].ending_at - res[60-(1+n)].timestamp;
-    });
-    this.io.emit('update_graph', {data: graphArray});
-  }
-
 
 }
 
