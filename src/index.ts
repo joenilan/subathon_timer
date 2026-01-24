@@ -4,14 +4,166 @@ import * as socketio from "socket.io";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import socketioclient from "socket.io-client";
-import sqlite3 from 'sqlite3'
-import * as sqlite from 'sqlite'
-import cfg from '../config.json'
+import sqlite3 from 'sqlite3';
+import * as sqlite from 'sqlite';
+import cfg from '../config.json';
 import * as tmi from 'tmi.js';
 import crypto from "crypto";
+import * as fs from "node:fs/promises";
+import open from "open";
+
 const USE_MOCK = !!process.env.USE_FDGT_MOCK;
+const TOKEN_SCOPES = "chat:read chat:edit channel:moderate moderator:manage:banned_users channel:manage:moderators channel:manage:vips";
+const TOKEN_CACHE_PATH = "./token_cache.json";
+
+interface TokenCache {
+  access_token: string;
+  expiry_time: number;
+  refresh_token: string;
+}
+
+let tokenCache: TokenCache = {
+  access_token: "",
+  expiry_time: 0,
+  refresh_token: "",
+};
+
+class AppState {
+  twitch: tmi.Client;
+  db: sqlite.Database;
+  io: socketio.Server;
+
+  isStarted: boolean;
+  startedAt: number;
+
+  endingAt: number;
+  baseTime: number;
+
+  randomTarget = "definitelynotyannis";
+  randomTargetUserId = "";
+  randomTargetIsMod = false;
+
+  spins: Map<string, any> = new Map();
+
+  constructor(twitch: tmi.Client, db: sqlite.Database, io: socketio.Server,
+              isStarted: boolean, startedAt: number, endingAt: number, baseTime: number) {
+    this.twitch = twitch;
+    this.db = db;
+    this.io = io;
+    this.isStarted = isStarted;
+    this.startedAt = startedAt;
+    this.endingAt = endingAt;
+    this.baseTime = baseTime;
+
+    setInterval(async () => {
+      if(!this.isStarted || this.endingAt < Date.now()) return;
+      await db.run(`INSERT INTO graph VALUES(?, ?);`, [Date.now(), this.endingAt]);
+      // Keep only the latest 120 records
+      await db.run('DELETE FROM graph WHERE timestamp IN (SELECT timestamp FROM graph ORDER BY timestamp DESC LIMIT -1 OFFSET 120);');
+      await this.broadcastGraph();
+    }, 1000*60);
+  }
+
+  async updateBaseTime(newBaseTime: number) {
+    this.baseTime = newBaseTime;
+    this.io.emit('update_incentives', {
+      'tier_1': Math.round(this.baseTime * cfg.time.multipliers.tier_1),
+      'tier_2': Math.round(this.baseTime * cfg.time.multipliers.tier_2),
+      'tier_3': Math.round(this.baseTime * cfg.time.multipliers.tier_3),
+      'bits': Math.round(this.baseTime * cfg.time.multipliers.bits),
+      'donation': Math.round(this.baseTime * cfg.time.multipliers.donation),
+      'follow': Math.round(this.baseTime * cfg.time.multipliers.follow)
+    });
+    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['base_time', newBaseTime]);
+  }
+
+  async start(seconds: number) {
+    this.isStarted = true;
+    this.startedAt = Date.now();
+    this.forceTime(seconds);
+    this.io.emit('update_uptime', {'started_at': this.startedAt});
+    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
+  }
+
+  async updateStartedAt(newStartedAt: number) {
+    this.startedAt = newStartedAt
+    this.io.emit('update_uptime', {'started_at': this.startedAt});
+    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
+  }
+
+  forceTime(seconds: number) {
+    this.endingAt = Date.now() + (seconds * 1000);
+    this.io.emit('update_timer', {'ending_at': this.endingAt, 'forced': true});
+  }
+
+  addTime(seconds: number) {
+    if(seconds == null) {
+      return
+    }
+    this.endingAt = this.endingAt + (seconds * 1000);
+    this.io.emit('update_timer', {'ending_at': this.endingAt});
+
+  }
+
+  displayAddTimeUpdate(seconds: number, reason: string) {
+    this.io.emit('time_add_reason', {'seconds_added': seconds, 'reason': reason})
+  }
+
+  async executeSpinResult(spinId: string) {
+    if(!this.spins.has(spinId)) return;
+    const spin = this.spins.get(spinId);
+    this.spins.delete(spinId);
+
+    if(spin.res.type === 'time') {
+      this.addTime(spin.res.value);
+      this.displayAddTimeUpdate(spin.res.value, `${spin.sender} (wheel)`)
+    } else if(spin.res.type === 'timeout') {
+      if(spin.res.target === 'random') {
+        const target = this.randomTarget;
+        const targetUserId = this.randomTargetUserId;
+        const targetIsMod = this.randomTargetIsMod;
+        await timeoutUser(targetUserId, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
+        if(targetIsMod) {
+          console.log(`Remodding ${target} in ${(1000*spin.res.value) + 5000}ms`);
+          setTimeout(async () => {
+            await modUser(targetUserId);
+            await this.twitch.mod(cfg.channel, target).catch(err => console.log('Could not remod user after wheel TO!', err));
+          }, (1000*spin.res.value) + 5000);
+        }
+      } else if(spin.res.target === 'sender') {
+        const wasMod = spin.res.mod;
+        await this.twitch.timeout(cfg.channel, spin.sender, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
+        if(wasMod) {
+          console.log(`Remodding ${spin.sender} in ${(1000*spin.res.value) + 5000}ms`);
+          setTimeout(async () => {
+            await this.twitch.mod(cfg.channel, spin.sender).catch(err => console.log('Could not remod user after wheel TO!', err));
+          }, (1000*spin.res.value) + 5000);
+        }
+      }
+    }
+  }
+
+  async broadcastGraph() {
+    const res = await this.db.all('SELECT timestamp,ending_at FROM graph ORDER BY timestamp DESC LIMIT 50;');
+    const graphArray : any[] = Array.from({length: 60}, (_, n) => {
+      if(res.length === 0) return 0;
+      else if(n < 60 - res.length) return res[res.length - 1].ending_at - res[res.length - 1].timestamp;
+      else return res[60-(1+n)].ending_at - res[60-(1+n)].timestamp;
+    });
+    this.io.emit('update_graph', {data: graphArray});
+  }
+
+
+}
 
 (async () => {
+  // Read token cache
+  try {
+    const cacheData = await fs.readFile(TOKEN_CACHE_PATH, "utf8");
+    tokenCache = JSON.parse(cacheData);
+  } catch (err) {}
+
+
   // open the database
   const db = await sqlite.open({
     filename: './data.db',
@@ -25,12 +177,19 @@ const USE_MOCK = !!process.env.USE_FDGT_MOCK;
   await db.run('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value INTEGER);');
 
 
+  const authToken = await getAuthToken();
+
+  // Check expiry of token every 10 minutes and refresh if necessary
+  setInterval(async () => {
+    await getAuthToken();
+  }, 1000*60*10);
+
   const twitch = !USE_MOCK ? tmi.Client({
     channels: [cfg.channel.toLowerCase()],
-    identity: cfg.twitch_token ? {
+    identity: {
       username: cfg.channel.toLowerCase(),
-      password: cfg.twitch_token
-    } : undefined
+      password: authToken
+    }
   }) : tmi.Client({
     options: {debug: true},
     channels: [cfg.channel],
@@ -105,6 +264,7 @@ function registerTwitchEvents(state: AppState) {
     if(!isWheelBlacklisted(userstate.username||"")) {
       if(Math.random() > 0.90) {
         state.randomTarget = userstate.username || "";
+        state.randomTargetUserId = userstate.id!;
         state.randomTargetIsMod = userstate.mod || false;
       }
     }
@@ -359,131 +519,6 @@ function registerStreamelementsEvents(state: AppState) {
 
 }
 
-class AppState {
-  twitch: tmi.Client;
-  db: sqlite.Database;
-  io: socketio.Server;
-
-  isStarted: boolean;
-  startedAt: number;
-
-  endingAt: number;
-  baseTime: number;
-
-  randomTarget = "definitelynotyannis";
-  randomTargetIsMod = false;
-
-  spins: Map<string, any> = new Map();
-
-  constructor(twitch: tmi.Client, db: sqlite.Database, io: socketio.Server,
-              isStarted: boolean, startedAt: number, endingAt: number, baseTime: number) {
-    this.twitch = twitch;
-    this.db = db;
-    this.io = io;
-    this.isStarted = isStarted;
-    this.startedAt = startedAt;
-    this.endingAt = endingAt;
-    this.baseTime = baseTime;
-
-    setInterval(async () => {
-      if(!this.isStarted || this.endingAt < Date.now()) return;
-      await db.run(`INSERT INTO graph VALUES(?, ?);`, [Date.now(), this.endingAt]);
-      // Keep only the latest 120 records
-      await db.run('DELETE FROM graph WHERE timestamp IN (SELECT timestamp FROM graph ORDER BY timestamp DESC LIMIT -1 OFFSET 120);');
-      await this.broadcastGraph();
-    }, 1000*60);
-  }
-
-  async updateBaseTime(newBaseTime: number) {
-    this.baseTime = newBaseTime;
-    this.io.emit('update_incentives', {
-      'tier_1': Math.round(this.baseTime * cfg.time.multipliers.tier_1),
-      'tier_2': Math.round(this.baseTime * cfg.time.multipliers.tier_2),
-      'tier_3': Math.round(this.baseTime * cfg.time.multipliers.tier_3),
-      'bits': Math.round(this.baseTime * cfg.time.multipliers.bits),
-      'donation': Math.round(this.baseTime * cfg.time.multipliers.donation),
-      'follow': Math.round(this.baseTime * cfg.time.multipliers.follow)
-    });
-    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['base_time', newBaseTime]);
-  }
-
-  async start(seconds: number) {
-    this.isStarted = true;
-    this.startedAt = Date.now();
-    this.forceTime(seconds);
-    this.io.emit('update_uptime', {'started_at': this.startedAt});
-    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
-  }
-
-  async updateStartedAt(newStartedAt: number) {
-    this.startedAt = newStartedAt
-    this.io.emit('update_uptime', {'started_at': this.startedAt});
-    await this.db.run('INSERT OR REPLACE INTO settings VALUES (?, ?);', ['started_at', this.startedAt]);
-  }
-
-  forceTime(seconds: number) {
-    this.endingAt = Date.now() + (seconds * 1000);
-    this.io.emit('update_timer', {'ending_at': this.endingAt, 'forced': true});
-  }
-
-  addTime(seconds: number) {
-    if(seconds == null) {
-      return
-    }
-    this.endingAt = this.endingAt + (seconds * 1000);
-    this.io.emit('update_timer', {'ending_at': this.endingAt});
-
-  }
-
-  displayAddTimeUpdate(seconds: number, reason: string) {
-    this.io.emit('time_add_reason', {'seconds_added': seconds, 'reason': reason})
-  }
-
-  async executeSpinResult(spinId: string) {
-    if(!this.spins.has(spinId)) return;
-    const spin = this.spins.get(spinId);
-    this.spins.delete(spinId);
-
-    if(spin.res.type === 'time') {
-      this.addTime(spin.res.value);
-      this.displayAddTimeUpdate(spin.res.value, `${spin.sender} (wheel)`)
-    } else if(spin.res.type === 'timeout') {
-      if(spin.res.target === 'random') {
-        const target = this.randomTarget;
-        const targetIsMod = this.randomTargetIsMod;
-        await this.twitch.timeout(cfg.channel, target, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
-        if(targetIsMod) {
-          console.log(`Remodding ${target} in ${(1000*spin.res.value) + 5000}ms`);
-          setTimeout(async () => {
-            await this.twitch.mod(cfg.channel, target).catch(err => console.log('Could not remod user after wheel TO!', err));
-          }, (1000*spin.res.value) + 5000);
-        }
-      } else if(spin.res.target === 'sender') {
-        const wasMod = spin.res.mod;
-        await this.twitch.timeout(cfg.channel, spin.sender, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
-        if(wasMod) {
-          console.log(`Remodding ${spin.sender} in ${(1000*spin.res.value) + 5000}ms`);
-          setTimeout(async () => {
-            await this.twitch.mod(cfg.channel, spin.sender).catch(err => console.log('Could not remod user after wheel TO!', err));
-          }, (1000*spin.res.value) + 5000);
-        }
-      }
-    }
-  }
-
-  async broadcastGraph() {
-    const res = await this.db.all('SELECT timestamp,ending_at FROM graph ORDER BY timestamp DESC LIMIT 50;');
-    const graphArray : any[] = Array.from({length: 60}, (_, n) => {
-      if(res.length === 0) return 0;
-      else if(n < 60 - res.length) return res[res.length - 1].ending_at - res[res.length - 1].timestamp;
-      else return res[60-(1+n)].ending_at - res[60-(1+n)].timestamp;
-    });
-    this.io.emit('update_graph', {data: graphArray});
-  }
-
-
-}
-
 function multiplierFromPlan(plan: tmi.SubMethod|undefined) {
   if(!plan) return cfg.time.multipliers.tier_1;
   switch (plan) {
@@ -495,5 +530,143 @@ function multiplierFromPlan(plan: tmi.SubMethod|undefined) {
       return cfg.time.multipliers.tier_2;
     case "3000":
       return cfg.time.multipliers.tier_3;
+  }
+}
+
+async function getAuthToken(): Promise<string> {
+  if (tokenCache.access_token && tokenCache.access_token.length > 0) {
+    if (tokenCache.expiry_time > Date.now() - (1000*60*3)) {
+      return tokenCache.access_token;
+    } else {
+      console.log("Refreshing access token...");
+      const refreshData = new FormData();
+      refreshData.append("client_id", cfg.twitch_client_id);
+      refreshData.append("grant_type", "refresh_token");
+      refreshData.append("refresh_token", tokenCache.refresh_token);
+
+      const refreshResult = await fetch("https://id.twitch.tv/oauth2/token", {
+        method: "POST",
+        body: refreshData
+      });
+
+      if (refreshResult.ok) {
+        const refreshResultJson = await refreshResult.json();
+        tokenCache.access_token = refreshResultJson.access_token;
+        tokenCache.refresh_token = refreshResultJson.refresh_token;
+        tokenCache.expiry_time = Date.now() + (1000 * refreshResultJson.expires_in);
+
+        await fs.writeFile(TOKEN_CACHE_PATH, JSON.stringify(tokenCache), 'utf8');
+
+        return tokenCache.access_token;
+      }
+
+      console.log("Refreshing token failed...");
+    }
+  }
+
+  console.log("Triggering device code flow.");
+  return await triggerDeviceCodeFlow();
+}
+
+async function triggerDeviceCodeFlow(): Promise<string> {
+  const formData = new FormData();
+  formData.append("client_id", cfg.twitch_client_id);
+  formData.append("scopes", TOKEN_SCOPES)
+
+  const response = await fetch("https://id.twitch.tv/oauth2/device", {
+    method: 'POST',
+    body: formData
+  });
+
+  const responseJson = await response.json();
+
+  const codeExpiry = new Date(Date.now() + (responseJson.expires_in * 1000));
+
+  console.log("Opening browser to authenticate...");
+  console.log(`Click here if your browser did not open: ${responseJson.verification_uri}`);
+  await open(responseJson.verification_uri);
+
+  while (new Date() < codeExpiry) {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // Poll device code flow
+    const formDataPoll = new FormData();
+    formDataPoll.append("client_id", cfg.twitch_client_id);
+    formDataPoll.append("scopes", TOKEN_SCOPES);
+    formDataPoll.append("device_code", responseJson.device_code);
+    formDataPoll.append("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
+
+    const pollResult = await fetch("https://id.twitch.tv/oauth2/token", {
+      method: 'POST',
+      body: formDataPoll
+    });
+
+    if (!pollResult.ok) {
+      if (pollResult.status == 400) {
+        continue;
+      } else {
+        console.log("Error occured while fetching token from twitch device code.");
+        throw new Error(`Error occured while fetching token from twitch device code: ${pollResult.statusText} ${pollResult.statusText}`);
+      }
+    }
+    const pollResultJson = await pollResult.json();
+
+    tokenCache = {
+      access_token: pollResultJson.access_token,
+      expiry_time: Date.now() + (pollResultJson.expires_in * 1000),
+      refresh_token: pollResultJson.refresh_token
+    };
+
+    await fs.writeFile(TOKEN_CACHE_PATH, JSON.stringify(tokenCache), 'utf8');
+
+    console.log("Authentication with Twitch succeeded!");
+
+    return pollResultJson.access_token;
+  }
+
+  throw Error("Device code authentication timed out");
+}
+
+async function timeoutUser(userId: string, durationSeconds: number, reason: string) {
+  const urlParams = new URLSearchParams();
+  urlParams.append("broadcaster_id", cfg.twitch_channel_id);
+  urlParams.append("moderator_id", cfg.twitch_user_id);
+
+  const res = await fetch("https://api.twitch.tv/helix/moderation/bans?" + urlParams.toString(), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${await getAuthToken()}`,
+      "Client-Id": cfg.twitch_client_id,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      "data": {
+        "user_id": userId,
+        "duration": durationSeconds,
+        "reason": reason
+      }
+    })
+  });
+  if (!res.ok) {
+    console.log(await res.text())
+    throw new Error("Failed to apply timeout: " + res.statusText);
+  }
+}
+
+async function modUser(userId: string) {
+  const urlParams = new URLSearchParams();
+  urlParams.append("broadcaster_id", cfg.twitch_channel_id);
+  urlParams.append("user_id", userId);
+
+  const res = await fetch("https://api.twitch.tv/helix/moderation/moderators?" + urlParams.toString(), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${await getAuthToken()}`,
+      "Client-Id": cfg.twitch_client_id
+    }
+  });
+  if (!res.ok) {
+    console.log(await res.text())
+    throw new Error("Failed to add moderator: " + res.statusText);
   }
 }

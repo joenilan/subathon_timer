@@ -20,21 +20,23 @@ created in the base directory. You can simply make a copy of the `config.example
 | channel                   | Twitch channel the timer will listen to events on                                                                                 |
 | admins                    | Twitch users that will have access to commands                                                                                    |
 | wheel_blacklist           | List of Twitch users that cannot be timed out by the wheel timeout option                                                         |
-| twitch_token              | Twitch OAuth token to execute timeouts from ([obtain here](https://twitchapps.com/tmi/))                                          |
+| twitch_client_id          | Client ID for Twitch API calls (use `elwoogfl7prmozj77tbw1g7jparem5` or create your own App)                                      |
+| twitch_user_id            | Twitch User ID of the used account ([obtain here](https://www.streamweasels.com/tools/convert-twitch-username-%20to-user-id/))    |
+| twitch_channel_id         | Twitch User ID of the target channel ([obtain here](https://www.streamweasels.com/tools/convert-twitch-username-%20to-user-id/))  |
 | use_streamlabs            | Enable streamlabs connection for donations                                                                                        |
 | streamlabs_token          | Streamlabs Socket Token used to connect to Streamlabs                                                                             |
 | use_streamelements        | Enable streamelements connection for donations                                                                                    |
 | streamelements_token      | Streamelements JWT Token used to connect to Streamelements ([obtain here](https://streamelements.com/dashboard/account/channels)) |
 | enable_wheel              | Enable wheel of fortune                                                                                                           |
-| time                      ||
+| time                      |                                                                                                                                   |
 | time.base_value           | Base value used to calculate all other values                                                                                     |
-| time.multipliers          ||
+| time.multipliers          |                                                                                                                                   |
 | time.multipliers.tier_1   | Multiplier for Tier 1 or Prime subs                                                                                               |
 | time.multipliers.tier_2   | Multiplier for Tier 2 subs                                                                                                        |
 | time.multipliers.tier_3   | Multiplier for Tier 3 subs                                                                                                        |
 | time.multipliers.donation | Multiplier for donations per $1                                                                                                   |
 | time.multipliers.bits     | Multiplier for bits per 100 bits                                                                                                  |
-| wheel                     ||
+| wheel                     |                                                                                                                                   |
 | wheel[].type              | Wheel spin type (`time`,`timeout`)                                                                                                |
 | wheel[].value             | Value for timeout or time in seconds                                                                                              |
 | wheel[].chance            | Weight for this specific result                                                                                                   |
