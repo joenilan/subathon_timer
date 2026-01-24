@@ -3,3 +3,4 @@
 /dist
 data.db
 config.json
+token_cache.json

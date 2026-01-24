@@ -23,5 +23,8 @@
     "sqlite3": "^5.1.7",
     "tmi.js": "^1.8.5",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "open": "^11.0.0"
   }
 }
