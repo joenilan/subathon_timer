@@ -126,17 +126,16 @@ class AppState {
         if(targetIsMod) {
           console.log(`Remodding ${target} in ${(1000*spin.res.value) + 5000}ms`);
           setTimeout(async () => {
-            await modUser(targetUserId);
-            await this.twitch.mod(cfg.channel, target).catch(err => console.log('Could not remod user after wheel TO!', err));
+            await modUser(targetUserId).catch(err => console.log('Could not remod user after wheel TO!', err));
           }, (1000*spin.res.value) + 5000);
         }
       } else if(spin.res.target === 'sender') {
         const wasMod = spin.res.mod;
-        await this.twitch.timeout(cfg.channel, spin.sender, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
+        await timeoutUser(spin.senderId, spin.res.value, "WHEEL SPIN").catch(err => console.log('Could not execute wheel TO!', err));
         if(wasMod) {
           console.log(`Remodding ${spin.sender} in ${(1000*spin.res.value) + 5000}ms`);
           setTimeout(async () => {
-            await this.twitch.mod(cfg.channel, spin.sender).catch(err => console.log('Could not remod user after wheel TO!', err));
+            await modUser(spin.senderId).catch(err => console.log('Could not remod user after wheel TO!', err));
           }, (1000*spin.res.value) + 5000);
         }
       }
@@ -377,7 +376,7 @@ function registerTwitchEvents(state: AppState) {
       }
 
       const spinId = crypto.randomBytes(8).toString("hex");
-      const spin = {results: possibleResults, random: rand, id: spinId, res: result, sender: userstate.login||"", mod: userstate.mod};
+      const spin = {results: possibleResults, random: rand, id: spinId, res: result, sender: userstate.login||"", senderId: userstate.id||"", mod: userstate.mod};
       state.spins.set(spinId, spin);
       state.io.emit('display_spin', spin);
     }
