@@ -1,0 +1,169 @@
+import type { AppState } from './useAppStore'
+import type { EventSubState } from './useEventSubStore'
+import type { TwitchSessionState } from './useTwitchSessionStore'
+
+export const selectBootstrapRuntimeState = (state: AppState) => ({
+  hydrateNativeSnapshot: state.hydrateNativeSnapshot,
+  setOverlayBootstrapState: state.setOverlayBootstrapState,
+})
+
+export const selectNativeSnapshotInputs = (state: AppState) => ({
+  commandPermissions: state.commandPermissions,
+  defaultTimerSeconds: state.defaultTimerSeconds,
+  lastAppliedDeltaSeconds: state.lastAppliedDeltaSeconds,
+  overlayLanAccessEnabled: state.overlayLanAccessEnabled,
+  ruleConfig: state.ruleConfig,
+  timerEvents: state.timerEvents,
+  timerSessionBaseRemainingSeconds: state.timerSessionBaseRemainingSeconds,
+  timerSessionBaseUptimeSeconds: state.timerSessionBaseUptimeSeconds,
+  timerSessionRunningSince: state.timerSessionRunningSince,
+  timerStatus: state.timerStatus,
+  wheelSegments: state.wheelSegments,
+})
+
+export const selectOverlayRuntimeState = (state: AppState) => ({
+  activity: state.activity,
+  overlayLanAccessEnabled: state.overlayLanAccessEnabled,
+  reasonOverlayTransform: state.reasonOverlayTransform,
+  ruleConfig: state.ruleConfig,
+  setOverlayBootstrapState: state.setOverlayBootstrapState,
+  timerOverlayTransform: state.timerOverlayTransform,
+  timerRemainingSeconds: state.timerRemainingSeconds,
+  timerStatus: state.timerStatus,
+  timerWidgetTheme: state.timerWidgetTheme,
+  trendPoints: state.trendPoints,
+  uptimeSeconds: state.uptimeSeconds,
+})
+
+export const selectSidebarFrameState = (state: AppState) => ({
+  dashMode: state.dashMode,
+  overlayBaseUrl: state.overlayBaseUrl,
+  overlayPreviewBaseUrl: state.overlayPreviewBaseUrl,
+  overlayLanBaseUrl: state.overlayLanBaseUrl,
+  overlayLanAccessEnabled: state.overlayLanAccessEnabled,
+  setSidebarCollapsed: state.setSidebarCollapsed,
+  showActivity: state.showActivity,
+  showTrend: state.showTrend,
+  sidebarCollapsed: state.sidebarCollapsed,
+})
+
+export const selectDashboardPageState = (state: AppState) => ({
+  activity: state.activity,
+  adjustTimer: state.adjustTimer,
+  dashMode: state.dashMode,
+  lastAppliedDeltaSeconds: state.lastAppliedDeltaSeconds,
+  pauseTimer: state.pauseTimer,
+  resetTimer: state.resetTimer,
+  ruleConfig: state.ruleConfig,
+  setDashMode: state.setDashMode,
+  setRuleValue: state.setRuleValue,
+  setSidebarCollapsed: state.setSidebarCollapsed,
+  setTimerSeconds: state.setTimerSeconds,
+  startTimer: state.startTimer,
+  timerRemainingSeconds: state.timerRemainingSeconds,
+  timerStatus: state.timerStatus,
+  timerWidgetTheme: state.timerWidgetTheme,
+  trendPoints: state.trendPoints,
+  uptimeSeconds: state.uptimeSeconds,
+})
+
+export const selectOverlaysPageState = (state: AppState) => ({
+  overlayBaseUrl: state.overlayBaseUrl,
+  overlayPreviewBaseUrl: state.overlayPreviewBaseUrl,
+  overlayLanBaseUrl: state.overlayLanBaseUrl,
+  overlayLanAccessEnabled: state.overlayLanAccessEnabled,
+  reasonOverlayTransform: state.reasonOverlayTransform,
+  resetOverlayTransform: state.resetOverlayTransform,
+  setOverlayLanAccessEnabled: state.setOverlayLanAccessEnabled,
+  setOverlayTransform: state.setOverlayTransform,
+  setTimerWidgetTheme: state.setTimerWidgetTheme,
+  timerOverlayTransform: state.timerOverlayTransform,
+  timerWidgetTheme: state.timerWidgetTheme,
+})
+
+export const selectTimerOverlayState = (state: AppState) => ({
+  ruleConfig: state.ruleConfig,
+  timerOverlayTransform: state.timerOverlayTransform,
+  timerRemainingSeconds: state.timerRemainingSeconds,
+  timerStatus: state.timerStatus,
+  timerWidgetTheme: state.timerWidgetTheme,
+  trendPoints: state.trendPoints,
+  uptimeSeconds: state.uptimeSeconds,
+})
+
+export const selectReasonOverlayState = (state: AppState) => ({
+  latestActivity: state.activity[0] ?? null,
+  reasonOverlayTransform: state.reasonOverlayTransform,
+  timerWidgetTheme: state.timerWidgetTheme,
+})
+
+export const selectSettingsPageState = (state: AppState) => ({
+  applyImportedLegacyConfig: state.applyImportedLegacyConfig,
+  commandPermissions: state.commandPermissions,
+  defaultTimerSeconds: state.defaultTimerSeconds,
+  setCommandPermission: state.setCommandPermission,
+  setDefaultTimerSeconds: state.setDefaultTimerSeconds,
+  setTimerWidgetTheme: state.setTimerWidgetTheme,
+  timerWidgetTheme: state.timerWidgetTheme,
+})
+
+export const selectWheelPageState = (state: AppState) => ({
+  addWheelSegment: state.addWheelSegment,
+  applyWheelResult: state.applyWheelResult,
+  removeWheelSegment: state.removeWheelSegment,
+  setWheelTextScale: state.setWheelTextScale,
+  spinWheel: state.spinWheel,
+  updateWheelSegment: state.updateWheelSegment,
+  wheelSegments: state.wheelSegments,
+  wheelSpin: state.wheelSpin,
+  wheelTextScale: state.wheelTextScale,
+})
+
+export const selectTwitchSidebarState = (state: TwitchSessionState) => ({
+  deviceFlow: state.deviceFlow,
+  openVerificationUri: state.openVerificationUri,
+  startDeviceAuth: state.startDeviceAuth,
+  status: state.status,
+  tokens: state.tokens,
+  session: state.session,
+  validateSession: state.validateSession,
+})
+
+export const selectConnectionsTwitchState = (state: TwitchSessionState) => ({
+  clearError: state.clearError,
+  deviceFlow: state.deviceFlow,
+  disconnect: state.disconnect,
+  lastError: state.lastError,
+  openVerificationUri: state.openVerificationUri,
+  refreshSession: state.refreshSession,
+  session: state.session,
+  startDeviceAuth: state.startDeviceAuth,
+  status: state.status,
+  tokens: state.tokens,
+  validateSession: state.validateSession,
+})
+
+export const selectTwitchLifecycleState = (state: TwitchSessionState) => ({
+  authStatus: state.status,
+  deviceFlow: state.deviceFlow,
+  isBootstrapped: state.isBootstrapped,
+  pollDeviceAuth: state.pollDeviceAuth,
+  refreshSession: state.refreshSession,
+  tokens: state.tokens,
+  validateSession: state.validateSession,
+})
+
+export const selectEventSubLifecycleState = (state: EventSubState) => ({
+  connectEventSub: state.connect,
+  disconnectEventSub: state.disconnect,
+  normalizedEvents: state.normalizedEvents,
+})
+
+export const selectConnectionsEventSubState = (state: EventSubState) => ({
+  eventSubError: state.lastError,
+  eventSubLastMessageAt: state.lastMessageAt,
+  eventSubNotifications: state.recentNotifications,
+  eventSubSession: state.session,
+  eventSubStatus: state.status,
+  eventSubSubscriptions: state.subscriptions,
+})

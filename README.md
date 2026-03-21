@@ -1,64 +1,95 @@
 # Subathon Timer
-Configurable Twitch Subathon Timer with integrated wheel of fortune
 
-## Getting Started
-### Dependencies
-* [Node.js 16+](https://nodejs.org/en/)
+Desktop-first Twitch subathon timer built with Tauri, React, and TypeScript. The active app lives in `apps/desktop` and includes:
 
-### Installation
-* Clone or download this repository
-* Install all dependencies with `npm i`
+- Twitch device auth with secure native token storage in Tauri
+- EventSub-driven timer updates and activity history
+- OBS-ready timer and reason overlays served from the desktop app
+- A configurable spin wheel with time and moderation outcomes
 
-### Configuration
-#### Configuration file
-Before starting the program a configuration file with the name `config.json` has to be
-created in the base directory. You can simply make a copy of the `config.example.json` and rename it.
+The legacy root `src/` and `public/` app is kept as behavior reference only. New work should target `apps/desktop`.
 
-| Configuration option      | Details                                                                                                                           |
-|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| port                      | Port for the integrated webserver                                                                                                 |
-| channel                   | Twitch channel the timer will listen to events on                                                                                 |
-| admins                    | Twitch users that will have access to commands                                                                                    |
-| wheel_blacklist           | List of Twitch users that cannot be timed out by the wheel timeout option                                                         |
-| twitch_client_id          | Client ID for Twitch API calls (use `elwoogfl7prmozj77tbw1g7jparem5` or create your own App)                                      |
-| twitch_user_id            | Twitch User ID of the used account ([obtain here](https://www.streamweasels.com/tools/convert-twitch-username-%20to-user-id/))    |
-| twitch_channel_id         | Twitch User ID of the target channel ([obtain here](https://www.streamweasels.com/tools/convert-twitch-username-%20to-user-id/))  |
-| use_streamlabs            | Enable streamlabs connection for donations                                                                                        |
-| streamlabs_token          | Streamlabs Socket Token used to connect to Streamlabs                                                                             |
-| use_streamelements        | Enable streamelements connection for donations                                                                                    |
-| streamelements_token      | Streamelements JWT Token used to connect to Streamelements ([obtain here](https://streamelements.com/dashboard/account/channels)) |
-| enable_wheel              | Enable wheel of fortune                                                                                                           |
-| time                      |                                                                                                                                   |
-| time.base_value           | Base value used to calculate all other values                                                                                     |
-| time.multipliers          |                                                                                                                                   |
-| time.multipliers.tier_1   | Multiplier for Tier 1 or Prime subs                                                                                               |
-| time.multipliers.tier_2   | Multiplier for Tier 2 subs                                                                                                        |
-| time.multipliers.tier_3   | Multiplier for Tier 3 subs                                                                                                        |
-| time.multipliers.donation | Multiplier for donations per $1                                                                                                   |
-| time.multipliers.bits     | Multiplier for bits per 100 bits                                                                                                  |
-| wheel                     |                                                                                                                                   |
-| wheel[].type              | Wheel spin type (`time`,`timeout`)                                                                                                |
-| wheel[].value             | Value for timeout or time in seconds                                                                                              |
-| wheel[].chance            | Weight for this specific result                                                                                                   |
-| wheel[].text              | Result Text shown on the timer                                                                                                    |
-| wheel[].min_subs          | Minimum amount of subs in the sub-bomb to include this option                                                                     |
-| wheel[].color             | CSS color of this result on the wheel                                                                                             |
-| wheel[].target            | Timeout target (`sender`, `random`)                                                                                               |
+## Repository Layout
 
+- `apps/desktop/`: active desktop app
+- `apps/desktop/src/`: React UI, state stores, timer logic, overlays
+- `apps/desktop/src-tauri/`: native Tauri shell and loopback overlay server
+- `apps/desktop/docs/`: desktop-specific implementation notes and roadmap docs
 
-#### Assets
-The background and graph end image can be replaced before starting the program by replacing 
-the files in public/assets with your own assets.
+## Quick Start
 
-### Usage
-* To reset the program after previous usage delete the data.db file
-* Start the program using `npm run start`
-* Use the outputted URL in your browser or OBS browser source
+### Prerequisites
 
-#### Commands
-* `?start [hh:mm:ss]` (when not started) Start the timer with the given timer value and set the uptime to 0
-* `?forcetimer [hh:mm:ss]` (when running) Update the timers value
-* `?setbasetime [seconds]` Update the base time
+- Node.js 20+
+- Rust toolchain
+- Tauri prerequisites for your platform
 
-# License
-This project is licensed under the GNU General Public License v3.0 License - see the LICENSE file for details
+### Run The Desktop App
+
+```bash
+cd apps/desktop
+npm ci
+npm run dev
+```
+
+Browser dev runs on `http://127.0.0.1:1420`.
+
+To run the real desktop shell:
+
+```bash
+cd apps/desktop
+npm run tauri:dev
+```
+
+## Validation
+
+Frontend build:
+
+```bash
+cd apps/desktop
+npm run build
+```
+
+Native layer:
+
+```bash
+cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
+```
+
+Unit tests:
+
+```bash
+cd apps/desktop
+npm test
+```
+
+## Twitch And Overlay Flow
+
+1. Open the desktop app.
+2. Connect Twitch from `Connections`.
+3. Confirm EventSub shows a live session and active subscriptions.
+4. Open `Overlays` and use the generated local or LAN URL in OBS.
+
+In browser-only dev mode, overlay previews fall back to in-app routes. In Tauri, the app serves loopback overlay URLs intended for OBS browser sources.
+
+## Release Notes
+
+Desktop app versioning is managed from `apps/desktop/VERSION`.
+
+Useful commands:
+
+```bash
+cd apps/desktop
+npm run version:check
+npm run version:check-notes
+npm run version:patch
+```
+
+When preparing a desktop release, update:
+
+- `apps/desktop/CHANGELOG.md`
+- `apps/desktop/PATCH_NOTES.md`
+
+## License
+
+This project is licensed under the GNU General Public License v3.0. See `LICENSE`.
