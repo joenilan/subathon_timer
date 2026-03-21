@@ -32,7 +32,7 @@ bun run tauri:dev
 ## Core Commands
 
 - `bun run build`: Type-check and build the frontend bundle
-- `bun test`: Run unit tests with Vitest
+- `bun run test`: Run unit tests with Vitest
 - `bun run version:check`: Confirm desktop version files are in sync
 - `bun run version:check-notes`: Confirm release notes include the active version
 - `bun run version:patch|minor|major`: Bump `VERSION` and sync package metadata

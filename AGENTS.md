@@ -32,7 +32,7 @@
 - `cd apps/desktop && bun run dev` runs the frontend in the browser on `127.0.0.1:1420`.
 - `cd apps/desktop && bun run tauri:dev` runs the actual desktop app with the Tauri runtime.
 - `cd apps/desktop && bun run build` builds the frontend bundle and type-checks TypeScript.
-- `cd apps/desktop && bun test` runs the desktop unit tests with Vitest.
+- `cd apps/desktop && bun run test` runs the desktop unit tests with Vitest.
 - `cd apps/desktop && bun run version:check` verifies that `VERSION`, `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` all match.
 - `cd apps/desktop && bun run version:check-notes` verifies that `CHANGELOG.md` and `PATCH_NOTES.md` both include the current desktop app version.
 - `cd apps/desktop && bun run version:patch|minor|major` bumps `apps/desktop/VERSION` and syncs the desktop app version files.

@@ -60,7 +60,7 @@ Unit tests:
 
 ```bash
 cd apps/desktop
-bun test
+bun run test
 ```
 
 ## Twitch And Overlay Flow
