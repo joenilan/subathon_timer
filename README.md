@@ -20,7 +20,7 @@ The legacy root `src/` and `public/` app is kept as behavior reference only. New
 
 ### Prerequisites
 
-- Node.js 20+
+- Bun 1.2+
 - Rust toolchain
 - Tauri prerequisites for your platform
 
@@ -28,8 +28,8 @@ The legacy root `src/` and `public/` app is kept as behavior reference only. New
 
 ```bash
 cd apps/desktop
-npm ci
-npm run dev
+bun install --frozen-lockfile
+bun run dev
 ```
 
 Browser dev runs on `http://127.0.0.1:1420`.
@@ -38,7 +38,7 @@ To run the real desktop shell:
 
 ```bash
 cd apps/desktop
-npm run tauri:dev
+bun run tauri:dev
 ```
 
 ## Validation
@@ -47,7 +47,7 @@ Frontend build:
 
 ```bash
 cd apps/desktop
-npm run build
+bun run build
 ```
 
 Native layer:
@@ -60,7 +60,7 @@ Unit tests:
 
 ```bash
 cd apps/desktop
-npm test
+bun test
 ```
 
 ## Twitch And Overlay Flow
@@ -80,9 +80,9 @@ Useful commands:
 
 ```bash
 cd apps/desktop
-npm run version:check
-npm run version:check-notes
-npm run version:patch
+bun run version:check
+bun run version:check-notes
+bun run version:patch
 ```
 
 When preparing a desktop release, update:

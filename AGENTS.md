@@ -28,17 +28,19 @@
 - Root `src/` and `public/` are the legacy Node/overlay app. Treat them as behavior reference unless a task explicitly targets the old stack.
 
 ## Build, Test, and Development Commands
-- `cd apps/desktop && npm run dev` runs the frontend in the browser on `127.0.0.1:1420`.
-- `cd apps/desktop && npm run tauri:dev` runs the actual desktop app with the Tauri runtime.
-- `cd apps/desktop && npm run build` builds the frontend bundle and type-checks TypeScript.
-- `cd apps/desktop && npm run version:check` verifies that `VERSION`, `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` all match.
-- `cd apps/desktop && npm run version:check-notes` verifies that `CHANGELOG.md` and `PATCH_NOTES.md` both include the current desktop app version.
-- `cd apps/desktop && npm run version:patch|minor|major` bumps `apps/desktop/VERSION` and syncs the desktop app version files.
-- `cd apps/desktop && npm run version:set -- 0.2.0` sets an exact desktop app version and syncs the desktop app version files.
-- `cd apps/desktop && npm run tauri:clean` removes the full Rust/Tauri build cache when disk usage gets out of hand.
-- `cd apps/desktop && npm run tauri:build:clean` creates a release build, then removes the release-side Rust artifacts while keeping dev caches.
+- `cd apps/desktop && bun install --frozen-lockfile` installs desktop dependencies from `bun.lock`.
+- `cd apps/desktop && bun run dev` runs the frontend in the browser on `127.0.0.1:1420`.
+- `cd apps/desktop && bun run tauri:dev` runs the actual desktop app with the Tauri runtime.
+- `cd apps/desktop && bun run build` builds the frontend bundle and type-checks TypeScript.
+- `cd apps/desktop && bun test` runs the desktop unit tests with Vitest.
+- `cd apps/desktop && bun run version:check` verifies that `VERSION`, `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` all match.
+- `cd apps/desktop && bun run version:check-notes` verifies that `CHANGELOG.md` and `PATCH_NOTES.md` both include the current desktop app version.
+- `cd apps/desktop && bun run version:patch|minor|major` bumps `apps/desktop/VERSION` and syncs the desktop app version files.
+- `cd apps/desktop && bun run version:set -- 0.2.0` sets an exact desktop app version and syncs the desktop app version files.
+- `cd apps/desktop && bun run tauri:clean` removes the full Rust/Tauri build cache when disk usage gets out of hand.
+- `cd apps/desktop && bun run tauri:build:clean` creates a release build, then removes the release-side Rust artifacts while keeping dev caches.
 - `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` validates the native layer without producing a release build.
-- Root `npm run start` is only for the legacy app.
+- Root `bun run start` is only for the legacy app.
 
 ## Coding Style & Naming Conventions
 - Use TypeScript with strict mode intact. Avoid weakening types to get builds through.
@@ -49,8 +51,8 @@
 - For React effects that write to stores or native bridges, keep an explicit idempotency guard. Do not rely on dependency arrays alone to prevent loops under React 19 dev behavior.
 
 ## Testing Guidelines
-- For desktop changes, run `npm run build` and `cargo check`.
-- For auth and UI changes, verify both `npm run dev` and `npm run tauri:dev` when the runtime matters.
+- For desktop changes, run `bun run build` and `cargo check`.
+- For auth and UI changes, verify both `bun run dev` and `bun run tauri:dev` when the runtime matters.
 - Test Twitch auth from the `Connections` page, including reconnect and refresh paths when touched.
 - Test EventSub after auth by confirming the `Connections` page shows a WebSocket session, subscription count, and recent notifications when Twitch events occur.
 - Test the dashboard after Twitch events occur: timer adjustments, activity feed, and trend graph should move without manual refresh.

@@ -14,28 +14,28 @@ The desktop app is the active implementation of `subathon_timer`. It combines a 
 Install dependencies:
 
 ```bash
-npm ci
+bun install --frozen-lockfile
 ```
 
 Run browser dev mode:
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 Run the full desktop app:
 
 ```bash
-npm run tauri:dev
+bun run tauri:dev
 ```
 
 ## Core Commands
 
-- `npm run build`: Type-check and build the frontend bundle
-- `npm test`: Run unit tests with Vitest
-- `npm run version:check`: Confirm desktop version files are in sync
-- `npm run version:check-notes`: Confirm release notes include the active version
-- `npm run version:patch|minor|major`: Bump `VERSION` and sync package metadata
+- `bun run build`: Type-check and build the frontend bundle
+- `bun test`: Run unit tests with Vitest
+- `bun run version:check`: Confirm desktop version files are in sync
+- `bun run version:check-notes`: Confirm release notes include the active version
+- `bun run version:patch|minor|major`: Bump `VERSION` and sync package metadata
 - `cargo check --manifest-path src-tauri/Cargo.toml`: Validate the native layer
 
 ## Twitch Setup
@@ -71,7 +71,7 @@ In browser-only dev mode, overlay previews fall back to route-based previews ins
 
 After changes to auth, runtime, overlays, or timer behavior, validate:
 
-1. `npm run build`
+1. `bun run build`
 2. `cargo check --manifest-path src-tauri/Cargo.toml`
 3. Twitch connect and reconnect on `Connections`
 4. EventSub session/subscription health after auth
@@ -86,10 +86,10 @@ After changes to auth, runtime, overlays, or timer behavior, validate:
 Typical release preparation:
 
 ```bash
-npm run version:patch
-npm run version:check
-npm run version:check-notes
-npm run build
+bun run version:patch
+bun run version:check
+bun run version:check-notes
+bun run build
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
