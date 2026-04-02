@@ -7,14 +7,12 @@ Desktop-first Twitch subathon timer built with Tauri, React, and TypeScript. The
 - StreamElements and Streamlabs tip support wired into the timer rules
 - OBS-ready timer and reason overlays served from the desktop app
 - A configurable spin wheel with time and moderation outcomes
-- `apps/auth-bridge`, a Bun auth service for provider OAuth token exchange
 
 The legacy root `src/` and `public/` app is kept as behavior reference only. New work should target `apps/desktop`.
 
 ## Repository Layout
 
 - `apps/desktop/`: active desktop app
-- `apps/auth-bridge/`: provider OAuth bridge for public-user Streamlabs auth
 - `apps/desktop/src/`: React UI, state stores, timer logic, overlays
 - `apps/desktop/src-tauri/`: native Tauri shell and loopback overlay server
 - `apps/desktop/docs/`: desktop-specific implementation notes and roadmap docs
@@ -66,21 +64,29 @@ cd apps/desktop
 bun run test
 ```
 
-Auth bridge:
-
-```bash
-cd apps/auth-bridge
-bun install --frozen-lockfile
-bun run test
-bun run check
-```
-
 ## Twitch And Overlay Flow
 
 1. Open the desktop app.
 2. Connect Twitch from `Connections`.
 3. Confirm EventSub shows a live session and active subscriptions.
 4. Open `Overlays` and use the generated local or LAN URL in OBS.
+
+## Tip Providers
+
+Tip setup now follows the same simple model many streamer tools use:
+
+1. Open the provider dashboard from `Connections`
+2. Copy the provider token they already expose
+3. Paste it into the app
+4. Click `Connect`
+
+Current provider paths:
+
+- StreamElements: channel JWT token from the channel secrets page
+- Streamlabs: Socket API Token from `Dashboard > Settings > API Settings > API Tokens`
+- Neither current path requires end users to deal with OAuth app credentials or a separate hosted auth service.
+
+Details and current provider notes are in [apps/desktop/docs/tip-providers.md](/E:/git/subathon_timer/apps/desktop/docs/tip-providers.md).
 
 In browser-only dev mode, overlay previews fall back to in-app routes. In Tauri, the app serves loopback overlay URLs intended for OBS browser sources.
 

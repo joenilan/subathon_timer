@@ -13,16 +13,14 @@ function normalizeStreamlabsConnection(value: unknown) {
   }
 
   const record = value as Record<string, unknown>
-  const accessToken = typeof record.accessToken === 'string' ? record.accessToken : ''
+  const token = typeof record.token === 'string' ? record.token : ''
 
-  if (!accessToken) {
+  if (!token) {
     return null
   }
 
   return {
-    accessToken,
-    refreshToken: typeof record.refreshToken === 'string' ? record.refreshToken : null,
-    tokenType: typeof record.tokenType === 'string' ? record.tokenType : null,
+    token,
   }
 }
 
@@ -56,19 +54,19 @@ function parseBrowserSnapshot(raw: string | null) {
       return null
     }
 
-    if (parsed.version === 3) {
+    if (parsed.version === 4) {
       return {
-        version: 3,
+        version: 4,
         streamelements: normalizeStreamElementsConnection(parsed.streamelements),
         streamlabs: normalizeStreamlabsConnection(parsed.streamlabs),
       } satisfies TipProviderSnapshot
     }
 
-    if (parsed.version === 2 || parsed.version === 1) {
+    if (parsed.version === 3 || parsed.version === 2 || parsed.version === 1) {
       return {
-        version: 3,
+        version: 4,
         streamelements: normalizeStreamElementsConnection(parsed.streamelements),
-        streamlabs: normalizeStreamlabsConnection(parsed.streamlabs),
+        streamlabs: null,
       } satisfies TipProviderSnapshot
     }
 
@@ -110,7 +108,7 @@ export function buildNativeTipProviderSnapshot(input: {
   streamlabs: TipProviderSnapshot['streamlabs']
 }): TipProviderSnapshot {
   return {
-    version: 3,
+    version: 4,
     streamelements: input.streamelements,
     streamlabs: input.streamlabs,
   }

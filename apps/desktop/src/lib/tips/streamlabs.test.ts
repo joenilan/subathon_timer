@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { getNewStreamlabsDonationEvents, normalizeStreamlabsDonations } from './streamlabs'
+import { normalizeStreamlabsSocketEvent } from './streamlabs'
 
 describe('Streamlabs tip helpers', () => {
-  it('normalizes donation polling payloads', () => {
-    const events = normalizeStreamlabsDonations([
-      {
-        donationId: '96164121',
-        displayName: 'test',
-        amount: 13.37,
-        currency: 'USD',
-        occurredAt: '2026-04-02T10:00:00Z',
-        rawPayload: { donation_id: '96164121' },
-      },
-    ])
+  it('normalizes donation socket payloads', () => {
+    const events = normalizeStreamlabsSocketEvent({
+      type: 'donation',
+      for: 'streamlabs',
+      event_id: 'evt-100',
+      message: [
+        {
+          donation_id: '96164121',
+          name: 'test',
+          amount: '13.37',
+          currency: 'USD',
+          created_at: '2026-04-02T10:00:00Z',
+        },
+      ],
+    })
 
     expect(events).toHaveLength(1)
     expect(events[0]?.source).toBe('streamlabs')
@@ -20,41 +24,31 @@ describe('Streamlabs tip helpers', () => {
     expect(events[0]?.displayName).toBe('test')
     expect(events[0]?.amount).toBe(13.37)
     expect(events[0]?.currency).toBe('USD')
+    expect(events[0]?.id).toBe('96164121')
   })
 
-  it('returns only donations newer than the last seen id', () => {
-    const events = getNewStreamlabsDonationEvents(
-      [
-        {
-          donationId: '103',
-          displayName: 'Latest',
-          amount: 10,
-          currency: 'USD',
-          occurredAt: '2026-04-02T10:03:00Z',
-          rawPayload: { donation_id: '103' },
-        },
-        {
-          donationId: '102',
-          displayName: 'Newer',
-          amount: 5,
-          currency: 'USD',
-          occurredAt: '2026-04-02T10:02:00Z',
-          rawPayload: { donation_id: '102' },
-        },
-        {
-          donationId: '101',
-          displayName: 'Seen',
-          amount: 1,
-          currency: 'USD',
-          occurredAt: '2026-04-02T10:01:00Z',
-          rawPayload: { donation_id: '101' },
-        },
-      ],
-      '101',
-    )
+  it('ignores unrelated or invalid socket events', () => {
+    expect(
+      normalizeStreamlabsSocketEvent({
+        type: 'follow',
+        for: 'streamlabs',
+        message: [],
+      }),
+    ).toHaveLength(0)
 
-    expect(events).toHaveLength(2)
-    expect(events[0]?.id).toBe('102')
-    expect(events[1]?.id).toBe('103')
+    expect(
+      normalizeStreamlabsSocketEvent({
+        type: 'donation',
+        for: 'merch',
+        message: [],
+      }),
+    ).toHaveLength(0)
+
+    expect(
+      normalizeStreamlabsSocketEvent({
+        type: 'donation',
+        message: [{ amount: 0 }],
+      }),
+    ).toHaveLength(0)
   })
 })

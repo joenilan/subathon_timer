@@ -72,10 +72,10 @@ In browser-only dev mode, overlay previews fall back to route-based previews ins
 The desktop app can now add time from StreamElements and Streamlabs tips.
 
 - StreamElements uses the Astro websocket `channel.tips` topic.
-- Streamlabs uses the official donations API plus the auth bridge in `apps/auth-bridge`.
+- StreamElements currently uses the channel JWT token path from the channel secrets page.
+- Streamlabs uses the Socket API Token flow documented by Streamlabs and Streamer.bot.
+- The supported setup paths are end-user paths. No client ID, client secret, or hosted auth bridge is required for the current integrations.
 - Setup details and the 2026 provider docs are in [docs/tip-providers.md](/E:/git/subathon_timer/apps/desktop/docs/tip-providers.md).
-
-For public-user Streamlabs auth, the desktop app expects a bridge URL via `VITE_TIP_AUTH_BRIDGE_URL`. In local development it defaults to `http://127.0.0.1:8788`, so run `cd ../auth-bridge && bun run dev` before pressing `Connect Streamlabs` unless you built the app against a deployed bridge URL.
 
 ## Manual Smoke Tests
 

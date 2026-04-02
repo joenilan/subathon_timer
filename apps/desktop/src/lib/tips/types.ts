@@ -8,13 +8,11 @@ export interface StreamElementsTipConnection {
 }
 
 export interface StreamlabsTipConnection {
-  accessToken: string
-  refreshToken: string | null
-  tokenType: string | null
+  token: string
 }
 
 export interface TipProviderSnapshot {
-  version: 3
+  version: 4
   streamelements: StreamElementsTipConnection | null
   streamlabs: StreamlabsTipConnection | null
 }

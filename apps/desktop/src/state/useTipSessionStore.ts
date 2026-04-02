@@ -1,4 +1,4 @@
-import { openUrl } from '@tauri-apps/plugin-opener'
+import io from 'socket.io-client'
 import { create } from 'zustand'
 import {
   buildNativeTipProviderSnapshot,
@@ -7,27 +7,13 @@ import {
   saveNativeTipProviderSnapshot,
 } from '../lib/platform/nativeTipSession'
 import {
-  cancelNativeStreamlabsOAuth,
-  consumeNativeStreamlabsOAuthResult,
-  STREAMLABS_DEFAULT_REDIRECT_URI,
-} from '../lib/platform/nativeStreamlabsAuth'
-import {
-  exchangeStreamlabsBridgeOAuth,
-  getTipAuthBridgeBaseUrl,
-  getTipAuthBridgeHealth,
-  refreshStreamlabsBridgeOAuth,
-  startStreamlabsBridgeOAuth,
-} from '../lib/tips/authBridge'
-import {
   buildStreamElementsSubscribeMessage,
   normalizeStreamElementsTipMessage,
   parseStreamElementsSocketEnvelope,
   summarizeStreamElementsTip,
 } from '../lib/tips/streamelements'
 import {
-  fetchStreamlabsDonations,
-  getNewStreamlabsDonationEvents,
-  StreamlabsDonationsRequestError,
+  normalizeStreamlabsSocketEvent,
   summarizeStreamlabsTip,
 } from '../lib/tips/streamlabs'
 import type {
@@ -41,26 +27,31 @@ import type { NormalizedTimerEvent } from '../lib/timer/types'
 const MAX_TIP_EVENTS = 24
 const MAX_TIP_NOTIFICATIONS = 12
 const STREAMELEMENTS_SOCKET_URL = 'wss://astro.streamelements.com/'
+const STREAMLABS_SOCKET_URL = 'https://sockets.streamlabs.com'
 
 let activeStreamElementsSocket: WebSocket | null = null
 let activeStreamElementsReconnectTimer: number | null = null
 let desiredStreamElementsConnection: StreamElementsTipConnection | null = null
 
-let activeStreamlabsPollTimer: number | null = null
-let activeStreamlabsAuthPollTimer: number | null = null
+let activeStreamlabsSocket: SocketIOClient.Socket | null = null
 let desiredStreamlabsConnection: StreamlabsTipConnection | null = null
-let activeStreamlabsRuntimeId = 0
-let lastSeenStreamlabsDonationId: string | null = null
 
 function trimSecret(value: string) {
   return value.trim()
 }
 
+function normalizeStreamElementsConnection(
+  connection: StreamElementsTipConnection,
+): StreamElementsTipConnection {
+  return {
+    token: trimSecret(connection.token),
+    tokenType: connection.tokenType,
+  }
+}
+
 function normalizeStreamlabsConnection(connection: StreamlabsTipConnection): StreamlabsTipConnection {
   return {
-    accessToken: trimSecret(connection.accessToken),
-    refreshToken: connection.refreshToken ? trimSecret(connection.refreshToken) : null,
-    tokenType: connection.tokenType ? trimSecret(connection.tokenType) : null,
+    token: trimSecret(connection.token),
   }
 }
 
@@ -98,35 +89,14 @@ function clearStreamElementsReconnectTimer() {
   }
 }
 
-function clearStreamlabsPollTimer() {
-  if (activeStreamlabsPollTimer === null) {
+function closeStreamlabsSocket() {
+  if (!activeStreamlabsSocket) {
     return
   }
 
-  window.clearTimeout(activeStreamlabsPollTimer)
-  activeStreamlabsPollTimer = null
-}
-
-function clearStreamlabsAuthPollTimer() {
-  if (activeStreamlabsAuthPollTimer === null) {
-    return
-  }
-
-  window.clearTimeout(activeStreamlabsAuthPollTimer)
-  activeStreamlabsAuthPollTimer = null
-}
-
-async function openExternalUrl(url: string) {
-  try {
-    if ('__TAURI_INTERNALS__' in window) {
-      await openUrl(url)
-      return
-    }
-  } catch {
-    // Fall back to the browser path below.
-  }
-
-  window.open(url, '_blank', 'noopener,noreferrer')
+  activeStreamlabsSocket.removeAllListeners()
+  activeStreamlabsSocket.close()
+  activeStreamlabsSocket = null
 }
 
 async function persistTipSnapshot(input: {
@@ -147,10 +117,6 @@ export interface TipSessionState {
   streamelementsStatus: TipProviderStatus
   streamelementsLastError: string | null
   streamelementsLastEventAt: number | null
-  streamlabsAuthorizationPending: boolean
-  streamlabsBridgeUrl: string
-  streamlabsBridgeReachable: boolean | null
-  streamlabsBridgeLastError: string | null
   streamlabsConnection: StreamlabsTipConnection | null
   streamlabsStatus: TipProviderStatus
   streamlabsLastError: string | null
@@ -159,49 +125,13 @@ export interface TipSessionState {
   normalizedEvents: NormalizedTimerEvent[]
 
   bootstrap: () => Promise<void>
-  checkStreamlabsBridge: () => Promise<boolean>
   connectStreamElements: (connection: StreamElementsTipConnection) => Promise<void>
-  startStreamlabsOAuth: () => Promise<void>
+  connectStreamlabs: (connection: StreamlabsTipConnection) => Promise<void>
   disconnectProvider: (provider: 'streamelements' | 'streamlabs') => Promise<void>
   clearError: (provider: 'streamelements' | 'streamlabs') => void
 }
 
 export const useTipSessionStore = create<TipSessionState>((set, get) => {
-  const isActiveStreamlabsRuntime = (runtimeId: number) =>
-    desiredStreamlabsConnection !== null && activeStreamlabsRuntimeId === runtimeId
-
-  const checkStreamlabsBridge = async () => {
-    try {
-      const health = await getTipAuthBridgeHealth()
-      if (!health.streamlabsEnabled) {
-        set({
-          streamlabsBridgeUrl: health.baseUrl,
-          streamlabsBridgeReachable: false,
-          streamlabsBridgeLastError:
-            'The auth bridge is reachable, but Streamlabs is not configured there. Set STREAMLABS_CLIENT_ID and STREAMLABS_CLIENT_SECRET on the bridge server.',
-        })
-        return false
-      }
-
-      set({
-        streamlabsBridgeUrl: health.baseUrl,
-        streamlabsBridgeReachable: true,
-        streamlabsBridgeLastError: null,
-      })
-      return true
-    } catch (error) {
-      set({
-        streamlabsBridgeUrl: getTipAuthBridgeBaseUrl(),
-        streamlabsBridgeReachable: false,
-        streamlabsBridgeLastError:
-          error instanceof Error
-            ? error.message
-            : 'Unable to reach the Streamlabs auth bridge.',
-      })
-      return false
-    }
-  }
-
   const scheduleStreamElementsReconnect = (url?: string) => {
     clearStreamElementsReconnectTimer()
 
@@ -315,72 +245,15 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     } catch (error) {
       set({
         streamelementsStatus: 'error',
-        streamelementsLastError: error instanceof Error ? error.message : 'Unable to connect StreamElements tips.',
+        streamelementsLastError:
+          error instanceof Error ? error.message : 'Unable to connect StreamElements tips.',
       })
     }
   }
 
-  const refreshStreamlabsRuntimeConnection = async (
-    connection: StreamlabsTipConnection,
-    runtimeId: number,
-  ) => {
-    if (!connection.refreshToken) {
-      throw new Error('Streamlabs access expired. Reconnect Streamlabs to continue importing donations.')
-    }
-
-    const refreshed = normalizeStreamlabsConnection(
-      await refreshStreamlabsBridgeOAuth(connection.refreshToken),
-    )
-
-    if (!isActiveStreamlabsRuntime(runtimeId)) {
-      throw new Error('Streamlabs connection changed during token refresh.')
-    }
-
-    desiredStreamlabsConnection = refreshed
-
-    set({
-      streamlabsConnection: refreshed,
-      streamlabsStatus: 'connected',
-      streamlabsLastError: null,
-    })
-
-    await persistTipSnapshot({
-      streamelements: get().streamelementsConnection,
-      streamlabs: refreshed,
-    })
-
-    return refreshed
-  }
-
-  const fetchStreamlabsDonationsWithRefresh = async (
-    connection: StreamlabsTipConnection,
-    runtimeId: number,
-  ) => {
-    try {
-      return {
-        connection,
-        donations: await fetchStreamlabsDonations(connection.accessToken),
-      }
-    } catch (error) {
-      if (!(error instanceof StreamlabsDonationsRequestError) || error.status !== 401) {
-        throw error
-      }
-
-      const refreshed = await refreshStreamlabsRuntimeConnection(connection, runtimeId)
-
-      return {
-        connection: refreshed,
-        donations: await fetchStreamlabsDonations(refreshed.accessToken),
-      }
-    }
-  }
-
   const connectStreamlabsRuntime = async (connection: StreamlabsTipConnection) => {
-    const runtimeId = activeStreamlabsRuntimeId + 1
-    activeStreamlabsRuntimeId = runtimeId
-    desiredStreamlabsConnection = normalizeStreamlabsConnection(connection)
-    clearStreamlabsPollTimer()
-    lastSeenStreamlabsDonationId = null
+    desiredStreamlabsConnection = connection
+    closeStreamlabsSocket()
 
     set({
       streamlabsStatus: 'connecting',
@@ -388,142 +261,81 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     })
 
     try {
-      const primeResult = await fetchStreamlabsDonationsWithRefresh(
-        desiredStreamlabsConnection,
-        runtimeId,
-      )
+      const socket = io(STREAMLABS_SOCKET_URL, {
+        transports: ['websocket'],
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1500,
+        query: {
+          token: connection.token,
+        },
+      }) as SocketIOClient.Socket
 
-      if (!isActiveStreamlabsRuntime(runtimeId)) {
-        return
-      }
+      activeStreamlabsSocket = socket
 
-      const primeDonations = primeResult.donations
-      lastSeenStreamlabsDonationId = primeDonations[0]?.donationId ?? null
-
-      set({
-        streamlabsStatus: 'connected',
-        streamlabsLastError: null,
+      socket.on('connect', () => {
+        set({
+          streamlabsStatus: 'connected',
+          streamlabsLastError: null,
+        })
       })
 
-      const poll = async () => {
-        const currentConnection = desiredStreamlabsConnection
+      socket.on('connect_error', (error: Error | undefined) => {
+        set({
+          streamlabsStatus: 'error',
+          streamlabsLastError:
+            error instanceof Error && error.message.trim().length > 0
+              ? error.message
+              : 'Streamlabs socket failed to connect.',
+        })
+      })
 
-        if (!currentConnection || !isActiveStreamlabsRuntime(runtimeId)) {
+      socket.on('reconnect_attempt', () => {
+        if (!desiredStreamlabsConnection) {
           return
         }
 
-        try {
-          const pollResult = await fetchStreamlabsDonationsWithRefresh(currentConnection, runtimeId)
-
-          if (!isActiveStreamlabsRuntime(runtimeId)) {
-            return
-          }
-
-          const donations = pollResult.donations
-          const normalizedEvents = getNewStreamlabsDonationEvents(donations, lastSeenStreamlabsDonationId)
-          lastSeenStreamlabsDonationId = donations[0]?.donationId ?? lastSeenStreamlabsDonationId
-
-          if (normalizedEvents.length > 0) {
-            const notifications = normalizedEvents.map((event) => summarizeStreamlabsTip(event))
-            const occurredAt = notifications[0]?.occurredAt ?? Date.now()
-
-            set((state) => ({
-              streamlabsStatus: 'connected',
-              streamlabsLastError: null,
-              streamlabsLastEventAt: occurredAt,
-              normalizedEvents: prependNormalizedEvents(normalizedEvents, state.normalizedEvents),
-              recentNotifications: prependNotifications(notifications, state.recentNotifications),
-            }))
-          } else {
-            set({
-              streamlabsStatus: 'connected',
-              streamlabsLastError: null,
-            })
-          }
-        } catch (error) {
-          set({
-            streamlabsStatus: 'error',
-            streamlabsLastError:
-              error instanceof Error ? error.message : 'Unable to refresh Streamlabs donations.',
-          })
-        } finally {
-          if (isActiveStreamlabsRuntime(runtimeId)) {
-            activeStreamlabsPollTimer = window.setTimeout(() => {
-              void poll()
-            }, 15_000)
-          }
-        }
-      }
-
-      activeStreamlabsPollTimer = window.setTimeout(() => {
-        void poll()
-      }, 15_000)
-    } catch (error) {
-      set({
-        streamlabsStatus: 'error',
-        streamlabsLastError: error instanceof Error ? error.message : 'Unable to connect Streamlabs tips.',
-      })
-    }
-  }
-
-  const pollStreamlabsOAuthResult = async () => {
-    try {
-      const result = await consumeNativeStreamlabsOAuthResult()
-
-      if (!get().streamlabsAuthorizationPending) {
-        return
-      }
-
-      if (!result) {
-        activeStreamlabsAuthPollTimer = window.setTimeout(() => {
-          void pollStreamlabsOAuthResult()
-        }, 1000)
-        return
-      }
-
-      clearStreamlabsAuthPollTimer()
-
-      if (result.status !== 'success' || !result.code || !result.state) {
         set({
-          streamlabsAuthorizationPending: false,
-          streamlabsStatus: 'error',
-          streamlabsLastError: result.error ?? 'Streamlabs authorization failed.',
+          streamlabsStatus: 'connecting',
+          streamlabsLastError: null,
         })
-        return
-      }
-
-      const exchanged = await exchangeStreamlabsBridgeOAuth({
-        code: result.code,
-        state: result.state,
-        redirectUri: STREAMLABS_DEFAULT_REDIRECT_URI,
       })
 
-      const nextConnection = {
-        accessToken: trimSecret(exchanged.accessToken),
-        refreshToken: exchanged.refreshToken ? trimSecret(exchanged.refreshToken) : null,
-        tokenType: exchanged.tokenType ? trimSecret(exchanged.tokenType) : null,
-      } satisfies StreamlabsTipConnection
+      socket.on('disconnect', (reason: string) => {
+        if (!desiredStreamlabsConnection) {
+          return
+        }
 
-      set({
-        streamlabsAuthorizationPending: false,
-        streamlabsConnection: nextConnection,
-        streamlabsStatus: 'connected',
-        streamlabsLastError: null,
+        set({
+          streamlabsStatus: 'error',
+          streamlabsLastError:
+            reason === 'io client disconnect' ? null : 'Streamlabs disconnected. Reconnecting…',
+        })
       })
 
-      await persistTipSnapshot({
-        streamelements: get().streamelementsConnection,
-        streamlabs: nextConnection,
-      })
+      socket.on('event', (payload: unknown) => {
+        const normalizedEvents = normalizeStreamlabsSocketEvent(payload)
+        if (normalizedEvents.length === 0) {
+          return
+        }
 
-      await connectStreamlabsRuntime(nextConnection)
+        const notifications = normalizedEvents.map((event) => summarizeStreamlabsTip(event))
+        const occurredAt = notifications[0]?.occurredAt ?? Date.now()
+
+        set((state) => ({
+          streamlabsStatus: 'connected',
+          streamlabsLastError: null,
+          streamlabsLastEventAt: occurredAt,
+          normalizedEvents: prependNormalizedEvents(normalizedEvents, state.normalizedEvents),
+          recentNotifications: prependNotifications(notifications, state.recentNotifications),
+        }))
+      })
     } catch (error) {
-      clearStreamlabsAuthPollTimer()
       set({
-        streamlabsAuthorizationPending: false,
         streamlabsStatus: 'error',
         streamlabsLastError:
-          error instanceof Error ? error.message : 'Unable to finish Streamlabs authorization.',
+          error instanceof Error ? error.message : 'Unable to connect Streamlabs tips.',
       })
     }
   }
@@ -534,10 +346,6 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     streamelementsStatus: 'idle',
     streamelementsLastError: null,
     streamelementsLastEventAt: null,
-    streamlabsAuthorizationPending: false,
-    streamlabsBridgeUrl: getTipAuthBridgeBaseUrl(),
-    streamlabsBridgeReachable: null,
-    streamlabsBridgeLastError: null,
     streamlabsConnection: null,
     streamlabsStatus: 'idle',
     streamlabsLastError: null,
@@ -566,29 +374,23 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
         if (snapshot?.streamlabs) {
           await connectStreamlabsRuntime(snapshot.streamlabs)
         }
-
-        void checkStreamlabsBridge()
       } catch (error) {
         set({
           isBootstrapped: true,
           streamelementsStatus: 'error',
-          streamelementsLastError: error instanceof Error ? error.message : 'Unable to load saved tip provider settings.',
+          streamelementsLastError:
+            error instanceof Error ? error.message : 'Unable to load saved tip provider settings.',
         })
       }
     },
 
-    checkStreamlabsBridge,
-
     connectStreamElements: async (connection) => {
-      const nextConnection = {
-        token: trimSecret(connection.token),
-        tokenType: connection.tokenType,
-      } satisfies StreamElementsTipConnection
+      const nextConnection = normalizeStreamElementsConnection(connection)
 
       if (!nextConnection.token) {
         set({
           streamelementsStatus: 'error',
-          streamelementsLastError: 'Paste a StreamElements websocket token before connecting.',
+          streamelementsLastError: 'Paste a StreamElements token before connecting.',
         })
         return
       }
@@ -601,44 +403,23 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
       await connectStreamElementsRuntime(nextConnection)
     },
 
-    startStreamlabsOAuth: async () => {
-      const bridgeReady = await checkStreamlabsBridge()
-      if (!bridgeReady) {
+    connectStreamlabs: async (connection) => {
+      const nextConnection = normalizeStreamlabsConnection(connection)
+
+      if (!nextConnection.token) {
         set({
-          streamlabsAuthorizationPending: false,
           streamlabsStatus: 'error',
-          streamlabsLastError:
-            get().streamlabsBridgeLastError ??
-            'The Streamlabs auth bridge is unavailable. Start the bridge or point the app at the deployed bridge URL.',
+          streamlabsLastError: 'Paste your Streamlabs Socket API Token before connecting.',
         })
         return
       }
 
-      set({
-        streamlabsAuthorizationPending: true,
-        streamlabsStatus: 'connecting',
-        streamlabsLastError: null,
+      set({ streamlabsConnection: nextConnection })
+      await persistTipSnapshot({
+        streamelements: get().streamelementsConnection,
+        streamlabs: nextConnection,
       })
-
-      clearStreamlabsAuthPollTimer()
-      await cancelNativeStreamlabsOAuth()
-
-      try {
-        const { authorizeUrl } = await startStreamlabsBridgeOAuth(STREAMLABS_DEFAULT_REDIRECT_URI)
-
-        await openExternalUrl(authorizeUrl)
-        activeStreamlabsAuthPollTimer = window.setTimeout(() => {
-          void pollStreamlabsOAuthResult()
-        }, 1000)
-      } catch (error) {
-        clearStreamlabsAuthPollTimer()
-        set({
-          streamlabsAuthorizationPending: false,
-          streamlabsStatus: 'error',
-          streamlabsLastError:
-            error instanceof Error ? error.message : 'Unable to begin Streamlabs authorization.',
-        })
-      }
+      await connectStreamlabsRuntime(nextConnection)
     },
 
     disconnectProvider: async (provider) => {
@@ -662,17 +443,11 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
         return
       }
 
-      clearStreamlabsAuthPollTimer()
-      await cancelNativeStreamlabsOAuth()
-
-      activeStreamlabsRuntimeId += 1
       desiredStreamlabsConnection = null
-      clearStreamlabsPollTimer()
-      lastSeenStreamlabsDonationId = null
+      closeStreamlabsSocket()
 
       const nextStreamElementsConnection = get().streamelementsConnection
       set({
-        streamlabsAuthorizationPending: false,
         streamlabsConnection: null,
         streamlabsStatus: 'idle',
         streamlabsLastError: null,

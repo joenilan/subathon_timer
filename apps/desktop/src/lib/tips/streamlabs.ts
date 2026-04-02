@@ -1,14 +1,11 @@
 import type { NormalizedTimerEvent } from '../timer/types'
 import type { TipProviderNotification } from './types'
 
-export class StreamlabsDonationsRequestError extends Error {
-  status: number
-
-  constructor(status: number, message?: string) {
-    super(message ?? `Streamlabs donations request failed (${status}).`)
-    this.name = 'StreamlabsDonationsRequestError'
-    this.status = status
-  }
+interface StreamlabsSocketEnvelope {
+  type?: string
+  for?: string
+  event_id?: string
+  message?: unknown
 }
 
 function asRecord(value: unknown) {
@@ -17,6 +14,18 @@ function asRecord(value: unknown) {
   }
 
   return null
+}
+
+function asArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+  }
+
+  if (value && typeof value === 'object') {
+    return [value]
+  }
+
+  return []
 }
 
 function getString(record: Record<string, unknown> | null, key: string) {
@@ -39,92 +48,59 @@ function getNumericValue(record: Record<string, unknown> | null, key: string) {
   return null
 }
 
-export interface StreamlabsDonationRecord {
-  donationId: string
-  amount: number
-  currency: string | null
-  displayName: string | null
-  occurredAt: string
-  rawPayload: Record<string, unknown>
-}
+function normalizeStreamlabsDonation(
+  value: unknown,
+  fallbackEventId: string | null,
+  index: number,
+): NormalizedTimerEvent | null {
+  const donation = asRecord(value)
+  const donationId =
+    getString(donation, 'donation_id') ??
+    getString(donation, 'id') ??
+    (fallbackEventId ? `${fallbackEventId}:${index}` : null)
+  const amount = getNumericValue(donation, 'amount')
 
-export async function fetchStreamlabsDonations(accessToken: string, limit = 10) {
-  const response = await fetch(`https://streamlabs.com/api/v2.0/donations?limit=${limit}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  })
-
-  if (!response.ok) {
-    throw new StreamlabsDonationsRequestError(response.status)
+  if (!donation || !donationId || amount === null || amount <= 0) {
+    return null
   }
 
-  const payload = asRecord(await response.json())
-  const data = Array.isArray(payload?.data) ? payload.data : []
+  const displayName = getString(donation, 'name') ?? getString(donation, 'from')
 
-  return data
-    .map((entry) => {
-      const donation = asRecord(entry)
-      const donationId = getString(donation, 'donation_id') ?? getString(donation, 'id')
-      const amount = getNumericValue(donation, 'amount')
-
-      if (!donation || !donationId || amount === null || amount <= 0) {
-        return null
-      }
-
-      return {
-        donationId,
-        amount,
-        currency: getString(donation, 'currency'),
-        displayName: getString(donation, 'name') ?? getString(donation, 'from'),
-        occurredAt:
-          getString(donation, 'created_at') ??
-          getString(donation, 'createdAt') ??
-          new Date().toISOString(),
-        rawPayload: donation,
-      } satisfies StreamlabsDonationRecord
-    })
-    .filter((entry): entry is StreamlabsDonationRecord => entry !== null)
-}
-
-export function normalizeStreamlabsDonations(donations: StreamlabsDonationRecord[]) {
-  return donations.map((donation) => ({
-    id: donation.donationId,
-    source: 'streamlabs' as const,
-    eventType: 'tip' as const,
-    occurredAt: donation.occurredAt,
+  return {
+    id: donationId,
+    source: 'streamlabs',
+    eventType: 'tip',
+    occurredAt:
+      getString(donation, 'created_at') ??
+      getString(donation, 'createdAt') ??
+      new Date().toISOString(),
     userId: null,
-    userLogin: donation.displayName,
-    displayName: donation.displayName,
+    userLogin: displayName,
+    displayName,
     anonymous: false,
-    amount: donation.amount,
-    currency: donation.currency,
+    amount,
+    currency: getString(donation, 'currency'),
     tier: null,
     count: null,
     command: null,
-    rawPayload: donation.rawPayload,
-  })) satisfies NormalizedTimerEvent[]
+    rawPayload: donation,
+  }
 }
 
-export function getNewStreamlabsDonationEvents(
-  donations: StreamlabsDonationRecord[],
-  lastSeenDonationId: string | null,
-) {
-  if (donations.length === 0) {
+export function normalizeStreamlabsSocketEvent(value: unknown) {
+  const payload = asRecord(value) as StreamlabsSocketEnvelope | null
+
+  if (!payload || payload.type !== 'donation') {
     return [] as NormalizedTimerEvent[]
   }
 
-  const unseen: StreamlabsDonationRecord[] = []
-
-  for (const donation of donations) {
-    if (donation.donationId === lastSeenDonationId) {
-      break
-    }
-
-    unseen.push(donation)
+  if (payload.for && payload.for !== 'streamlabs') {
+    return [] as NormalizedTimerEvent[]
   }
 
-  return normalizeStreamlabsDonations(unseen.slice().reverse())
+  return asArray(payload.message)
+    .map((entry, index) => normalizeStreamlabsDonation(entry, payload.event_id ?? null, index))
+    .filter((entry): entry is NormalizedTimerEvent => entry !== null)
 }
 
 export function summarizeStreamlabsTip(event: NormalizedTimerEvent): TipProviderNotification {
