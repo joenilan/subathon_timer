@@ -11,7 +11,8 @@ import { selectConnectionsEventSubState, selectConnectionsTipState, selectConnec
 const STREAMELEMENTS_CHANNELS_URL = 'https://streamelements.com/dashboard/account/channels'
 const STREAMELEMENTS_TOKEN_HELP_URL =
   'https://support.streamelements.com/hc/en-us/articles/10474949304466-How-to-Locate-Your-Account-ID-and-JWT-Token'
-const STREAMLABS_DASHBOARD_URL = 'https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard'
+const STREAMLABS_API_SETTINGS_URL =
+  'https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard%23%2Fsettings%2Fapi-settings'
 const STREAMLABS_TOKENS_HELP_URL = 'https://support.streamlabs.com/hc/en-us/articles/115000090014-Alerts-Widget-Troubleshooting'
 
 function formatTimestamp(value: number | null) {
@@ -504,7 +505,7 @@ export function ConnectionsPage() {
             <div className="panel-header">
               <div>
                 <h3 className="panel-title">Streamlabs</h3>
-                <p className="panel-copy">Click the button, go to <strong>Settings &gt; API Settings &gt; API Tokens</strong>, copy <strong>Your Socket API Token</strong>, paste it here, connect.</p>
+                <p className="panel-copy">Click the button, open the <strong>API Settings</strong> page, reveal <strong>Your Socket API Token</strong>, paste it here, connect.</p>
               </div>
               <div className={`status-chip status-chip--${streamlabsStatusTone}`}>{streamlabsStatusLabel}</div>
             </div>
@@ -532,20 +533,20 @@ export function ConnectionsPage() {
                 <div className="panel-subtitle">Quick setup</div>
                 <div className="scope-row">
                   <code>1. Click Get Streamlabs Token</code>
-                  <p>Sign in to the Streamlabs account that receives your donations.</p>
+                  <p>It opens Streamlabs directly on the API Settings screen. Sign in to the Streamlabs account that receives your donations.</p>
                 </div>
                 <div className="scope-row">
-                  <code>2. Go to Settings &gt; API Settings &gt; API Tokens</code>
-                  <p>That is the exact menu path Streamlabs uses in their help docs.</p>
+                  <code>2. Click the API Settings tab if it is not already selected</code>
+                  <p>On that page you can reveal both an API Access Token and a Socket API Token.</p>
                 </div>
                 <div className="scope-row">
-                  <code>3. Copy &quot;Your Socket API Token&quot;, paste it here, click Connect</code>
-                  <p>No client ID, client secret, or developer app needed.</p>
+                  <code>3. Reveal &quot;Your Socket API Token&quot;, paste it here, click Connect</code>
+                  <p>Use the Socket API Token. Do not use the API Access Token, client ID, client secret, or a developer app.</p>
                 </div>
               </div>
 
               <div className="action-row">
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_DASHBOARD_URL)}>
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_API_SETTINGS_URL)}>
                   Get Streamlabs Token
                 </button>
                 <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_TOKENS_HELP_URL)}>
@@ -565,7 +566,7 @@ export function ConnectionsPage() {
                     value={streamlabsToken}
                     onChange={(event) => setStreamlabsToken(event.target.value)}
                   />
-                  <span className="rule-field__hint">Paste the exact value Streamlabs labels &quot;Your Socket API Token&quot;. It stays local on this PC when you run the desktop app.</span>
+                  <span className="rule-field__hint">Paste the exact value Streamlabs labels &quot;Your Socket API Token&quot;, not the API Access Token. It stays local on this PC when you run the desktop app.</span>
                 </label>
               </div>
 

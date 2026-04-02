@@ -22,7 +22,8 @@ No client IDs, client secrets, or local auth services are required for the suppo
 
 ### Streamlabs
 
-- Dashboard login: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard
+- Direct API Settings page: https://streamlabs.com/dashboard#/settings/api-settings
+- Login redirect to API Settings page: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard%23%2Fsettings%2Fapi-settings
 - Socket API docs: https://dev.streamlabs.com/docs/socket-api
 - Socket token endpoint reference: https://dev.streamlabs.com/reference/sockettoken
 - Streamlabs support article: https://support.streamlabs.com/hc/en-us/articles/115000090014-Alerts-Widget-Troubleshooting
@@ -65,15 +66,16 @@ That is the flow this app now follows.
 
 Recommended setup:
 
-1. Open the Streamlabs dashboard: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard
-2. Go to `Settings > API Settings > API Tokens`
-3. Copy `Your Socket API Token`
+1. Open the API Settings page:
+   `https://streamlabs.com/dashboard#/settings/api-settings`
+2. If needed, click the `API Settings` tab
+3. Reveal `Your Socket API Token`
 4. Paste it into `Connections > Streamlabs`
 5. Click `Connect Streamlabs`
 
 Important:
 
-- Use the Socket API Token, not an OAuth client ID, client secret, or developer app credential.
+- Use the Socket API Token, not the API Access Token, OAuth client ID, client secret, or developer app credential.
 - This app now matches the simpler Streamer.bot-style Streamlabs setup instead of the earlier overcomplicated OAuth-bridge approach.
 
 ## Timer Rule
