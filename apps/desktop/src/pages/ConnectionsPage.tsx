@@ -508,13 +508,16 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="action-row">
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_CHANNELS_URL)}>
-                  Get StreamElements Token
-                </button>
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_TOKEN_HELP_URL)}>
-                  Need Help?
-                </button>
+              <div className="provider-helper-actions">
+                <div className="panel-subtitle">Open the token page</div>
+                <div className="action-row provider-helper-actions__row">
+                  <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_CHANNELS_URL)}>
+                    Get StreamElements Token
+                  </button>
+                  <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_TOKEN_HELP_URL)}>
+                    Need Help?
+                  </button>
+                </div>
               </div>
 
               <div className="provider-field-grid">
@@ -623,13 +626,16 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="action-row">
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_API_SETTINGS_URL)}>
-                  Get Streamlabs Token
-                </button>
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_TOKENS_HELP_URL)}>
-                  Need Help?
-                </button>
+              <div className="provider-helper-actions">
+                <div className="panel-subtitle">Open the token page</div>
+                <div className="action-row provider-helper-actions__row">
+                  <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_API_SETTINGS_URL)}>
+                    Get Streamlabs Token
+                  </button>
+                  <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_TOKENS_HELP_URL)}>
+                    Need Help?
+                  </button>
+                </div>
               </div>
 
               <div className="provider-field-grid">
