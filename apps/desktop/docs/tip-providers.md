@@ -1,6 +1,6 @@
 # Tip Providers
 
-This desktop app can add time from third-party tip providers without using `.env` files.
+This desktop app can add time from third-party tip providers without shipping provider secrets inside the desktop client.
 
 ## Quick links
 
@@ -20,7 +20,10 @@ This desktop app can add time from third-party tip providers without using `.env
 - Donations endpoint docs: https://dev.streamlabs.com/reference/donations
 - Scope list: https://dev.streamlabs.com/docs/scopes
 
-If you want the least technical setup, use StreamElements first. Streamlabs still requires a developer app and OAuth token flow.
+For end users:
+
+- Streamlabs now uses app-owned OAuth through the auth bridge, so users only approve your app.
+- StreamElements still requires a user-specific token until StreamElements provides OAuth2 app access for this project.
 
 ## StreamElements
 
@@ -35,6 +38,12 @@ The app uses:
 - websocket endpoint: `wss://astro.streamelements.com/`
 - subscription topic: `channel.tips`
 - token types supported by the docs: `apikey`, `jwt`, `oauth2`
+
+Current limitation:
+
+- The public docs support websocket auth with `oauth2`, but StreamElements does not currently provide a self-service public app flow in the docs used for this repo.
+- Official StreamElements support indicates OAuth2 credentials require an application/request process rather than a normal public signup flow.
+- Until that access is available for this project, the desktop app still uses a user-specific StreamElements token.
 
 Recommended setup in this app:
 
@@ -55,14 +64,16 @@ As of April 2026, Streamlabs still documents realtime donation events through th
 - Obtain access token: https://dev.streamlabs.com/docs/obtain-an-access_token
 - Socket API guide: https://dev.streamlabs.com/docs/socket-api
 
-This app intentionally uses the donations endpoint instead of the legacy Socket.IO sample client.
+This app intentionally uses the donations endpoint instead of the legacy Socket.IO sample client, and it now uses a backend auth bridge for token exchange.
 
 The desktop app now supports an app-owned OAuth flow for Streamlabs. That means:
 
 - you register the Streamlabs app once
-- you paste the client ID and client secret into the desktop app once
-- users click `Authorize Streamlabs` instead of pasting raw access tokens
-- the desktop app receives the local callback and stores the resulting access token securely
+- you run or deploy the auth bridge with the Streamlabs client ID and client secret
+- users click `Connect Streamlabs` instead of pasting raw access tokens
+- the desktop app receives the local callback and sends the code to the auth bridge
+- the auth bridge exchanges the code with your `client_secret`
+- the desktop app stores the resulting user token securely and refreshes it through the bridge when Streamlabs rotates or expires the access token
 
 Required redirect URI for the desktop app:
 
@@ -73,18 +84,19 @@ Owner setup:
 1. Open the Streamlabs dashboard: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard
 2. Register a Streamlabs developer app: https://dev.streamlabs.com/docs/register-your-application
 3. Add this redirect URI to that app exactly: `http://127.0.0.1:31847/auth/streamlabs/callback`
-4. In `Connections`, paste the Streamlabs client ID and client secret once.
-5. Click `Authorize Streamlabs`.
-6. Approve your app in the browser when Streamlabs opens.
-7. The app polls `GET https://streamlabs.com/api/v2.0/donations?limit=10`.
-8. Only donation IDs newer than the last seen donation are applied to the timer.
+4. Run or deploy `apps/auth-bridge` with `STREAMLABS_CLIENT_ID` and `STREAMLABS_CLIENT_SECRET`.
+5. Build the desktop app with `VITE_TIP_AUTH_BRIDGE_URL` pointing at that bridge.
+6. Users click `Connect Streamlabs`.
+7. Users approve your app in the browser when Streamlabs opens.
+8. The app polls `GET https://streamlabs.com/api/v2.0/donations?limit=10`.
+9. Only donation IDs newer than the last seen donation are applied to the timer.
 
 Why this implementation:
 
 - Streamlabs still recommends the Socket API in docs.
 - Their documented sample uses the legacy Socket.IO 2 client.
 - This app avoids reintroducing that legacy client dependency and instead uses the official donations endpoint with `donations.read`.
-- Streamlabs OAuth still requires a client secret for token exchange, so the clean desktop flow depends on an app you register and control.
+- Streamlabs OAuth still requires a client secret for token exchange, so the clean desktop flow depends on an auth bridge you control.
 
 Approval note:
 

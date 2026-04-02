@@ -1,7 +1,5 @@
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{IpAddr, TcpListener, TcpStream};
@@ -45,21 +43,11 @@ struct OverlayServerHandle {
 
 #[derive(Default)]
 struct StreamlabsAuthRuntime {
-    pending: Option<StreamlabsAuthPending>,
     last_result: Option<StreamlabsOAuthResult>,
 }
 
 struct StreamlabsAuthHandle {
     runtime: Arc<Mutex<StreamlabsAuthRuntime>>,
-}
-
-#[derive(Clone)]
-struct StreamlabsAuthPending {
-    state: String,
-    client_id: String,
-    client_secret: String,
-    redirect_uri: String,
-    scopes: Vec<String>,
 }
 
 impl Drop for OverlayServerHandle {
@@ -177,40 +165,13 @@ struct BootstrapState {
     overlay_lan_access_enabled: bool,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct StreamlabsOAuthStartInput {
-    client_id: String,
-    client_secret: String,
-    redirect_uri: String,
-    scopes: Vec<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct StreamlabsOAuthStartResult {
-    authorize_url: String,
-}
-
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StreamlabsOAuthResult {
     status: String,
-    access_token: Option<String>,
-    refresh_token: Option<String>,
-    token_type: Option<String>,
-    scope: Option<String>,
+    code: Option<String>,
+    state: Option<String>,
     error: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct StreamlabsTokenPayload {
-    access_token: Option<String>,
-    refresh_token: Option<String>,
-    token_type: Option<String>,
-    scope: Option<String>,
-    error: Option<String>,
-    message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -620,78 +581,6 @@ fn build_bootstrap_state(runtime: &OverlayServerRuntime) -> BootstrapState {
     }
 }
 
-fn generate_streamlabs_oauth_state() -> String {
-    thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(48)
-        .map(char::from)
-        .collect()
-}
-
-fn build_streamlabs_authorize_url(input: &StreamlabsOAuthStartInput, state: &str) -> String {
-    let mut serializer = form_urlencoded::Serializer::new(String::new());
-    serializer.append_pair("client_id", input.client_id.trim());
-    serializer.append_pair("redirect_uri", input.redirect_uri.trim());
-    serializer.append_pair("response_type", "code");
-    serializer.append_pair("state", state);
-
-    if !input.scopes.is_empty() {
-        serializer.append_pair("scope", &input.scopes.join(" "));
-    }
-
-    format!(
-        "https://streamlabs.com/api/v2.0/authorize?{}",
-        serializer.finish()
-    )
-}
-
-fn exchange_streamlabs_authorization_code(
-    pending: &StreamlabsAuthPending,
-    code: &str,
-) -> Result<StreamlabsOAuthResult, String> {
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .post("https://streamlabs.com/api/v2.0/token")
-        .header("Content-Type", "application/json")
-        .header("X-Requested-With", "XMLHttpRequest")
-        .json(&json!({
-            "grant_type": "authorization_code",
-            "client_id": &pending.client_id,
-            "client_secret": &pending.client_secret,
-            "redirect_uri": &pending.redirect_uri,
-            "code": code,
-        }))
-        .send()
-        .map_err(|error| format!("failed to exchange Streamlabs auth code: {error}"))?;
-
-    let status = response.status();
-    let payload = response
-        .json::<StreamlabsTokenPayload>()
-        .map_err(|error| format!("failed to parse Streamlabs token response: {error}"))?;
-
-    if !status.is_success() {
-        let detail = payload
-            .message
-            .or(payload.error)
-            .unwrap_or_else(|| format!("Streamlabs token exchange failed ({}).", status.as_u16()));
-        return Err(detail);
-    }
-
-    let access_token = payload
-        .access_token
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| "Streamlabs token response did not include an access token.".to_string())?;
-
-    Ok(StreamlabsOAuthResult {
-        status: "success".into(),
-        access_token: Some(access_token),
-        refresh_token: payload.refresh_token.filter(|value| !value.trim().is_empty()),
-        token_type: payload.token_type.filter(|value| !value.trim().is_empty()),
-        scope: payload.scope.filter(|value| !value.trim().is_empty()),
-        error: None,
-    })
-}
-
 fn render_streamlabs_auth_html(title: &str, body: &str, tone: &str) -> String {
     format!(
         r#"<!doctype html>
@@ -951,42 +840,6 @@ fn clear_native_tip_provider_session<R: tauri::Runtime>(
 }
 
 #[tauri::command]
-fn begin_streamlabs_oauth(
-    input: StreamlabsOAuthStartInput,
-    streamlabs_auth: tauri::State<'_, StreamlabsAuthHandle>,
-) -> Result<StreamlabsOAuthStartResult, String> {
-    let client_id = input.client_id.trim();
-    let client_secret = input.client_secret.trim();
-    let redirect_uri = input.redirect_uri.trim();
-
-    if client_id.is_empty() || client_secret.is_empty() {
-        return Err("Enter the Streamlabs client ID and client secret before connecting.".into());
-    }
-
-    if redirect_uri.is_empty() {
-        return Err("Enter a Streamlabs redirect URI before connecting.".into());
-    }
-
-    let state = generate_streamlabs_oauth_state();
-    let authorize_url = build_streamlabs_authorize_url(&input, &state);
-    let mut runtime = streamlabs_auth
-        .runtime
-        .lock()
-        .map_err(|_| "streamlabs auth lock poisoned".to_string())?;
-
-    runtime.pending = Some(StreamlabsAuthPending {
-        state,
-        client_id: client_id.into(),
-        client_secret: client_secret.into(),
-        redirect_uri: redirect_uri.into(),
-        scopes: input.scopes,
-    });
-    runtime.last_result = None;
-
-    Ok(StreamlabsOAuthStartResult { authorize_url })
-}
-
-#[tauri::command]
 fn consume_streamlabs_oauth_result(
     streamlabs_auth: tauri::State<'_, StreamlabsAuthHandle>,
 ) -> Result<Option<StreamlabsOAuthResult>, String> {
@@ -1007,7 +860,6 @@ fn cancel_streamlabs_oauth(
         .lock()
         .map_err(|_| "streamlabs auth lock poisoned".to_string())?;
 
-    runtime.pending = None;
     runtime.last_result = None;
     Ok(())
 }
@@ -1690,63 +1542,6 @@ fn handle_streamlabs_auth_callback(
 ) -> Vec<u8> {
     let params: std::collections::HashMap<String, String> =
         form_urlencoded::parse(query.as_bytes()).into_owned().collect();
-    let returned_state = params.get("state").cloned().unwrap_or_default();
-
-    let pending = {
-        let runtime = match streamlabs_auth.lock() {
-            Ok(runtime) => runtime,
-            Err(_) => {
-                return format_http_response(
-                    "HTTP/1.1 500 Internal Server Error",
-                    "text/html; charset=utf-8",
-                    &render_streamlabs_auth_html(
-                        "Authorization failed",
-                        "The desktop app auth state was unavailable.",
-                        "error",
-                    ),
-                )
-            }
-        };
-
-        match runtime.pending.clone() {
-            Some(pending) => pending,
-            None => {
-                return format_http_response(
-                    "HTTP/1.1 400 Bad Request",
-                    "text/html; charset=utf-8",
-                    &render_streamlabs_auth_html(
-                        "Authorization is no longer pending",
-                        "Start the Streamlabs connection again from the desktop app, then approve it in the browser.",
-                        "error",
-                    ),
-                )
-            }
-        }
-    };
-
-    if returned_state != pending.state {
-        if let Ok(mut runtime) = streamlabs_auth.lock() {
-            runtime.pending = None;
-            runtime.last_result = Some(StreamlabsOAuthResult {
-                status: "error".into(),
-                access_token: None,
-                refresh_token: None,
-                token_type: None,
-                scope: None,
-                error: Some("Streamlabs returned an invalid OAuth state.".into()),
-            });
-        }
-
-        return format_http_response(
-            "HTTP/1.1 400 Bad Request",
-            "text/html; charset=utf-8",
-            &render_streamlabs_auth_html(
-                "Authorization failed",
-                "The Streamlabs OAuth state did not match the request started by the desktop app.",
-                "error",
-            ),
-        );
-    }
 
     if let Some(error) = params.get("error") {
         let description = params
@@ -1755,13 +1550,10 @@ fn handle_streamlabs_auth_callback(
             .unwrap_or_else(|| error.clone());
 
         if let Ok(mut runtime) = streamlabs_auth.lock() {
-            runtime.pending = None;
             runtime.last_result = Some(StreamlabsOAuthResult {
                 status: "error".into(),
-                access_token: None,
-                refresh_token: None,
-                token_type: None,
-                scope: None,
+                code: None,
+                state: params.get("state").cloned(),
                 error: Some(description.clone()),
             });
         }
@@ -1777,13 +1569,10 @@ fn handle_streamlabs_auth_callback(
         Some(code) if !code.trim().is_empty() => code.clone(),
         _ => {
             if let Ok(mut runtime) = streamlabs_auth.lock() {
-                runtime.pending = None;
                 runtime.last_result = Some(StreamlabsOAuthResult {
                     status: "error".into(),
-                    access_token: None,
-                    refresh_token: None,
-                    token_type: None,
-                    scope: None,
+                    code: None,
+                    state: params.get("state").cloned(),
                     error: Some("Streamlabs did not return an authorization code.".into()),
                 });
             }
@@ -1800,52 +1589,26 @@ fn handle_streamlabs_auth_callback(
         }
     };
 
-    match exchange_streamlabs_authorization_code(&pending, &code) {
-        Ok(result) => {
-            if let Ok(mut runtime) = streamlabs_auth.lock() {
-                runtime.pending = None;
-                runtime.last_result = Some(result);
-            }
+    let state = params.get("state").cloned();
 
-            let scopes_summary = if pending.scopes.is_empty() {
-                "requested scopes".to_string()
-            } else {
-                pending.scopes.join(", ")
-            };
-
-            format_http_response(
-                "HTTP/1.1 200 OK",
-                "text/html; charset=utf-8",
-                &render_streamlabs_auth_html(
-                    "Streamlabs connected",
-                    &format!(
-                        "The desktop app finished the Streamlabs OAuth exchange and can now poll donations with {}.",
-                        scopes_summary
-                    ),
-                    "success",
-                ),
-            )
-        }
-        Err(error) => {
-            if let Ok(mut runtime) = streamlabs_auth.lock() {
-                runtime.pending = None;
-                runtime.last_result = Some(StreamlabsOAuthResult {
-                    status: "error".into(),
-                    access_token: None,
-                    refresh_token: None,
-                    token_type: None,
-                    scope: None,
-                    error: Some(error.clone()),
-                });
-            }
-
-            format_http_response(
-                "HTTP/1.1 500 Internal Server Error",
-                "text/html; charset=utf-8",
-                &render_streamlabs_auth_html("Authorization failed", &error, "error"),
-            )
-        }
+    if let Ok(mut runtime) = streamlabs_auth.lock() {
+        runtime.last_result = Some(StreamlabsOAuthResult {
+            status: "success".into(),
+            code: Some(code),
+            state: state.clone(),
+            error: None,
+        });
     }
+
+    format_http_response(
+        "HTTP/1.1 200 OK",
+        "text/html; charset=utf-8",
+        &render_streamlabs_auth_html(
+            "Streamlabs approved",
+            "The desktop app received the Streamlabs authorization callback and is finishing the connection now.",
+            "success",
+        ),
+    )
 }
 
 fn try_handle_connection(
@@ -2057,7 +1820,6 @@ pub fn run() {
             load_native_tip_provider_session,
             save_native_tip_provider_session,
             clear_native_tip_provider_session,
-            begin_streamlabs_oauth,
             consume_streamlabs_oauth_result,
             cancel_streamlabs_oauth
         ])

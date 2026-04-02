@@ -7,12 +7,6 @@ export interface StreamElementsTipConnection {
   tokenType: StreamElementsTokenType
 }
 
-export interface StreamlabsOAuthAppConfig {
-  clientId: string
-  clientSecret: string
-  redirectUri: string
-}
-
 export interface StreamlabsTipConnection {
   accessToken: string
   refreshToken: string | null
@@ -20,9 +14,8 @@ export interface StreamlabsTipConnection {
 }
 
 export interface TipProviderSnapshot {
-  version: 2
+  version: 3
   streamelements: StreamElementsTipConnection | null
-  streamlabsApp: StreamlabsOAuthAppConfig | null
   streamlabs: StreamlabsTipConnection | null
 }
 

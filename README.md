@@ -7,12 +7,14 @@ Desktop-first Twitch subathon timer built with Tauri, React, and TypeScript. The
 - StreamElements and Streamlabs tip support wired into the timer rules
 - OBS-ready timer and reason overlays served from the desktop app
 - A configurable spin wheel with time and moderation outcomes
+- `apps/auth-bridge`, a Bun auth service for provider OAuth token exchange
 
 The legacy root `src/` and `public/` app is kept as behavior reference only. New work should target `apps/desktop`.
 
 ## Repository Layout
 
 - `apps/desktop/`: active desktop app
+- `apps/auth-bridge/`: provider OAuth bridge for public-user Streamlabs auth
 - `apps/desktop/src/`: React UI, state stores, timer logic, overlays
 - `apps/desktop/src-tauri/`: native Tauri shell and loopback overlay server
 - `apps/desktop/docs/`: desktop-specific implementation notes and roadmap docs
@@ -62,6 +64,15 @@ Unit tests:
 ```bash
 cd apps/desktop
 bun run test
+```
+
+Auth bridge:
+
+```bash
+cd apps/auth-bridge
+bun install --frozen-lockfile
+bun run test
+bun run check
 ```
 
 ## Twitch And Overlay Flow

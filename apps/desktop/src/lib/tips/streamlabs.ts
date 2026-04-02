@@ -1,6 +1,16 @@
 import type { NormalizedTimerEvent } from '../timer/types'
 import type { TipProviderNotification } from './types'
 
+export class StreamlabsDonationsRequestError extends Error {
+  status: number
+
+  constructor(status: number, message?: string) {
+    super(message ?? `Streamlabs donations request failed (${status}).`)
+    this.name = 'StreamlabsDonationsRequestError'
+    this.status = status
+  }
+}
+
 function asRecord(value: unknown) {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return value as Record<string, unknown>
@@ -46,7 +56,7 @@ export async function fetchStreamlabsDonations(accessToken: string, limit = 10) 
   })
 
   if (!response.ok) {
-    throw new Error(`Streamlabs donations request failed (${response.status}).`)
+    throw new StreamlabsDonationsRequestError(response.status)
   }
 
   const payload = asRecord(await response.json())

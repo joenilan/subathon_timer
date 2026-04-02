@@ -184,7 +184,6 @@ export const selectConnectionsTipState = (state: TipSessionState) => ({
   streamElementsLastError: state.streamelementsLastError,
   streamElementsLastEventAt: state.streamelementsLastEventAt,
   streamElementsStatus: state.streamelementsStatus,
-  streamlabsAppConfig: state.streamlabsAppConfig,
   streamlabsAuthorizationPending: state.streamlabsAuthorizationPending,
   streamlabsConnection: state.streamlabsConnection,
   streamlabsLastError: state.streamlabsLastError,

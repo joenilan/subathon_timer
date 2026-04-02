@@ -45,27 +45,6 @@ function normalizeStreamElementsConnection(value: unknown) {
   }
 }
 
-function normalizeStreamlabsAppConfig(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null
-  }
-
-  const record = value as Record<string, unknown>
-  const clientId = typeof record.clientId === 'string' ? record.clientId : ''
-  const clientSecret = typeof record.clientSecret === 'string' ? record.clientSecret : ''
-  const redirectUri = typeof record.redirectUri === 'string' ? record.redirectUri : ''
-
-  if (!clientId || !clientSecret || !redirectUri) {
-    return null
-  }
-
-  return {
-    clientId,
-    clientSecret,
-    redirectUri,
-  }
-}
-
 function parseBrowserSnapshot(raw: string | null) {
   if (!raw) {
     return null
@@ -77,20 +56,18 @@ function parseBrowserSnapshot(raw: string | null) {
       return null
     }
 
-    if (parsed.version === 2) {
+    if (parsed.version === 3) {
       return {
-        version: 2,
+        version: 3,
         streamelements: normalizeStreamElementsConnection(parsed.streamelements),
-        streamlabsApp: normalizeStreamlabsAppConfig(parsed.streamlabsApp),
         streamlabs: normalizeStreamlabsConnection(parsed.streamlabs),
       } satisfies TipProviderSnapshot
     }
 
-    if (parsed.version === 1) {
+    if (parsed.version === 2 || parsed.version === 1) {
       return {
-        version: 2,
+        version: 3,
         streamelements: normalizeStreamElementsConnection(parsed.streamelements),
-        streamlabsApp: null,
         streamlabs: normalizeStreamlabsConnection(parsed.streamlabs),
       } satisfies TipProviderSnapshot
     }
@@ -130,13 +107,11 @@ export async function clearNativeTipProviderSnapshot() {
 
 export function buildNativeTipProviderSnapshot(input: {
   streamelements: TipProviderSnapshot['streamelements']
-  streamlabsApp: TipProviderSnapshot['streamlabsApp']
   streamlabs: TipProviderSnapshot['streamlabs']
 }): TipProviderSnapshot {
   return {
-    version: 2,
+    version: 3,
     streamelements: input.streamelements,
-    streamlabsApp: input.streamlabsApp,
     streamlabs: input.streamlabs,
   }
 }

@@ -9,9 +9,13 @@ import {
 import {
   cancelNativeStreamlabsOAuth,
   consumeNativeStreamlabsOAuthResult,
-  startNativeStreamlabsOAuth,
   STREAMLABS_DEFAULT_REDIRECT_URI,
 } from '../lib/platform/nativeStreamlabsAuth'
+import {
+  exchangeStreamlabsBridgeOAuth,
+  refreshStreamlabsBridgeOAuth,
+  startStreamlabsBridgeOAuth,
+} from '../lib/tips/authBridge'
 import {
   buildStreamElementsSubscribeMessage,
   normalizeStreamElementsTipMessage,
@@ -21,11 +25,11 @@ import {
 import {
   fetchStreamlabsDonations,
   getNewStreamlabsDonationEvents,
+  StreamlabsDonationsRequestError,
   summarizeStreamlabsTip,
 } from '../lib/tips/streamlabs'
 import type {
   StreamElementsTipConnection,
-  StreamlabsOAuthAppConfig,
   StreamlabsTipConnection,
   TipProviderNotification,
   TipProviderStatus,
@@ -35,7 +39,6 @@ import type { NormalizedTimerEvent } from '../lib/timer/types'
 const MAX_TIP_EVENTS = 24
 const MAX_TIP_NOTIFICATIONS = 12
 const STREAMELEMENTS_SOCKET_URL = 'wss://astro.streamelements.com/'
-const STREAMLABS_OAUTH_SCOPES = ['donations.read']
 
 let activeStreamElementsSocket: WebSocket | null = null
 let activeStreamElementsReconnectTimer: number | null = null
@@ -44,10 +47,19 @@ let desiredStreamElementsConnection: StreamElementsTipConnection | null = null
 let activeStreamlabsPollTimer: number | null = null
 let activeStreamlabsAuthPollTimer: number | null = null
 let desiredStreamlabsConnection: StreamlabsTipConnection | null = null
+let activeStreamlabsRuntimeId = 0
 let lastSeenStreamlabsDonationId: string | null = null
 
 function trimSecret(value: string) {
   return value.trim()
+}
+
+function normalizeStreamlabsConnection(connection: StreamlabsTipConnection): StreamlabsTipConnection {
+  return {
+    accessToken: trimSecret(connection.accessToken),
+    refreshToken: connection.refreshToken ? trimSecret(connection.refreshToken) : null,
+    tokenType: connection.tokenType ? trimSecret(connection.tokenType) : null,
+  }
 }
 
 function prependNormalizedEvents(
@@ -117,10 +129,9 @@ async function openExternalUrl(url: string) {
 
 async function persistTipSnapshot(input: {
   streamelements: StreamElementsTipConnection | null
-  streamlabsApp: StreamlabsOAuthAppConfig | null
   streamlabs: StreamlabsTipConnection | null
 }) {
-  if (!input.streamelements && !input.streamlabsApp && !input.streamlabs) {
+  if (!input.streamelements && !input.streamlabs) {
     await clearNativeTipProviderSnapshot()
     return
   }
@@ -134,7 +145,6 @@ export interface TipSessionState {
   streamelementsStatus: TipProviderStatus
   streamelementsLastError: string | null
   streamelementsLastEventAt: number | null
-  streamlabsAppConfig: StreamlabsOAuthAppConfig | null
   streamlabsAuthorizationPending: boolean
   streamlabsConnection: StreamlabsTipConnection | null
   streamlabsStatus: TipProviderStatus
@@ -145,12 +155,15 @@ export interface TipSessionState {
 
   bootstrap: () => Promise<void>
   connectStreamElements: (connection: StreamElementsTipConnection) => Promise<void>
-  startStreamlabsOAuth: (config: StreamlabsOAuthAppConfig) => Promise<void>
+  startStreamlabsOAuth: () => Promise<void>
   disconnectProvider: (provider: 'streamelements' | 'streamlabs') => Promise<void>
   clearError: (provider: 'streamelements' | 'streamlabs') => void
 }
 
 export const useTipSessionStore = create<TipSessionState>((set, get) => {
+  const isActiveStreamlabsRuntime = (runtimeId: number) =>
+    desiredStreamlabsConnection !== null && activeStreamlabsRuntimeId === runtimeId
+
   const scheduleStreamElementsReconnect = (url?: string) => {
     clearStreamElementsReconnectTimer()
 
@@ -269,8 +282,65 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     }
   }
 
+  const refreshStreamlabsRuntimeConnection = async (
+    connection: StreamlabsTipConnection,
+    runtimeId: number,
+  ) => {
+    if (!connection.refreshToken) {
+      throw new Error('Streamlabs access expired. Reconnect Streamlabs to continue importing donations.')
+    }
+
+    const refreshed = normalizeStreamlabsConnection(
+      await refreshStreamlabsBridgeOAuth(connection.refreshToken),
+    )
+
+    if (!isActiveStreamlabsRuntime(runtimeId)) {
+      throw new Error('Streamlabs connection changed during token refresh.')
+    }
+
+    desiredStreamlabsConnection = refreshed
+
+    set({
+      streamlabsConnection: refreshed,
+      streamlabsStatus: 'connected',
+      streamlabsLastError: null,
+    })
+
+    await persistTipSnapshot({
+      streamelements: get().streamelementsConnection,
+      streamlabs: refreshed,
+    })
+
+    return refreshed
+  }
+
+  const fetchStreamlabsDonationsWithRefresh = async (
+    connection: StreamlabsTipConnection,
+    runtimeId: number,
+  ) => {
+    try {
+      return {
+        connection,
+        donations: await fetchStreamlabsDonations(connection.accessToken),
+      }
+    } catch (error) {
+      if (!(error instanceof StreamlabsDonationsRequestError) || error.status !== 401) {
+        throw error
+      }
+
+      const refreshed = await refreshStreamlabsRuntimeConnection(connection, runtimeId)
+
+      return {
+        connection: refreshed,
+        donations: await fetchStreamlabsDonations(refreshed.accessToken),
+      }
+    }
+  }
+
   const connectStreamlabsRuntime = async (connection: StreamlabsTipConnection) => {
-    desiredStreamlabsConnection = connection
+    const runtimeId = activeStreamlabsRuntimeId + 1
+    activeStreamlabsRuntimeId = runtimeId
+    desiredStreamlabsConnection = normalizeStreamlabsConnection(connection)
     clearStreamlabsPollTimer()
     lastSeenStreamlabsDonationId = null
 
@@ -280,12 +350,16 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     })
 
     try {
-      const primeDonations = await fetchStreamlabsDonations(connection.accessToken)
+      const primeResult = await fetchStreamlabsDonationsWithRefresh(
+        desiredStreamlabsConnection,
+        runtimeId,
+      )
 
-      if (desiredStreamlabsConnection !== connection) {
+      if (!isActiveStreamlabsRuntime(runtimeId)) {
         return
       }
 
+      const primeDonations = primeResult.donations
       lastSeenStreamlabsDonationId = primeDonations[0]?.donationId ?? null
 
       set({
@@ -294,16 +368,20 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
       })
 
       const poll = async () => {
-        if (!desiredStreamlabsConnection) {
+        const currentConnection = desiredStreamlabsConnection
+
+        if (!currentConnection || !isActiveStreamlabsRuntime(runtimeId)) {
           return
         }
 
         try {
-          const donations = await fetchStreamlabsDonations(connection.accessToken)
-          if (!desiredStreamlabsConnection) {
+          const pollResult = await fetchStreamlabsDonationsWithRefresh(currentConnection, runtimeId)
+
+          if (!isActiveStreamlabsRuntime(runtimeId)) {
             return
           }
 
+          const donations = pollResult.donations
           const normalizedEvents = getNewStreamlabsDonationEvents(donations, lastSeenStreamlabsDonationId)
           lastSeenStreamlabsDonationId = donations[0]?.donationId ?? lastSeenStreamlabsDonationId
 
@@ -331,7 +409,7 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
               error instanceof Error ? error.message : 'Unable to refresh Streamlabs donations.',
           })
         } finally {
-          if (desiredStreamlabsConnection) {
+          if (isActiveStreamlabsRuntime(runtimeId)) {
             activeStreamlabsPollTimer = window.setTimeout(() => {
               void poll()
             }, 15_000)
@@ -367,7 +445,7 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
       clearStreamlabsAuthPollTimer()
 
-      if (result.status !== 'success' || !result.accessToken) {
+      if (result.status !== 'success' || !result.code || !result.state) {
         set({
           streamlabsAuthorizationPending: false,
           streamlabsStatus: 'error',
@@ -376,21 +454,27 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
         return
       }
 
+      const exchanged = await exchangeStreamlabsBridgeOAuth({
+        code: result.code,
+        state: result.state,
+        redirectUri: STREAMLABS_DEFAULT_REDIRECT_URI,
+      })
+
       const nextConnection = {
-        accessToken: trimSecret(result.accessToken),
-        refreshToken: result.refreshToken ? trimSecret(result.refreshToken) : null,
-        tokenType: result.tokenType ? trimSecret(result.tokenType) : null,
+        accessToken: trimSecret(exchanged.accessToken),
+        refreshToken: exchanged.refreshToken ? trimSecret(exchanged.refreshToken) : null,
+        tokenType: exchanged.tokenType ? trimSecret(exchanged.tokenType) : null,
       } satisfies StreamlabsTipConnection
 
       set({
         streamlabsAuthorizationPending: false,
         streamlabsConnection: nextConnection,
+        streamlabsStatus: 'connected',
         streamlabsLastError: null,
       })
 
       await persistTipSnapshot({
         streamelements: get().streamelementsConnection,
-        streamlabsApp: get().streamlabsAppConfig,
         streamlabs: nextConnection,
       })
 
@@ -412,7 +496,6 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     streamelementsStatus: 'idle',
     streamelementsLastError: null,
     streamelementsLastEventAt: null,
-    streamlabsAppConfig: null,
     streamlabsAuthorizationPending: false,
     streamlabsConnection: null,
     streamlabsStatus: 'idle',
@@ -431,7 +514,6 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
         set({
           streamelementsConnection: snapshot?.streamelements ?? null,
-          streamlabsAppConfig: snapshot?.streamlabsApp ?? null,
           streamlabsConnection: snapshot?.streamlabs ?? null,
           isBootstrapped: true,
         })
@@ -469,49 +551,23 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
       set({ streamelementsConnection: nextConnection })
       await persistTipSnapshot({
         streamelements: nextConnection,
-        streamlabsApp: get().streamlabsAppConfig,
         streamlabs: get().streamlabsConnection,
       })
       await connectStreamElementsRuntime(nextConnection)
     },
 
-    startStreamlabsOAuth: async (config) => {
-      const nextConfig = {
-        clientId: trimSecret(config.clientId),
-        clientSecret: trimSecret(config.clientSecret),
-        redirectUri: trimSecret(config.redirectUri) || STREAMLABS_DEFAULT_REDIRECT_URI,
-      } satisfies StreamlabsOAuthAppConfig
-
-      if (!nextConfig.clientId || !nextConfig.clientSecret) {
-        set({
-          streamlabsStatus: 'error',
-          streamlabsLastError: 'Enter the Streamlabs client ID and client secret before connecting.',
-        })
-        return
-      }
-
+    startStreamlabsOAuth: async () => {
       set({
-        streamlabsAppConfig: nextConfig,
         streamlabsAuthorizationPending: true,
+        streamlabsStatus: 'connecting',
         streamlabsLastError: null,
-      })
-
-      await persistTipSnapshot({
-        streamelements: get().streamelementsConnection,
-        streamlabsApp: nextConfig,
-        streamlabs: get().streamlabsConnection,
       })
 
       clearStreamlabsAuthPollTimer()
       await cancelNativeStreamlabsOAuth()
 
       try {
-        const { authorizeUrl } = await startNativeStreamlabsOAuth({
-          clientId: nextConfig.clientId,
-          clientSecret: nextConfig.clientSecret,
-          redirectUri: nextConfig.redirectUri,
-          scopes: STREAMLABS_OAUTH_SCOPES,
-        })
+        const { authorizeUrl } = await startStreamlabsBridgeOAuth(STREAMLABS_DEFAULT_REDIRECT_URI)
 
         await openExternalUrl(authorizeUrl)
         activeStreamlabsAuthPollTimer = window.setTimeout(() => {
@@ -544,7 +600,6 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
         await persistTipSnapshot({
           streamelements: null,
-          streamlabsApp: get().streamlabsAppConfig,
           streamlabs: nextStreamlabsConnection,
         })
         return
@@ -553,6 +608,7 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
       clearStreamlabsAuthPollTimer()
       await cancelNativeStreamlabsOAuth()
 
+      activeStreamlabsRuntimeId += 1
       desiredStreamlabsConnection = null
       clearStreamlabsPollTimer()
       lastSeenStreamlabsDonationId = null
@@ -568,7 +624,6 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
       await persistTipSnapshot({
         streamelements: nextStreamElementsConnection,
-        streamlabsApp: get().streamlabsAppConfig,
         streamlabs: null,
       })
     },

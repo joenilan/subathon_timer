@@ -2,6 +2,7 @@
 
 ## Project Structure & Module Organization
 - `apps/desktop/` is the active app. It contains the Tauri shell, React frontend, and new Twitch auth/runtime work.
+- `apps/auth-bridge/` is the provider OAuth bridge. It owns server-side client secrets for public-user provider authorization flows.
 - `apps/desktop/src/` holds the UI, route pages, state stores, and web-side integration code.
 - `apps/desktop/src/state/useTwitchSessionStore.ts` owns local Twitch auth/session lifecycle.
 - `apps/desktop/src/state/useEventSubStore.ts` owns the live EventSub WebSocket session and core subscription set.
@@ -28,6 +29,10 @@
 - Root `src/` and `public/` are the legacy Node/overlay app. Treat them as behavior reference unless a task explicitly targets the old stack.
 
 ## Build, Test, and Development Commands
+- `cd apps/auth-bridge && bun install --frozen-lockfile` installs auth bridge dependencies.
+- `cd apps/auth-bridge && bun run dev` runs the local auth bridge on `127.0.0.1:8788` by default.
+- `cd apps/auth-bridge && bun run test` runs the auth bridge tests.
+- `cd apps/auth-bridge && bun run check` type-checks the auth bridge.
 - `cd apps/desktop && bun install --frozen-lockfile` installs desktop dependencies from `bun.lock`.
 - `cd apps/desktop && bun run dev` runs the frontend in the browser on `127.0.0.1:1420`.
 - `cd apps/desktop && bun run tauri:dev` runs the actual desktop app with the Tauri runtime.
@@ -52,10 +57,12 @@
 
 ## Testing Guidelines
 - For desktop changes, run `bun run build` and `cargo check`.
+- For auth-bridge changes, run `cd apps/auth-bridge && bun run test` and `cd apps/auth-bridge && bun run check`.
 - For auth and UI changes, verify both `bun run dev` and `bun run tauri:dev` when the runtime matters.
 - Test Twitch auth from the `Connections` page, including reconnect and refresh paths when touched.
 - Test EventSub after auth by confirming the `Connections` page shows a WebSocket session, subscription count, and recent notifications when Twitch events occur.
 - Test tip providers from the `Connections` page when touched: verify StreamElements or Streamlabs tip events appear in the recent provider list and apply the configured tip rule to the timer.
+- For public-user Streamlabs auth changes, run the auth bridge and verify the desktop app completes the browser approval flow without exposing client credentials in the UI.
 - Test the dashboard after Twitch events occur: timer adjustments, activity feed, and trend graph should move without manual refresh.
 - Test `Rules` by changing values and confirming new Twitch events use the updated seconds.
 - Test `Overlays` by opening the direct preview routes and confirming they reflect the same timer theme, timer state, and latest activity as the dashboard.
