@@ -109,7 +109,7 @@ When preparing a desktop release, update:
 - `apps/desktop/CHANGELOG.md`
 - `apps/desktop/PATCH_NOTES.md`
 
-`bun run release:windows` builds the Windows installers and copies normalized artifacts into `apps/desktop/release/windows/`.
+`bun run release:windows` builds the Windows installers and a portable zip, then copies normalized artifacts into `apps/desktop/release/windows/`.
 
 ## License
 

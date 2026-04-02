@@ -37,7 +37,7 @@
 - `cd apps/desktop && bun run version:check-notes` verifies that `CHANGELOG.md` and `PATCH_NOTES.md` both include the current desktop app version.
 - `cd apps/desktop && bun run version:patch|minor|major` bumps `apps/desktop/VERSION` and syncs the desktop app version files.
 - `cd apps/desktop && bun run version:set -- 0.2.0` sets an exact desktop app version and syncs the desktop app version files.
-- `cd apps/desktop && bun run release:windows` builds the Windows installers and copies normalized release artifacts into `apps/desktop/release/windows/`.
+- `cd apps/desktop && bun run release:windows` builds the Windows installers plus a portable zip, then copies normalized release artifacts into `apps/desktop/release/windows/`.
 - `cd apps/desktop && bun run tauri:clean` removes the full Rust/Tauri build cache when disk usage gets out of hand.
 - `cd apps/desktop && bun run tauri:build:clean` creates a release build, then removes the release-side Rust artifacts while keeping dev caches.
 - `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` validates the native layer without producing a release build.

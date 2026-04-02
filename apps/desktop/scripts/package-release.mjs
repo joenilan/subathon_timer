@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, copyFileSync } from 'node:fs'
 import { resolve, join, basename } from 'node:path'
+import { execFileSync } from 'node:child_process'
 
 const appRoot = resolve(import.meta.dirname, '..')
 const version = readFileSync(resolve(appRoot, 'VERSION'), 'utf8').trim()
 const bundleRoot = resolve(appRoot, 'src-tauri', 'target', 'release', 'bundle')
+const releaseBinary = resolve(appRoot, 'src-tauri', 'target', 'release', 'subathon-timer.exe')
 const releaseRoot = resolve(appRoot, 'release', 'windows')
 const releaseSlug = 'subathon-timer'
 
@@ -33,6 +35,58 @@ for (const spec of [
     sha256,
   })
 }
+
+const portableDir = join(releaseRoot, 'portable')
+mkdirSync(portableDir, { recursive: true })
+
+const portableExeName = `${releaseSlug}-portable.exe`
+const portableReadmeName = 'README-portable.txt'
+const portableZipName = `${releaseSlug}_${version}_x64_portable.zip`
+const portableExePath = join(portableDir, portableExeName)
+const portableReadmePath = join(portableDir, portableReadmeName)
+const portableZipPath = join(releaseRoot, portableZipName)
+
+copyFileSync(releaseBinary, portableExePath)
+writeFileSync(
+  portableReadmePath,
+  [
+    `Subathon Timer Portable ${version}`,
+    '',
+    `Run ${portableExeName} directly.`,
+    'On first launch, the app will create a local "data" folder beside the executable and keep app state there.',
+    'This portable build does not use the normal installed-app data directory.',
+    '',
+    'Contents:',
+    `- ${portableExeName}`,
+    `- ${portableReadmeName}`,
+  ].join('\n'),
+)
+
+if (statSync(portableZipPath, { throwIfNoEntry: false })?.isFile()) {
+  rmSync(portableZipPath, { force: true })
+}
+
+execFileSync(
+  'powershell',
+  [
+    '-NoProfile',
+    '-Command',
+    `Compress-Archive -Path '${portableExePath.replace(/'/g, "''")}','${portableReadmePath.replace(/'/g, "''")}' -DestinationPath '${portableZipPath.replace(/'/g, "''")}' -Force`,
+  ],
+  { stdio: 'inherit' },
+)
+
+const portableBuffer = readFileSync(portableZipPath)
+const portableSha256 = createHash('sha256').update(portableBuffer).digest('hex')
+writeFileSync(`${portableZipPath}.sha256`, `${portableSha256}  ${basename(portableZipPath)}\n`)
+
+packagedArtifacts.push({
+  kind: 'portable',
+  source: portableExePath,
+  output: portableZipPath,
+  size: statSync(portableZipPath).size,
+  sha256: portableSha256,
+})
 
 const manifest = {
   version,

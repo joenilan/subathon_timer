@@ -36,7 +36,7 @@ bun run tauri:dev
 - `bun run version:check`: Confirm desktop version files are in sync
 - `bun run version:check-notes`: Confirm release notes include the active version
 - `bun run version:patch|minor|major`: Bump `VERSION` and sync package metadata
-- `bun run release:windows`: Build MSI + NSIS installers, then copy them into `release/windows/` with normalized no-space filenames
+- `bun run release:windows`: Build MSI + NSIS installers, plus a portable zip, then copy them into `release/windows/` with normalized no-space filenames
 - `cargo check --manifest-path src-tauri/Cargo.toml`: Validate the native layer
 
 ## Twitch Setup
@@ -112,4 +112,7 @@ Windows release artifacts are copied to `apps/desktop/release/windows/` as:
 
 - `subathon-timer_<version>_x64_en-US.msi`
 - `subathon-timer_<version>_x64-setup.exe`
+- `subathon-timer_<version>_x64_portable.zip`
 - matching `.sha256` files and a `manifest.json`
+
+The portable zip contains `subathon-timer-portable.exe`. When that exe is launched, the app keeps its state in a local `data/` folder beside the executable instead of the normal Windows app-data location.

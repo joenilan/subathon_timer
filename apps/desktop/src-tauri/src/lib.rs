@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{IpAddr, TcpListener, TcpStream};
@@ -15,6 +16,8 @@ const DEFAULT_OVERLAY_PORT: u16 = 31_847;
 const APP_STATE_FILENAME: &str = "app-state.json";
 const TWITCH_SESSION_FILENAME: &str = "twitch-session.dat";
 const TIP_PROVIDER_SESSION_FILENAME: &str = "tip-provider-session.dat";
+const PORTABLE_EXE_SUFFIX: &str = "-portable";
+const PORTABLE_DATA_DIRNAME: &str = "data";
 #[cfg(not(target_os = "windows"))]
 const TWITCH_SESSION_SERVICE: &str = "subathon-timer-desktop";
 #[cfg(not(target_os = "windows"))]
@@ -188,27 +191,47 @@ struct OverlaySyncPayload {
     overlay_preview: OverlayPreviewState,
 }
 
-fn app_state_path<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+fn portable_storage_dir() -> Result<Option<PathBuf>, String> {
+    let exe_path = env::current_exe()
+        .map_err(|error| format!("failed to resolve current executable path: {error}"))?;
+    let stem = exe_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+
+    if !stem.ends_with(PORTABLE_EXE_SUFFIX) {
+        return Ok(None);
+    }
+
+    let Some(parent) = exe_path.parent() else {
+        return Err("failed to resolve portable executable directory".into());
+    };
+
+    Ok(Some(parent.join(PORTABLE_DATA_DIRNAME)))
+}
+
+fn app_storage_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+    if let Some(dir) = portable_storage_dir()? {
+        return Ok(dir);
+    }
+
     app.path()
         .app_data_dir()
-        .map(|dir| dir.join(APP_STATE_FILENAME))
         .map_err(|error| format!("failed to resolve app data dir: {error}"))
 }
 
+fn app_state_path<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+    app_storage_dir(app).map(|dir| dir.join(APP_STATE_FILENAME))
+}
+
 fn twitch_session_path<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join(TWITCH_SESSION_FILENAME))
-        .map_err(|error| format!("failed to resolve secure Twitch session path: {error}"))
+    app_storage_dir(app).map(|dir| dir.join(TWITCH_SESSION_FILENAME))
 }
 
 fn tip_provider_session_path<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
 ) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join(TIP_PROVIDER_SESSION_FILENAME))
-        .map_err(|error| format!("failed to resolve secure tip provider session path: {error}"))
+    app_storage_dir(app).map(|dir| dir.join(TIP_PROVIDER_SESSION_FILENAME))
 }
 
 fn load_native_snapshot<R: tauri::Runtime>(
