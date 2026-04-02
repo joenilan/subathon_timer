@@ -74,6 +74,37 @@ function getProviderStatusLabel(status: TipProviderStatus) {
   }
 }
 
+function getProviderConnectionSummary(
+  providerLabel: string,
+  status: TipProviderStatus,
+  lastEventAt: number | null,
+) {
+  switch (status) {
+    case 'connected':
+      return {
+        tone: 'connected',
+        title: `${providerLabel} connected`,
+        detail: lastEventAt
+          ? `Live tip feed is connected. Last tip seen ${formatTimestamp(lastEventAt)}.`
+          : 'Live tip feed is connected and waiting for the first new tip.',
+      }
+    case 'connecting':
+      return {
+        tone: 'pending',
+        title: `Connecting ${providerLabel}...`,
+        detail: 'The app is trying to open the live tip feed right now.',
+      }
+    case 'error':
+      return null
+    default:
+      return {
+        tone: 'idle',
+        title: `${providerLabel} not connected`,
+        detail: 'Paste the token, then click Connect.',
+      }
+  }
+}
+
 async function openExternalUrl(url: string) {
   try {
     if ('__TAURI_INTERNALS__' in window) {
@@ -222,8 +253,30 @@ export function ConnectionsPage() {
     () => getProviderStatusLabel(streamElementsStatus),
     [streamElementsStatus],
   )
+  const streamElementsSummary = useMemo(
+    () => getProviderConnectionSummary('StreamElements', streamElementsStatus, streamElementsLastEventAt),
+    [streamElementsLastEventAt, streamElementsStatus],
+  )
+  const streamElementsConnectLabel = useMemo(() => {
+    if (streamElementsStatus === 'connecting') {
+      return 'Connecting...'
+    }
+
+    return streamElementsConnection ? 'Reconnect StreamElements' : 'Connect StreamElements'
+  }, [streamElementsConnection, streamElementsStatus])
   const streamlabsStatusTone = useMemo(() => getProviderStatusTone(streamlabsStatus), [streamlabsStatus])
   const streamlabsStatusLabel = useMemo(() => getProviderStatusLabel(streamlabsStatus), [streamlabsStatus])
+  const streamlabsSummary = useMemo(
+    () => getProviderConnectionSummary('Streamlabs', streamlabsStatus, streamlabsLastEventAt),
+    [streamlabsLastEventAt, streamlabsStatus],
+  )
+  const streamlabsConnectLabel = useMemo(() => {
+    if (streamlabsStatus === 'connecting') {
+      return 'Connecting...'
+    }
+
+    return streamlabsConnection ? 'Reconnect Streamlabs' : 'Connect Streamlabs'
+  }, [streamlabsConnection, streamlabsStatus])
 
   const handleCopyCode = async () => {
     if (!deviceFlow) {
@@ -473,7 +526,7 @@ export function ConnectionsPage() {
 
               <div className="action-row">
                 <button className="btn btn--primary" onClick={() => void handleConnectStreamElements()}>
-                  {streamElementsConnection ? 'Reconnect StreamElements' : 'Connect StreamElements'}
+                  {streamElementsConnectLabel}
                 </button>
                 {streamElementsConnection ? (
                   <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamelements')}>
@@ -481,6 +534,13 @@ export function ConnectionsPage() {
                   </button>
                 ) : null}
               </div>
+
+              {streamElementsSummary ? (
+                <div className={`connection-banner connection-banner--${streamElementsSummary.tone}`}>
+                  <strong>{streamElementsSummary.title}</strong>
+                  <p>{streamElementsSummary.detail}</p>
+                </div>
+              ) : null}
 
               <div className="scope-list connections-list">
                 <div className="panel-subtitle">Recent StreamElements tips</div>
@@ -572,7 +632,7 @@ export function ConnectionsPage() {
 
               <div className="action-row">
                 <button className="btn btn--primary" onClick={() => void handleConnectStreamlabs()}>
-                  {streamlabsConnection ? 'Reconnect Streamlabs' : 'Connect Streamlabs'}
+                  {streamlabsConnectLabel}
                 </button>
                 {streamlabsConnection ? (
                   <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamlabs')}>
@@ -580,6 +640,13 @@ export function ConnectionsPage() {
                   </button>
                 ) : null}
               </div>
+
+              {streamlabsSummary ? (
+                <div className={`connection-banner connection-banner--${streamlabsSummary.tone}`}>
+                  <strong>{streamlabsSummary.title}</strong>
+                  <p>{streamlabsSummary.detail}</p>
+                </div>
+              ) : null}
 
               <div className="scope-list connections-list">
                 <div className="panel-subtitle">Recent Streamlabs tips</div>
