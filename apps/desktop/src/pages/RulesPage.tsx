@@ -140,6 +140,7 @@ export function RulesPage() {
               eventRule.controls?.length && (!eventRule.customToggleKey || (advancedSubOverridesEnabled && usesCustomValues)),
             )
             const showTipOverlay = eventRule.key === 'tipEnabled' && enabled && tipRuleOverlay
+            const showBody = enabled && (eventRule.sharedValueNote || showCustomToggle || showControls)
 
             return (
               <article
@@ -166,7 +167,7 @@ export function RulesPage() {
                   </label>
                 </div>
 
-                {(eventRule.sharedValueNote || showCustomToggle || showControls) && (
+                {showBody && (
                   <div className={`rule-event-card__body${showTipOverlay ? ' rule-event-card__body--overlay' : ''}`}>
                     <div className={showTipOverlay ? 'rule-event-card__content rule-event-card__content--obscured' : 'rule-event-card__content'}>
                       {eventRule.sharedValueNote || showCustomToggle ? (
