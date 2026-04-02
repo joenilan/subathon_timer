@@ -8,15 +8,11 @@ import { useEventSubStore } from '../state/useEventSubStore'
 import { useTipSessionStore } from '../state/useTipSessionStore'
 import { selectConnectionsEventSubState, selectConnectionsTipState, selectConnectionsTwitchState } from '../state/selectors'
 
-const STREAMELEMENTS_DASHBOARD_URL = 'https://streamelements.com/dashboard'
 const STREAMELEMENTS_CHANNELS_URL = 'https://streamelements.com/dashboard/account/channels'
 const STREAMELEMENTS_TOKEN_HELP_URL =
   'https://support.streamelements.com/hc/en-us/articles/10474949304466-How-to-Locate-Your-Account-ID-and-JWT-Token'
-const STREAMELEMENTS_WEBSOCKET_DOCS_URL = 'https://docs.streamelements.com/websockets'
-const STREAMELEMENTS_TIP_SETUP_URL = 'https://docs.streamelements.com/chatbot/commands/default/tip'
 const STREAMLABS_DASHBOARD_URL = 'https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard'
 const STREAMLABS_TOKENS_HELP_URL = 'https://support.streamlabs.com/hc/en-us/articles/115000090014-Alerts-Widget-Troubleshooting'
-const STREAMLABS_SOCKET_DOCS_URL = 'https://dev.streamlabs.com/docs/socket-api'
 
 function formatTimestamp(value: number | null) {
   if (!value) {
@@ -400,8 +396,7 @@ export function ConnectionsPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Tips & donations</h2>
-            <p className="panel-copy">Connect StreamElements and Streamlabs tip feeds here. Both providers feed the same tip rule on the Rules page, so you only configure the timer math once.</p>
-            <p className="panel-copy">Both integrations now follow the simple streamer-tool model: open the provider dashboard, copy the token the provider gives you, paste it here, and connect.</p>
+            <p className="panel-copy">Connect StreamElements or Streamlabs here, then enable the shared <strong>Tips / donations</strong> rule on the Rules page.</p>
           </div>
         </div>
 
@@ -410,8 +405,7 @@ export function ConnectionsPage() {
             <div className="panel-header">
               <div>
                 <h3 className="panel-title">StreamElements</h3>
-                <p className="panel-copy">Normal-user setup: open your StreamElements channel page, turn on <strong>Show Secrets</strong>, copy the JWT token, paste it here, and connect.</p>
-                <p className="panel-copy">You do not need a client ID, client secret, developer app, or any extra hosted service for this flow.</p>
+                <p className="panel-copy">Click the button, turn on <strong>Show Secrets</strong>, copy the JWT token, paste it here, connect.</p>
               </div>
               <div className={`status-chip status-chip--${getProviderStatusTone(streamElementsStatus)}`}>{streamElementsStatusLabel}</div>
             </div>
@@ -438,40 +432,31 @@ export function ConnectionsPage() {
               <div className="scope-list connections-list">
                 <div className="panel-subtitle">Quick setup</div>
                 <div className="scope-row">
-                  <code>1. Click Open Channel Page</code>
-                  <p>That opens the exact StreamElements page where the token lives. If you have more than one linked channel, switch to the one you actually stream from.</p>
+                  <code>1. Click Get StreamElements Token</code>
+                  <p>It opens the exact page where the token lives.</p>
                 </div>
                 <div className="scope-row">
-                  <code>2. Turn on &quot;Show Secrets&quot; on the right side</code>
-                  <p>That is the exact wording from the StreamElements help article. Once you toggle it on, the JWT token will appear on the same page.</p>
+                  <code>2. Turn on &quot;Show Secrets&quot;</code>
+                  <p>The JWT token appears on that same page.</p>
                 </div>
                 <div className="scope-row">
-                  <code>3. Copy the JWT token and paste it here</code>
-                  <p>The JWT token is private. Do not post it publicly or send it to anyone. Once connected, new tips will appear below and can add time through the shared Tips / donations rule.</p>
+                  <code>3. Copy the JWT token, paste it here, click Connect</code>
+                  <p>No client ID, client secret, or developer app needed.</p>
                 </div>
               </div>
 
               <div className="action-row">
                 <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_CHANNELS_URL)}>
-                  Open Channel Page
-                </button>
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_DASHBOARD_URL)}>
-                  Open Dashboard
+                  Get StreamElements Token
                 </button>
                 <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_TOKEN_HELP_URL)}>
-                  Open StreamElements Help
-                </button>
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_WEBSOCKET_DOCS_URL)}>
-                  Open Astro Docs
-                </button>
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_TIP_SETUP_URL)}>
-                  Open Tip Setup Docs
+                  Need Help?
                 </button>
               </div>
 
               <div className="provider-field-grid">
                 <label className="rule-field rule-field--compact">
-                  <span className="rule-field__label">JWT token</span>
+                  <span className="rule-field__label">Paste JWT token here</span>
                   <input
                     className="rule-field__input"
                     type="password"
@@ -481,7 +466,7 @@ export function ConnectionsPage() {
                     value={streamElementsToken}
                     onChange={(event) => setStreamElementsToken(event.target.value)}
                   />
-                  <span className="rule-field__hint">Paste the token that appears after you turn on Show Secrets. It is stored locally in the native secure session store when you run under Tauri.</span>
+                  <span className="rule-field__hint">The token is private. It stays local on this PC when you run the desktop app.</span>
                 </label>
               </div>
 
@@ -519,8 +504,7 @@ export function ConnectionsPage() {
             <div className="panel-header">
               <div>
                 <h3 className="panel-title">Streamlabs</h3>
-                <p className="panel-copy">Normal-user setup: open Streamlabs, go to <strong>Settings &gt; API Settings &gt; API Tokens</strong>, copy <strong>Your Socket API Token</strong>, paste it here, and connect.</p>
-                <p className="panel-copy">You do not need a client ID, client secret, developer app, or any extra hosted service for this flow.</p>
+                <p className="panel-copy">Click the button, go to <strong>Settings &gt; API Settings &gt; API Tokens</strong>, copy <strong>Your Socket API Token</strong>, paste it here, connect.</p>
               </div>
               <div className={`status-chip status-chip--${streamlabsStatusTone}`}>{streamlabsStatusLabel}</div>
             </div>
@@ -547,34 +531,31 @@ export function ConnectionsPage() {
               <div className="scope-list connections-list">
                 <div className="panel-subtitle">Quick setup</div>
                 <div className="scope-row">
-                  <code>1. Click Open Dashboard</code>
-                  <p>Sign in to the same Streamlabs account that receives your donations.</p>
+                  <code>1. Click Get Streamlabs Token</code>
+                  <p>Sign in to the Streamlabs account that receives your donations.</p>
                 </div>
                 <div className="scope-row">
                   <code>2. Go to Settings &gt; API Settings &gt; API Tokens</code>
-                  <p>That is the exact menu path Streamlabs support uses in their help article.</p>
+                  <p>That is the exact menu path Streamlabs uses in their help docs.</p>
                 </div>
                 <div className="scope-row">
-                  <code>3. Copy &quot;Your Socket API Token&quot; and paste it here</code>
-                  <p>Use the Socket API Token only. Do not use an OAuth client ID, client secret, or any developer app credential. Once connected, new donations will appear below and feed the shared Tips / donations timer rule.</p>
+                  <code>3. Copy &quot;Your Socket API Token&quot;, paste it here, click Connect</code>
+                  <p>No client ID, client secret, or developer app needed.</p>
                 </div>
               </div>
 
               <div className="action-row">
                 <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_DASHBOARD_URL)}>
-                  Open Dashboard
+                  Get Streamlabs Token
                 </button>
                 <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_TOKENS_HELP_URL)}>
-                  Open Streamlabs Help
-                </button>
-                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_SOCKET_DOCS_URL)}>
-                  Open Socket Docs
+                  Need Help?
                 </button>
               </div>
 
               <div className="provider-field-grid">
                 <label className="rule-field rule-field--compact">
-                  <span className="rule-field__label">Socket API Token</span>
+                  <span className="rule-field__label">Paste Socket API Token here</span>
                   <input
                     className="rule-field__input"
                     type="password"
@@ -584,7 +565,7 @@ export function ConnectionsPage() {
                     value={streamlabsToken}
                     onChange={(event) => setStreamlabsToken(event.target.value)}
                   />
-                  <span className="rule-field__hint">Paste the exact value Streamlabs labels &quot;Your Socket API Token&quot;. It is stored locally in the native secure session store when you run under Tauri.</span>
+                  <span className="rule-field__hint">Paste the exact value Streamlabs labels &quot;Your Socket API Token&quot;. It stays local on this PC when you run the desktop app.</span>
                 </label>
               </div>
 
