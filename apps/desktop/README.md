@@ -37,6 +37,7 @@ bun run tauri:dev
 - `bun run version:check-notes`: Confirm release notes include the active version
 - `bun run version:patch|minor|major`: Bump `VERSION` and sync package metadata
 - `bun run release:windows`: Build MSI + NSIS installers, plus a portable zip, then copy them into `release/windows/` with normalized no-space filenames
+- `bun run release:publish`: Run `release:windows`, generate `latest.json` + `notes.md`, then upload the release files to the Raspberry Pi target from `.env.raspi`
 - `cargo check --manifest-path src-tauri/Cargo.toml`: Validate the native layer
 
 ## Twitch Setup
@@ -104,6 +105,7 @@ bun run version:check-notes
 bun run build
 cargo check --manifest-path src-tauri/Cargo.toml
 bun run release:windows
+bun run release:publish
 ```
 
 Update `CHANGELOG.md` and `PATCH_NOTES.md` in the same pass as the version bump.
@@ -116,3 +118,5 @@ Windows release artifacts are copied to `apps/desktop/release/windows/` as:
 - matching `.sha256` files and a `manifest.json`
 
 The portable zip contains `subathon-timer-portable.exe`. When that exe is launched, the app keeps its state in a local `data/` folder beside the executable instead of the normal Windows app-data location.
+
+`release:publish` expects a local root-level `.env.raspi` file with the Raspberry Pi SSH details. That file is ignored by git and should stay local-only.

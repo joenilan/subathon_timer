@@ -22,7 +22,8 @@
     "tauri:clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "tauri:clean:release": "cargo clean --manifest-path src-tauri/Cargo.toml --release",
     "tauri:build:clean": "tauri build && cargo clean --manifest-path src-tauri/Cargo.toml --release",
-    "release:windows": "bun run tauri:build:windows && node ./scripts/package-release.mjs"
+    "release:windows": "bun run tauri:build:windows && node ./scripts/package-release.mjs",
+    "release:publish": "bun run release:windows && node ./scripts/publish-release.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -43,6 +44,7 @@
     "@types/socket.io-client": "1.4.36",
     "@vitejs/plugin-react": "^4.6.0",
     "jsdom": "^26.1.0",
+    "ssh2-sftp-client": "^12.1.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^3.2.4"

@@ -102,6 +102,7 @@ bun run version:check
 bun run version:check-notes
 bun run version:patch
 bun run release:windows
+bun run release:publish
 ```
 
 When preparing a desktop release, update:
@@ -110,6 +111,8 @@ When preparing a desktop release, update:
 - `apps/desktop/PATCH_NOTES.md`
 
 `bun run release:windows` builds the Windows installers and a portable zip, then copies normalized artifacts into `apps/desktop/release/windows/`.
+
+`bun run release:publish` uses the local root `.env.raspi` file to upload those release artifacts plus `latest.json` and `notes.md` to the Raspberry Pi-hosted downloads directory.
 
 ## License
 

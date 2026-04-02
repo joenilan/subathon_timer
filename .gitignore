@@ -30,3 +30,4 @@ token_cache.json
 /timer-overlay-*.png
 /wheel-*.png
 /apps/desktop/release/
+/.env.raspi
