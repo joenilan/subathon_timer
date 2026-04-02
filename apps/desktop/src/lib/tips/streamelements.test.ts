@@ -3,6 +3,7 @@ import {
   buildStreamElementsSubscribeMessages,
   normalizeStreamElementsTipMessage,
   parseStreamElementsSocketEnvelope,
+  summarizeStreamElementsTip,
 } from './streamelements'
 
 describe('StreamElements tip helpers', () => {
@@ -105,5 +106,26 @@ describe('StreamElements tip helpers', () => {
     )
 
     expect(normalizeStreamElementsTipMessage(envelope)).toBeNull()
+  })
+
+  it('formats the tip summary with a currency symbol when possible', () => {
+    const summary = summarizeStreamElementsTip({
+      id: 'tip-1',
+      source: 'streamelements',
+      eventType: 'tip',
+      occurredAt: '2026-04-02T10:00:00Z',
+      userId: null,
+      userLogin: 'Styler',
+      displayName: 'Styler',
+      anonymous: false,
+      amount: 5.5,
+      currency: 'USD',
+      tier: null,
+      count: null,
+      command: null,
+      rawPayload: {},
+    })
+
+    expect(summary.detail).toContain('$5.50')
   })
 })

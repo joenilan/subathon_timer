@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeStreamlabsSocketEvent } from './streamlabs'
+import { normalizeStreamlabsSocketEvent, summarizeStreamlabsTip } from './streamlabs'
 
 describe('Streamlabs tip helpers', () => {
   it('normalizes donation socket payloads', () => {
@@ -50,5 +50,26 @@ describe('Streamlabs tip helpers', () => {
         message: [{ amount: 0 }],
       }),
     ).toHaveLength(0)
+  })
+
+  it('formats the tip summary with a currency symbol when possible', () => {
+    const summary = summarizeStreamlabsTip({
+      id: 'tip-1',
+      source: 'streamlabs',
+      eventType: 'tip',
+      occurredAt: '2026-04-02T10:00:00Z',
+      userId: null,
+      userLogin: 'test',
+      displayName: 'test',
+      anonymous: false,
+      amount: 13.37,
+      currency: 'USD',
+      tier: null,
+      count: null,
+      command: null,
+      rawPayload: {},
+    })
+
+    expect(summary.detail).toContain('$13.37')
   })
 })

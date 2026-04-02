@@ -1,5 +1,6 @@
 import type { NormalizedTimerEvent } from '../timer/types'
 import type { StreamElementsTipConnection, TipProviderNotification } from './types'
+import { formatTipAmount } from './formatTipAmount'
 
 interface StreamElementsSocketEnvelope {
   id?: string
@@ -174,7 +175,7 @@ export function summarizeStreamElementsTip(event: NormalizedTimerEvent): TipProv
     id: event.id,
     provider: 'streamelements',
     title: 'StreamElements tip',
-    detail: `${actor} tipped ${event.amount ?? 0}${event.currency ? ` ${event.currency}` : ''}.`,
+    detail: `${actor} tipped ${formatTipAmount(event.amount, event.currency)}.`,
     occurredAt: Date.parse(event.occurredAt) || Date.now(),
   }
 }

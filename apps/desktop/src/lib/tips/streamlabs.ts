@@ -1,5 +1,6 @@
 import type { NormalizedTimerEvent } from '../timer/types'
 import type { TipProviderNotification } from './types'
+import { formatTipAmount } from './formatTipAmount'
 
 interface StreamlabsSocketEnvelope {
   type?: string
@@ -110,7 +111,7 @@ export function summarizeStreamlabsTip(event: NormalizedTimerEvent): TipProvider
     id: event.id,
     provider: 'streamlabs',
     title: 'Streamlabs tip',
-    detail: `${actor} tipped ${event.amount ?? 0}${event.currency ? ` ${event.currency}` : ''}.`,
+    detail: `${actor} tipped ${formatTipAmount(event.amount, event.currency)}.`,
     occurredAt: Date.parse(event.occurredAt) || Date.now(),
   }
 }
