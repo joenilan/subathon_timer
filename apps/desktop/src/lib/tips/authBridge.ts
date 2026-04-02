@@ -8,7 +8,23 @@ export interface StreamlabsBridgeStartResult {
   expiresInSeconds: number
 }
 
-function getTipAuthBridgeBaseUrl() {
+interface TipAuthBridgeHealthResponse {
+  ok?: boolean
+  providers?: {
+    streamlabs?: boolean
+    streamelements?: boolean
+  }
+  error?: string
+}
+
+export interface TipAuthBridgeHealth {
+  baseUrl: string
+  ok: boolean
+  streamlabsEnabled: boolean
+  streamelementsEnabled: boolean
+}
+
+export function getTipAuthBridgeBaseUrl() {
   const configured = import.meta.env.VITE_TIP_AUTH_BRIDGE_URL?.trim()
   return configured && configured.length > 0 ? configured : DEFAULT_TIP_AUTH_BRIDGE_URL
 }
@@ -17,16 +33,67 @@ async function readJson<T>(response: Response) {
   return (await response.json()) as T
 }
 
-export async function startStreamlabsBridgeOAuth(redirectUri: string) {
-  const response = await fetch(`${getTipAuthBridgeBaseUrl()}/api/providers/streamlabs/auth/start`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
+function buildAuthBridgeFetchError(baseUrl: string, action: string, error: unknown) {
+  const detail =
+    error instanceof Error && error.message.trim().length > 0
+      ? ` ${error.message.trim()}`
+      : ''
+
+  return new Error(
+    `Unable to ${action} because the Streamlabs auth bridge is not reachable at ${baseUrl}.${detail} Start apps/auth-bridge or set VITE_TIP_AUTH_BRIDGE_URL to your deployed bridge URL.`,
+  )
+}
+
+async function fetchTipAuthBridge(path: string, init: RequestInit, action: string) {
+  const baseUrl = getTipAuthBridgeBaseUrl()
+
+  try {
+    return await fetch(`${baseUrl}${path}`, init)
+  } catch (error) {
+    throw buildAuthBridgeFetchError(baseUrl, action, error)
+  }
+}
+
+export async function getTipAuthBridgeHealth() {
+  const response = await fetchTipAuthBridge(
+    '/health',
+    {
+      method: 'GET',
     },
-    body: JSON.stringify({
-      redirectUri,
-    }),
-  })
+    'check Streamlabs auth availability',
+  )
+
+  const payload = await readJson<TipAuthBridgeHealthResponse>(response)
+  const baseUrl = getTipAuthBridgeBaseUrl()
+
+  if (!response.ok || payload.ok !== true) {
+    throw new Error(
+      payload.error?.trim() || `The Streamlabs auth bridge health check failed at ${baseUrl}.`,
+    )
+  }
+
+  return {
+    baseUrl,
+    ok: true,
+    streamlabsEnabled: payload.providers?.streamlabs === true,
+    streamelementsEnabled: payload.providers?.streamelements === true,
+  } satisfies TipAuthBridgeHealth
+}
+
+export async function startStreamlabsBridgeOAuth(redirectUri: string) {
+  const response = await fetchTipAuthBridge(
+    '/api/providers/streamlabs/auth/start',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        redirectUri,
+      }),
+    },
+    'start Streamlabs authorization',
+  )
 
   const payload = await readJson<{ authorizeUrl?: string; state?: string; expiresInSeconds?: number; error?: string }>(response)
 
@@ -46,13 +113,17 @@ export async function exchangeStreamlabsBridgeOAuth(input: {
   state: string
   redirectUri: string
 }) {
-  const response = await fetch(`${getTipAuthBridgeBaseUrl()}/api/providers/streamlabs/auth/exchange`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
+  const response = await fetchTipAuthBridge(
+    '/api/providers/streamlabs/auth/exchange',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(input),
     },
-    body: JSON.stringify(input),
-  })
+    'finish Streamlabs authorization',
+  )
 
   const payload = await readJson<
     | ({
@@ -76,15 +147,19 @@ export async function exchangeStreamlabsBridgeOAuth(input: {
 }
 
 export async function refreshStreamlabsBridgeOAuth(refreshToken: string) {
-  const response = await fetch(`${getTipAuthBridgeBaseUrl()}/api/providers/streamlabs/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
+  const response = await fetchTipAuthBridge(
+    '/api/providers/streamlabs/auth/refresh',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        refreshToken,
+      }),
     },
-    body: JSON.stringify({
-      refreshToken,
-    }),
-  })
+    'refresh the Streamlabs access token',
+  )
 
   const payload = await readJson<
     | ({

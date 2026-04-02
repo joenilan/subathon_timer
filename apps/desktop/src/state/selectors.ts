@@ -175,6 +175,7 @@ export const selectTipLifecycleState = (state: TipSessionState) => ({
 })
 
 export const selectConnectionsTipState = (state: TipSessionState) => ({
+  checkStreamlabsBridge: state.checkStreamlabsBridge,
   clearTipError: state.clearError,
   connectStreamElements: state.connectStreamElements,
   disconnectTipProvider: state.disconnectProvider,
@@ -185,6 +186,9 @@ export const selectConnectionsTipState = (state: TipSessionState) => ({
   streamElementsLastEventAt: state.streamelementsLastEventAt,
   streamElementsStatus: state.streamelementsStatus,
   streamlabsAuthorizationPending: state.streamlabsAuthorizationPending,
+  streamlabsBridgeLastError: state.streamlabsBridgeLastError,
+  streamlabsBridgeReachable: state.streamlabsBridgeReachable,
+  streamlabsBridgeUrl: state.streamlabsBridgeUrl,
   streamlabsConnection: state.streamlabsConnection,
   streamlabsLastError: state.streamlabsLastError,
   streamlabsLastEventAt: state.streamlabsLastEventAt,

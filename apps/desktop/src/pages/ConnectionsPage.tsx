@@ -115,6 +115,7 @@ export function ConnectionsPage() {
     eventSubError,
   } = useEventSubStore(useShallow(selectConnectionsEventSubState))
   const {
+    checkStreamlabsBridge,
     clearTipError,
     connectStreamElements,
     disconnectTipProvider,
@@ -125,6 +126,9 @@ export function ConnectionsPage() {
     streamElementsLastEventAt,
     streamElementsStatus,
     streamlabsAuthorizationPending,
+    streamlabsBridgeLastError,
+    streamlabsBridgeReachable,
+    streamlabsBridgeUrl,
     streamlabsConnection,
     streamlabsLastError,
     streamlabsLastEventAt,
@@ -230,6 +234,17 @@ export function ConnectionsPage() {
     () => (streamlabsAuthorizationPending ? 'Waiting for approval' : getProviderStatusLabel(streamlabsStatus)),
     [streamlabsAuthorizationPending, streamlabsStatus],
   )
+  const streamlabsBridgeStatusLabel = useMemo(() => {
+    if (streamlabsBridgeReachable === true) {
+      return 'Reachable'
+    }
+
+    if (streamlabsBridgeReachable === false) {
+      return 'Unavailable'
+    }
+
+    return 'Unchecked'
+  }, [streamlabsBridgeReachable])
   const streamlabsOAuthSupported = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
   const handleCopyCode = async () => {
@@ -541,10 +556,23 @@ export function ConnectionsPage() {
                 </div>
               ) : null}
 
+              {streamlabsBridgeLastError ? (
+                <div className="alert-banner">
+                  <span>{streamlabsBridgeLastError}</span>
+                  <button className="btn btn--ghost" onClick={() => void checkStreamlabsBridge()}>
+                    Recheck bridge
+                  </button>
+                </div>
+              ) : null}
+
               <div className="fact-grid">
                 <div className="fact">
                   <span className="fact-label">Authorization flow</span>
                   <strong>Approve app in browser</strong>
+                </div>
+                <div className="fact">
+                  <span className="fact-label">Auth bridge</span>
+                  <strong>{streamlabsBridgeStatusLabel}</strong>
                 </div>
                 <div className="fact">
                   <span className="fact-label">Last tip</span>
@@ -552,18 +580,27 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
+              <div className="scope-row">
+                <code>Bridge URL</code>
+                <p><code>{streamlabsBridgeUrl}</code></p>
+              </div>
+
               <div className="scope-list connections-list">
                 <div className="panel-subtitle">Quick setup</div>
                 <div className="scope-row">
-                  <code>1. Click Connect Streamlabs</code>
-                  <p>The app opens the official Streamlabs authorization page for your account.</p>
+                  <code>1. Start the auth bridge</code>
+                  <p>Run <code>cd apps/auth-bridge && bun run dev</code> locally, or point this build at your deployed bridge with <code>VITE_TIP_AUTH_BRIDGE_URL</code>. The app currently expects <code>{streamlabsBridgeUrl}</code>.</p>
                 </div>
                 <div className="scope-row">
-                  <code>2. Approve the app in your browser</code>
+                  <code>2. Click Connect Streamlabs</code>
+                  <p>The app checks the bridge first, then opens the official Streamlabs authorization page for your account.</p>
+                </div>
+                <div className="scope-row">
+                  <code>3. Approve the app in your browser</code>
                   <p>Once approved, the desktop app captures the local callback and exchanges the code through the app-owned auth bridge. Users never see the app secret.</p>
                 </div>
                 <div className="scope-row">
-                  <code>3. Tips start updating the timer</code>
+                  <code>4. Tips start updating the timer</code>
                   <p>After connection, the app polls the Streamlabs donations endpoint and only applies new donation IDs once.</p>
                 </div>
               </div>
@@ -580,6 +617,9 @@ export function ConnectionsPage() {
                 </button>
                 <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_SCOPES_URL)}>
                   Open Scopes
+                </button>
+                <button className="btn btn--ghost" onClick={() => void checkStreamlabsBridge()}>
+                  Check Bridge
                 </button>
               </div>
 

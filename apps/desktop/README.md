@@ -75,7 +75,7 @@ The desktop app can now add time from StreamElements and Streamlabs tips.
 - Streamlabs uses the official donations API plus the auth bridge in `apps/auth-bridge`.
 - Setup details and the 2026 provider docs are in [docs/tip-providers.md](/E:/git/subathon_timer/apps/desktop/docs/tip-providers.md).
 
-For public-user Streamlabs auth, the desktop app expects a bridge URL via `VITE_TIP_AUTH_BRIDGE_URL`. In local development it defaults to `http://127.0.0.1:8788`.
+For public-user Streamlabs auth, the desktop app expects a bridge URL via `VITE_TIP_AUTH_BRIDGE_URL`. In local development it defaults to `http://127.0.0.1:8788`, so run `cd ../auth-bridge && bun run dev` before pressing `Connect Streamlabs` unless you built the app against a deployed bridge URL.
 
 ## Manual Smoke Tests
 

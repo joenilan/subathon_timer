@@ -91,6 +91,11 @@ Owner setup:
 8. The app polls `GET https://streamlabs.com/api/v2.0/donations?limit=10`.
 9. Only donation IDs newer than the last seen donation are applied to the timer.
 
+Local development default:
+
+- If `VITE_TIP_AUTH_BRIDGE_URL` is not set, the desktop app expects the bridge at `http://127.0.0.1:8788`.
+- In that case, run `cd apps/auth-bridge && bun run dev` before pressing `Connect Streamlabs`.
+
 Why this implementation:
 
 - Streamlabs still recommends the Socket API in docs.

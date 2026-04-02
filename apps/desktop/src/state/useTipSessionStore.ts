@@ -13,6 +13,8 @@ import {
 } from '../lib/platform/nativeStreamlabsAuth'
 import {
   exchangeStreamlabsBridgeOAuth,
+  getTipAuthBridgeBaseUrl,
+  getTipAuthBridgeHealth,
   refreshStreamlabsBridgeOAuth,
   startStreamlabsBridgeOAuth,
 } from '../lib/tips/authBridge'
@@ -146,6 +148,9 @@ export interface TipSessionState {
   streamelementsLastError: string | null
   streamelementsLastEventAt: number | null
   streamlabsAuthorizationPending: boolean
+  streamlabsBridgeUrl: string
+  streamlabsBridgeReachable: boolean | null
+  streamlabsBridgeLastError: string | null
   streamlabsConnection: StreamlabsTipConnection | null
   streamlabsStatus: TipProviderStatus
   streamlabsLastError: string | null
@@ -154,6 +159,7 @@ export interface TipSessionState {
   normalizedEvents: NormalizedTimerEvent[]
 
   bootstrap: () => Promise<void>
+  checkStreamlabsBridge: () => Promise<boolean>
   connectStreamElements: (connection: StreamElementsTipConnection) => Promise<void>
   startStreamlabsOAuth: () => Promise<void>
   disconnectProvider: (provider: 'streamelements' | 'streamlabs') => Promise<void>
@@ -163,6 +169,38 @@ export interface TipSessionState {
 export const useTipSessionStore = create<TipSessionState>((set, get) => {
   const isActiveStreamlabsRuntime = (runtimeId: number) =>
     desiredStreamlabsConnection !== null && activeStreamlabsRuntimeId === runtimeId
+
+  const checkStreamlabsBridge = async () => {
+    try {
+      const health = await getTipAuthBridgeHealth()
+      if (!health.streamlabsEnabled) {
+        set({
+          streamlabsBridgeUrl: health.baseUrl,
+          streamlabsBridgeReachable: false,
+          streamlabsBridgeLastError:
+            'The auth bridge is reachable, but Streamlabs is not configured there. Set STREAMLABS_CLIENT_ID and STREAMLABS_CLIENT_SECRET on the bridge server.',
+        })
+        return false
+      }
+
+      set({
+        streamlabsBridgeUrl: health.baseUrl,
+        streamlabsBridgeReachable: true,
+        streamlabsBridgeLastError: null,
+      })
+      return true
+    } catch (error) {
+      set({
+        streamlabsBridgeUrl: getTipAuthBridgeBaseUrl(),
+        streamlabsBridgeReachable: false,
+        streamlabsBridgeLastError:
+          error instanceof Error
+            ? error.message
+            : 'Unable to reach the Streamlabs auth bridge.',
+      })
+      return false
+    }
+  }
 
   const scheduleStreamElementsReconnect = (url?: string) => {
     clearStreamElementsReconnectTimer()
@@ -497,6 +535,9 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     streamelementsLastError: null,
     streamelementsLastEventAt: null,
     streamlabsAuthorizationPending: false,
+    streamlabsBridgeUrl: getTipAuthBridgeBaseUrl(),
+    streamlabsBridgeReachable: null,
+    streamlabsBridgeLastError: null,
     streamlabsConnection: null,
     streamlabsStatus: 'idle',
     streamlabsLastError: null,
@@ -525,6 +566,8 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
         if (snapshot?.streamlabs) {
           await connectStreamlabsRuntime(snapshot.streamlabs)
         }
+
+        void checkStreamlabsBridge()
       } catch (error) {
         set({
           isBootstrapped: true,
@@ -533,6 +576,8 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
         })
       }
     },
+
+    checkStreamlabsBridge,
 
     connectStreamElements: async (connection) => {
       const nextConnection = {
@@ -557,6 +602,18 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     },
 
     startStreamlabsOAuth: async () => {
+      const bridgeReady = await checkStreamlabsBridge()
+      if (!bridgeReady) {
+        set({
+          streamlabsAuthorizationPending: false,
+          streamlabsStatus: 'error',
+          streamlabsLastError:
+            get().streamlabsBridgeLastError ??
+            'The Streamlabs auth bridge is unavailable. Start the bridge or point the app at the deployed bridge URL.',
+        })
+        return
+      }
+
       set({
         streamlabsAuthorizationPending: true,
         streamlabsStatus: 'connecting',
