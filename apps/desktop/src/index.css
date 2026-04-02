@@ -3593,12 +3593,22 @@ select.rule-field__input {
     font-weight: 600;
 }
 
+.provider-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fact-grid + .provider-section,
+.provider-section + .provider-section {
+    padding-top: 12px;
+    border-top: 1px solid rgba(135, 150, 178, 0.12);
+}
+
 .provider-helper-actions {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding-top: 4px;
-    border-top: 1px solid rgba(135, 150, 178, 0.12);
 }
 
 .provider-helper-actions__row {

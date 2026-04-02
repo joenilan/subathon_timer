@@ -472,6 +472,13 @@ export function ConnectionsPage() {
                 </div>
               ) : null}
 
+              {streamElementsSummary ? (
+                <div className={`connection-banner connection-banner--${streamElementsSummary.tone}`}>
+                  <strong>{streamElementsSummary.title}</strong>
+                  <p>{streamElementsSummary.detail}</p>
+                </div>
+              ) : null}
+
               <div className="fact-grid">
                 <div className="fact">
                   <span className="fact-label">Connection type</span>
@@ -483,32 +490,34 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="scope-list connections-list quick-setup-list quick-setup-list--streamelements">
-                <div className="panel-subtitle">Quick setup</div>
-                <div className="quick-setup-step">
-                  <div className="quick-setup-step__header">
-                    <span className="quick-setup-step__badge">1</span>
-                    <code className="quick-setup-step__title">Open channel secrets</code>
+              <div className="provider-section">
+                <div className="scope-list connections-list quick-setup-list quick-setup-list--streamelements">
+                  <div className="panel-subtitle">Quick setup</div>
+                  <div className="quick-setup-step">
+                    <div className="quick-setup-step__header">
+                      <span className="quick-setup-step__badge">1</span>
+                      <code className="quick-setup-step__title">Open channel secrets</code>
+                    </div>
+                    <p>Click <strong>Get StreamElements Token</strong>. It opens the exact page where your channel JWT lives.</p>
                   </div>
-                  <p>Click <strong>Get StreamElements Token</strong>. It opens the exact page where your channel JWT lives.</p>
-                </div>
-                <div className="quick-setup-step">
-                  <div className="quick-setup-step__header">
-                    <span className="quick-setup-step__badge">2</span>
-                    <code className="quick-setup-step__title">Turn on Show Secrets</code>
+                  <div className="quick-setup-step">
+                    <div className="quick-setup-step__header">
+                      <span className="quick-setup-step__badge">2</span>
+                      <code className="quick-setup-step__title">Turn on Show Secrets</code>
+                    </div>
+                    <p>The JWT token appears on that same page as soon as secrets are visible.</p>
                   </div>
-                  <p>The JWT token appears on that same page as soon as secrets are visible.</p>
-                </div>
-                <div className="quick-setup-step">
-                  <div className="quick-setup-step__header">
-                    <span className="quick-setup-step__badge">3</span>
-                    <code className="quick-setup-step__title">Paste JWT and connect</code>
+                  <div className="quick-setup-step">
+                    <div className="quick-setup-step__header">
+                      <span className="quick-setup-step__badge">3</span>
+                      <code className="quick-setup-step__title">Paste JWT and connect</code>
+                    </div>
+                    <p>Paste the JWT below and connect. No client ID, client secret, or developer app needed.</p>
                   </div>
-                  <p>Paste the JWT below and connect. No client ID, client secret, or developer app needed.</p>
                 </div>
               </div>
 
-              <div className="provider-helper-actions">
+              <div className="provider-section provider-helper-actions">
                 <div className="panel-subtitle">Open the token page</div>
                 <div className="action-row provider-helper-actions__row">
                   <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_CHANNELS_URL)}>
@@ -520,56 +529,49 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="provider-field-grid">
-                <label className="rule-field rule-field--compact">
-                  <span className="rule-field__label">Paste JWT token here</span>
-                  <input
-                    className="rule-field__input"
-                    type="password"
-                    spellCheck={false}
-                    autoComplete="off"
-                    placeholder="Paste StreamElements JWT token"
-                    value={streamElementsToken}
-                    onChange={(event) => setStreamElementsToken(event.target.value)}
-                  />
-                  <span className="rule-field__hint">The token is private. It stays local on this PC when you run the desktop app.</span>
-                </label>
-              </div>
+              <div className="provider-section">
+                <div className="panel-subtitle">Paste token</div>
+                <div className="provider-field-grid">
+                  <label className="rule-field rule-field--compact">
+                    <span className="rule-field__label">Paste JWT token here</span>
+                    <input
+                      className="rule-field__input"
+                      type="password"
+                      spellCheck={false}
+                      autoComplete="off"
+                      placeholder="Paste StreamElements JWT token"
+                      value={streamElementsToken}
+                      onChange={(event) => setStreamElementsToken(event.target.value)}
+                    />
+                    <span className="rule-field__hint">The token is private. It stays local on this PC when you run the desktop app.</span>
+                  </label>
+                </div>
 
-              <div className="action-row">
-                <button className="btn btn--primary" onClick={() => void handleConnectStreamElements()}>
-                  {streamElementsConnectLabel}
-                </button>
-                {streamElementsConnection ? (
-                  <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamelements')}>
-                    Disconnect
+                <div className="action-row">
+                  <button className="btn btn--primary" onClick={() => void handleConnectStreamElements()}>
+                    {streamElementsConnectLabel}
                   </button>
-                ) : null}
+                  {streamElementsConnection ? (
+                    <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamelements')}>
+                      Disconnect
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
-              {streamElementsSummary ? (
-                <div className={`connection-banner connection-banner--${streamElementsSummary.tone}`}>
-                  <strong>{streamElementsSummary.title}</strong>
-                  <p>{streamElementsSummary.detail}</p>
+              {streamElementsNotifications.length > 0 ? (
+                <div className="provider-section">
+                  <div className="scope-list connections-list">
+                    <div className="panel-subtitle">Recent StreamElements tips</div>
+                    {streamElementsNotifications.map((notification) => (
+                      <div key={notification.id} className="scope-row">
+                        <code>{notification.title}</code>
+                        <p>{notification.detail}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
-
-              <div className="scope-list connections-list">
-                <div className="panel-subtitle">Recent StreamElements tips</div>
-                {streamElementsNotifications.length > 0 ? (
-                  streamElementsNotifications.map((notification) => (
-                    <div key={notification.id} className="scope-row">
-                      <code>{notification.title}</code>
-                      <p>{notification.detail}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="scope-row">
-                    <code>No tips yet</code>
-                    <p>Once StreamElements tip events arrive, they will show up here before they hit the timer activity feed.</p>
-                  </div>
-                )}
-              </div>
             </div>
           </section>
 
@@ -590,6 +592,13 @@ export function ConnectionsPage() {
                 </div>
               ) : null}
 
+              {streamlabsSummary ? (
+                <div className={`connection-banner connection-banner--${streamlabsSummary.tone}`}>
+                  <strong>{streamlabsSummary.title}</strong>
+                  <p>{streamlabsSummary.detail}</p>
+                </div>
+              ) : null}
+
               <div className="fact-grid">
                 <div className="fact">
                   <span className="fact-label">Connection type</span>
@@ -601,32 +610,34 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="scope-list connections-list quick-setup-list quick-setup-list--streamlabs">
-                <div className="panel-subtitle">Quick setup</div>
-                <div className="quick-setup-step">
-                  <div className="quick-setup-step__header">
-                    <span className="quick-setup-step__badge">1</span>
-                    <code className="quick-setup-step__title">Open API Settings</code>
+              <div className="provider-section">
+                <div className="scope-list connections-list quick-setup-list quick-setup-list--streamlabs">
+                  <div className="panel-subtitle">Quick setup</div>
+                  <div className="quick-setup-step">
+                    <div className="quick-setup-step__header">
+                      <span className="quick-setup-step__badge">1</span>
+                      <code className="quick-setup-step__title">Open API Settings</code>
+                    </div>
+                    <p>Click <strong>Get Streamlabs Token</strong>. It opens Streamlabs on the exact settings screen you need.</p>
                   </div>
-                  <p>Click <strong>Get Streamlabs Token</strong>. It opens Streamlabs on the exact settings screen you need.</p>
-                </div>
-                <div className="quick-setup-step">
-                  <div className="quick-setup-step__header">
-                    <span className="quick-setup-step__badge">2</span>
-                    <code className="quick-setup-step__title">Reveal the Socket API Token</code>
+                  <div className="quick-setup-step">
+                    <div className="quick-setup-step__header">
+                      <span className="quick-setup-step__badge">2</span>
+                      <code className="quick-setup-step__title">Reveal the Socket API Token</code>
+                    </div>
+                    <p>Click the <strong>API Settings</strong> tab if needed, then reveal <strong>Your Socket API Token</strong>.</p>
                   </div>
-                  <p>Click the <strong>API Settings</strong> tab if needed, then reveal <strong>Your Socket API Token</strong>.</p>
-                </div>
-                <div className="quick-setup-step">
-                  <div className="quick-setup-step__header">
-                    <span className="quick-setup-step__badge">3</span>
-                    <code className="quick-setup-step__title">Paste token and connect</code>
+                  <div className="quick-setup-step">
+                    <div className="quick-setup-step__header">
+                      <span className="quick-setup-step__badge">3</span>
+                      <code className="quick-setup-step__title">Paste token and connect</code>
+                    </div>
+                    <p>Use the Socket API Token below. Do not use the API Access Token, client ID, client secret, or a developer app.</p>
                   </div>
-                  <p>Use the Socket API Token below. Do not use the API Access Token, client ID, client secret, or a developer app.</p>
                 </div>
               </div>
 
-              <div className="provider-helper-actions">
+              <div className="provider-section provider-helper-actions">
                 <div className="panel-subtitle">Open the token page</div>
                 <div className="action-row provider-helper-actions__row">
                   <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_API_SETTINGS_URL)}>
@@ -638,56 +649,49 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="provider-field-grid">
-                <label className="rule-field rule-field--compact">
-                  <span className="rule-field__label">Paste Socket API Token here</span>
-                  <input
-                    className="rule-field__input"
-                    type="password"
-                    spellCheck={false}
-                    autoComplete="off"
-                    placeholder="Paste Streamlabs Socket API Token"
-                    value={streamlabsToken}
-                    onChange={(event) => setStreamlabsToken(event.target.value)}
-                  />
-                  <span className="rule-field__hint">Paste the exact value Streamlabs labels &quot;Your Socket API Token&quot;, not the API Access Token. It stays local on this PC when you run the desktop app.</span>
-                </label>
-              </div>
+              <div className="provider-section">
+                <div className="panel-subtitle">Paste token</div>
+                <div className="provider-field-grid">
+                  <label className="rule-field rule-field--compact">
+                    <span className="rule-field__label">Paste Socket API Token here</span>
+                    <input
+                      className="rule-field__input"
+                      type="password"
+                      spellCheck={false}
+                      autoComplete="off"
+                      placeholder="Paste Streamlabs Socket API Token"
+                      value={streamlabsToken}
+                      onChange={(event) => setStreamlabsToken(event.target.value)}
+                    />
+                    <span className="rule-field__hint">Paste the exact value Streamlabs labels &quot;Your Socket API Token&quot;, not the API Access Token. It stays local on this PC when you run the desktop app.</span>
+                  </label>
+                </div>
 
-              <div className="action-row">
-                <button className="btn btn--primary" onClick={() => void handleConnectStreamlabs()}>
-                  {streamlabsConnectLabel}
-                </button>
-                {streamlabsConnection ? (
-                  <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamlabs')}>
-                    Disconnect
+                <div className="action-row">
+                  <button className="btn btn--primary" onClick={() => void handleConnectStreamlabs()}>
+                    {streamlabsConnectLabel}
                   </button>
-                ) : null}
+                  {streamlabsConnection ? (
+                    <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamlabs')}>
+                      Disconnect
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
-              {streamlabsSummary ? (
-                <div className={`connection-banner connection-banner--${streamlabsSummary.tone}`}>
-                  <strong>{streamlabsSummary.title}</strong>
-                  <p>{streamlabsSummary.detail}</p>
+              {streamlabsNotifications.length > 0 ? (
+                <div className="provider-section">
+                  <div className="scope-list connections-list">
+                    <div className="panel-subtitle">Recent Streamlabs tips</div>
+                    {streamlabsNotifications.map((notification) => (
+                      <div key={notification.id} className="scope-row">
+                        <code>{notification.title}</code>
+                        <p>{notification.detail}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
-
-              <div className="scope-list connections-list">
-                <div className="panel-subtitle">Recent Streamlabs tips</div>
-                {streamlabsNotifications.length > 0 ? (
-                  streamlabsNotifications.map((notification) => (
-                    <div key={notification.id} className="scope-row">
-                      <code>{notification.title}</code>
-                      <p>{notification.detail}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="scope-row">
-                    <code>No tips yet</code>
-                    <p>Once Streamlabs donation events arrive, they will show up here before they hit the timer activity feed.</p>
-                  </div>
-                )}
-              </div>
             </div>
           </section>
         </div>
