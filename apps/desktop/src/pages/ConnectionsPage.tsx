@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { TWITCH_SCOPE_LABELS, TWITCH_SCOPES } from '../lib/twitch/constants'
+import type { StreamElementsTokenType, TipProviderStatus } from '../lib/tips/types'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
 import { useEventSubStore } from '../state/useEventSubStore'
-import { selectConnectionsEventSubState, selectConnectionsTwitchState } from '../state/selectors'
+import { useTipSessionStore } from '../state/useTipSessionStore'
+import { selectConnectionsEventSubState, selectConnectionsTipState, selectConnectionsTwitchState } from '../state/selectors'
 
 function formatTimestamp(value: number | null) {
   if (!value) {
@@ -38,8 +40,37 @@ function formatRelativeExpiry(value: number | null) {
   return remainder === 0 ? `${hours} hr` : `${hours} hr ${remainder} min`
 }
 
+function getProviderStatusTone(status: TipProviderStatus) {
+  switch (status) {
+    case 'connected':
+      return 'connected'
+    case 'connecting':
+      return 'pending'
+    case 'error':
+      return 'critical'
+    default:
+      return 'idle'
+  }
+}
+
+function getProviderStatusLabel(status: TipProviderStatus) {
+  switch (status) {
+    case 'connected':
+      return 'Connected'
+    case 'connecting':
+      return 'Connecting'
+    case 'error':
+      return 'Needs attention'
+    default:
+      return 'Not connected'
+  }
+}
+
 export function ConnectionsPage() {
   const [copied, setCopied] = useState(false)
+  const [streamElementsToken, setStreamElementsToken] = useState('')
+  const [streamElementsTokenType, setStreamElementsTokenType] = useState<StreamElementsTokenType>('apikey')
+  const [streamlabsToken, setStreamlabsToken] = useState('')
   const {
     status,
     tokens,
@@ -61,6 +92,21 @@ export function ConnectionsPage() {
     eventSubLastMessageAt,
     eventSubError,
   } = useEventSubStore(useShallow(selectConnectionsEventSubState))
+  const {
+    clearTipError,
+    connectStreamElements,
+    connectStreamlabs,
+    disconnectTipProvider,
+    recentTipNotifications,
+    streamElementsConnection,
+    streamElementsLastError,
+    streamElementsLastEventAt,
+    streamElementsStatus,
+    streamlabsConnection,
+    streamlabsLastError,
+    streamlabsLastEventAt,
+    streamlabsStatus,
+  } = useTipSessionStore(useShallow(selectConnectionsTipState))
   const missingScopes = useMemo(
     () => TWITCH_SCOPES.filter((scope) => !(session?.scopes ?? []).includes(scope)),
     [session],
@@ -68,6 +114,23 @@ export function ConnectionsPage() {
   const hasScopeGap = status === 'connected' && missingScopes.length > 0
   const hasSavedTokens = Boolean(tokens)
   const canRecoverSavedSession = hasSavedTokens && (status === 'error' || status === 'reconnect-required')
+  const streamElementsNotifications = useMemo(
+    () => recentTipNotifications.filter((notification) => notification.provider === 'streamelements').slice(0, 4),
+    [recentTipNotifications],
+  )
+  const streamlabsNotifications = useMemo(
+    () => recentTipNotifications.filter((notification) => notification.provider === 'streamlabs').slice(0, 4),
+    [recentTipNotifications],
+  )
+
+  useEffect(() => {
+    setStreamElementsToken(streamElementsConnection?.token ?? '')
+    setStreamElementsTokenType(streamElementsConnection?.tokenType ?? 'apikey')
+  }, [streamElementsConnection])
+
+  useEffect(() => {
+    setStreamlabsToken(streamlabsConnection?.accessToken ?? '')
+  }, [streamlabsConnection])
 
   const statusTone = useMemo(() => {
     if (hasScopeGap) {
@@ -136,6 +199,15 @@ export function ConnectionsPage() {
     }
   }, [eventSubStatus])
 
+  const streamElementsStatusLabel = useMemo(
+    () => getProviderStatusLabel(streamElementsStatus),
+    [streamElementsStatus],
+  )
+  const streamlabsStatusLabel = useMemo(
+    () => getProviderStatusLabel(streamlabsStatus),
+    [streamlabsStatus],
+  )
+
   const handleCopyCode = async () => {
     if (!deviceFlow) {
       return
@@ -148,6 +220,19 @@ export function ConnectionsPage() {
     } catch {
       setCopied(false)
     }
+  }
+
+  const handleConnectStreamElements = async () => {
+    await connectStreamElements({
+      token: streamElementsToken,
+      tokenType: streamElementsTokenType,
+    })
+  }
+
+  const handleConnectStreamlabs = async () => {
+    await connectStreamlabs({
+      accessToken: streamlabsToken,
+    })
   }
 
   return (
@@ -290,6 +375,179 @@ export function ConnectionsPage() {
           </div>
         </section>
       </div>
+
+      <section className="panel connections-panel">
+        <div className="panel-header">
+          <div>
+            <h2 className="panel-title">Tips & donations</h2>
+            <p className="panel-copy">Connect StreamElements and Streamlabs tip feeds here. Both providers feed the same tip rule on the Rules page, so you only configure the timer math once.</p>
+          </div>
+        </div>
+
+        <div className="connections-grid connections-grid--tips">
+          <section className="panel connections-panel connections-panel--provider">
+            <div className="panel-header">
+              <div>
+                <h3 className="panel-title">StreamElements</h3>
+                <p className="panel-copy">Uses the 2026 Astro websocket gateway. Paste a channel token from the correct StreamElements dashboard account, then the app subscribes to `channel.tips`.</p>
+              </div>
+              <div className={`status-chip status-chip--${getProviderStatusTone(streamElementsStatus)}`}>{streamElementsStatusLabel}</div>
+            </div>
+
+            <div className="connections-panel__body">
+              {streamElementsLastError ? (
+                <div className="alert-banner">
+                  <span>{streamElementsLastError}</span>
+                  <button className="btn btn--ghost" onClick={() => clearTipError('streamelements')}>Dismiss</button>
+                </div>
+              ) : null}
+
+              <div className="fact-grid">
+                <div className="fact">
+                  <span className="fact-label">Token type</span>
+                  <strong>{streamElementsConnection?.tokenType ?? 'Not set'}</strong>
+                </div>
+                <div className="fact">
+                  <span className="fact-label">Last tip</span>
+                  <strong>{formatTimestamp(streamElementsLastEventAt)}</strong>
+                </div>
+              </div>
+
+              <div className="provider-field-grid">
+                <label className="rule-field rule-field--compact">
+                  <span className="rule-field__label">Token type</span>
+                  <select
+                    className="rule-field__input"
+                    value={streamElementsTokenType}
+                    onChange={(event) => setStreamElementsTokenType(event.target.value as StreamElementsTokenType)}
+                  >
+                    <option value="apikey">Overlay token / API key</option>
+                    <option value="jwt">JWT</option>
+                    <option value="oauth2">OAuth2 token</option>
+                  </select>
+                  <span className="rule-field__hint">The Astro docs support `apikey`, `jwt`, and `oauth2`. The easiest path is the dashboard overlay token for the correct channel.</span>
+                </label>
+
+                <label className="rule-field rule-field--compact">
+                  <span className="rule-field__label">Websocket token</span>
+                  <input
+                    className="rule-field__input"
+                    type="password"
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="Paste StreamElements token"
+                    value={streamElementsToken}
+                    onChange={(event) => setStreamElementsToken(event.target.value)}
+                  />
+                  <span className="rule-field__hint">The token is stored locally in the native secure session store when you run under Tauri.</span>
+                </label>
+              </div>
+
+              <div className="action-row">
+                <button className="btn btn--primary" onClick={() => void handleConnectStreamElements()}>
+                  {streamElementsConnection ? 'Reconnect StreamElements' : 'Connect StreamElements'}
+                </button>
+                {streamElementsConnection ? (
+                  <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamelements')}>
+                    Disconnect
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="scope-list connections-list">
+                <div className="panel-subtitle">Recent StreamElements tips</div>
+                {streamElementsNotifications.length > 0 ? (
+                  streamElementsNotifications.map((notification) => (
+                    <div key={notification.id} className="scope-row">
+                      <code>{notification.title}</code>
+                      <p>{notification.detail}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="scope-row">
+                    <code>No tips yet</code>
+                    <p>Once StreamElements tip events arrive, they will show up here before they hit the timer activity feed.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="panel connections-panel connections-panel--provider">
+            <div className="panel-header">
+              <div>
+                <h3 className="panel-title">Streamlabs</h3>
+                <p className="panel-copy">Uses the official donations API with polling. Paste an OAuth access token that includes `donations.read`, and the app will poll for new donations without pulling in the legacy Socket.IO client Streamlabs still documents.</p>
+              </div>
+              <div className={`status-chip status-chip--${getProviderStatusTone(streamlabsStatus)}`}>{streamlabsStatusLabel}</div>
+            </div>
+
+            <div className="connections-panel__body">
+              {streamlabsLastError ? (
+                <div className="alert-banner">
+                  <span>{streamlabsLastError}</span>
+                  <button className="btn btn--ghost" onClick={() => clearTipError('streamlabs')}>Dismiss</button>
+                </div>
+              ) : null}
+
+              <div className="fact-grid">
+                <div className="fact">
+                  <span className="fact-label">Auth mode</span>
+                  <strong>{streamlabsConnection ? 'Access token' : 'Not set'}</strong>
+                </div>
+                <div className="fact">
+                  <span className="fact-label">Last tip</span>
+                  <strong>{formatTimestamp(streamlabsLastEventAt)}</strong>
+                </div>
+              </div>
+
+              <div className="provider-field-grid">
+                <label className="rule-field rule-field--compact">
+                  <span className="rule-field__label">Access token</span>
+                  <input
+                    className="rule-field__input"
+                    type="password"
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="Paste Streamlabs access token"
+                    value={streamlabsToken}
+                    onChange={(event) => setStreamlabsToken(event.target.value)}
+                  />
+                  <span className="rule-field__hint">Use a Streamlabs OAuth access token with `donations.read`. The app polls `GET /donations` and only applies newly seen donation IDs.</span>
+                </label>
+              </div>
+
+              <div className="action-row">
+                <button className="btn btn--primary" onClick={() => void handleConnectStreamlabs()}>
+                  {streamlabsConnection ? 'Reconnect Streamlabs' : 'Connect Streamlabs'}
+                </button>
+                {streamlabsConnection ? (
+                  <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamlabs')}>
+                    Disconnect
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="scope-list connections-list">
+                <div className="panel-subtitle">Recent Streamlabs tips</div>
+                {streamlabsNotifications.length > 0 ? (
+                  streamlabsNotifications.map((notification) => (
+                    <div key={notification.id} className="scope-row">
+                      <code>{notification.title}</code>
+                      <p>{notification.detail}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="scope-row">
+                    <code>No tips yet</code>
+                    <p>Once Streamlabs donation events arrive, they will show up here before they hit the timer activity feed.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
 
       <section className="panel connections-panel connections-panel--eventsub">
         <div className="panel-header">

@@ -15,7 +15,7 @@ export interface NativeTimerActivityEntry {
   summary: string
   deltaSeconds: number
   occurredAt: number
-  source: 'twitch-eventsub' | 'manual'
+  source: 'twitch-eventsub' | 'streamelements' | 'streamlabs' | 'manual'
 }
 
 export interface NativeTimerEventEntry extends NativeTimerActivityEntry {

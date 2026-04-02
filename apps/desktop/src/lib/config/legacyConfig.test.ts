@@ -12,6 +12,7 @@ describe('importLegacyConfig', () => {
           tier_1: 1,
           tier_2: 2,
           tier_3: 3,
+          donation: 0.2,
           bits: 0.5,
           follow: 0.25,
         },
@@ -36,6 +37,9 @@ describe('importLegacyConfig', () => {
     }))
 
     expect(result.rules.baseValueSeconds).toBe(90)
+    expect(result.rules.tipEnabled).toBe(true)
+    expect(result.rules.tipAmountUnit).toBe(1)
+    expect(result.rules.tipUnitSeconds).toBe(18)
     expect(result.rules.bitsUnitSeconds).toBe(45)
     expect(result.rules.followSeconds).toBe(23)
     expect(result.wheelSegments).toHaveLength(2)

@@ -4,6 +4,7 @@ export type TimerDisplayRuleKey =
   | 'tier1SubSeconds'
   | 'tier2SubSeconds'
   | 'tier3SubSeconds'
+  | 'tipUnitSeconds'
   | 'bitsUnitSeconds'
   | 'followSeconds'
   | 'raidUnitSeconds'
@@ -187,6 +188,15 @@ export const timerEventRuleDefinitions: TimerEventRuleDefinition[] = [
     ],
   },
   {
+    key: 'tipEnabled',
+    label: 'Tips / donations',
+    hint: 'Applies proportional time from connected StreamElements or Streamlabs tips.',
+    controls: [
+      { key: 'tipAmountUnit', label: 'Amount unit', min: 0.01, step: 0.01 },
+      { key: 'tipUnitSeconds', label: 'Seconds', min: 0, suffix: 's' },
+    ],
+  },
+  {
     key: 'cheerEnabled',
     label: 'Bits / cheers',
     hint: 'Applies time whenever the cheer crosses the configured bits unit.',
@@ -290,6 +300,17 @@ export function buildTimerRuleDisplay(
       seconds: ruleConfig.bitsUnitSeconds,
       markerShape: 'diamond',
       markerTone: 'cyan',
+    })
+  }
+
+  if (ruleConfig.tipEnabled && ruleConfig.tipAmountUnit > 0 && ruleConfig.tipUnitSeconds > 0) {
+    items.push({
+      key: 'tipUnitSeconds',
+      label: labelStyle === 'full' ? `Tips per ${ruleConfig.tipAmountUnit.toFixed(2)}` : 'Tips',
+      value: `+${ruleConfig.tipUnitSeconds}s`,
+      seconds: ruleConfig.tipUnitSeconds,
+      markerShape: 'pill',
+      markerTone: 'green',
     })
   }
 

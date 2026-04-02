@@ -4,6 +4,7 @@ Desktop-first Twitch subathon timer built with Tauri, React, and TypeScript. The
 
 - Twitch device auth with secure native token storage in Tauri
 - EventSub-driven timer updates and activity history
+- StreamElements and Streamlabs tip support wired into the timer rules
 - OBS-ready timer and reason overlays served from the desktop app
 - A configurable spin wheel with time and moderation outcomes
 

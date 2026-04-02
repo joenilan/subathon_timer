@@ -12,7 +12,7 @@ export function RulesPage() {
         <div>
           <h1 className="page-title">Rules</h1>
           <p className="page-desc">
-            These rules drive the live timer, overlays, and Twitch EventSub handling. Changes save immediately. Tips and other provider-based events can layer in later without changing this flow.
+            These rules drive the live timer, overlays, Twitch EventSub handling, and connected tip providers. Changes save immediately.
           </p>
         </div>
       </section>

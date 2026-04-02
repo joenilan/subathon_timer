@@ -67,6 +67,14 @@ Use the `Overlays` page to:
 
 In browser-only dev mode, overlay previews fall back to route-based previews instead of the native loopback server.
 
+## Tip Providers
+
+The desktop app can now add time from StreamElements and Streamlabs tips.
+
+- StreamElements uses the Astro websocket `channel.tips` topic.
+- Streamlabs uses the Socket API donation events.
+- Setup details and the 2026 provider docs are in [docs/tip-providers.md](/E:/git/subathon_timer/apps/desktop/docs/tip-providers.md).
+
 ## Manual Smoke Tests
 
 After changes to auth, runtime, overlays, or timer behavior, validate:
@@ -78,6 +86,7 @@ After changes to auth, runtime, overlays, or timer behavior, validate:
 5. Dashboard timer/activity updates after Twitch events
 6. Overlay preview parity with dashboard state
 7. Wheel spin and applied outcome behavior
+8. Tip provider connect flow plus timer updates after a test donation
 
 ## Release Workflow
 

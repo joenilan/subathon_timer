@@ -90,7 +90,14 @@ export function buildOverlayPreview(activity: TimerActivityEntry | null) {
   }
 
   return {
-    eyebrow: activity.source === 'manual' ? 'Manual change' : 'Twitch event',
+    eyebrow:
+      activity.source === 'manual'
+        ? 'Manual change'
+        : activity.source === 'streamelements'
+          ? 'StreamElements tip'
+          : activity.source === 'streamlabs'
+            ? 'Streamlabs tip'
+            : 'Twitch event',
     title: activity.title,
     summary: activity.summary,
     delta: formatSignedDuration(activity.deltaSeconds),

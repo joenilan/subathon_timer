@@ -60,6 +60,7 @@ describe('resolveTimerAdjustment', () => {
         displayName: 'Gifter',
         anonymous: false,
         amount: null,
+        currency: null,
         tier: '2000',
         count: 3,
         command: null,
@@ -89,6 +90,7 @@ describe('resolveTimerAdjustment', () => {
         displayName: 'Viewer',
         anonymous: false,
         amount: null,
+        currency: null,
         tier: null,
         count: null,
         command: null,
@@ -98,6 +100,37 @@ describe('resolveTimerAdjustment', () => {
     )
 
     expect(result).toBeNull()
+  })
+
+  it('applies proportional time for tip events', () => {
+    const config = normalizeTimerRuleConfig({
+      tipEnabled: true,
+      tipAmountUnit: 1,
+      tipUnitSeconds: 15,
+    })
+
+    const result = resolveTimerAdjustment(
+      {
+        id: 'tip-1',
+        source: 'streamelements',
+        eventType: 'tip',
+        occurredAt: new Date().toISOString(),
+        userId: null,
+        userLogin: 'tipper',
+        displayName: 'Tipper',
+        anonymous: false,
+        amount: 4.2,
+        currency: 'USD',
+        tier: null,
+        count: null,
+        command: null,
+        rawPayload: {},
+      },
+      config,
+    )
+
+    expect(result?.deltaSeconds).toBe(63)
+    expect(result?.summary).toContain('StreamElements')
   })
 })
 

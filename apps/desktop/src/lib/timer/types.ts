@@ -1,4 +1,4 @@
-export type NormalizedTwitchEventType =
+export type NormalizedTimerEventType =
   | 'subscription'
   | 'resubscription'
   | 'gift_subscription'
@@ -6,7 +6,10 @@ export type NormalizedTwitchEventType =
   | 'cheer'
   | 'follow'
   | 'raid'
+  | 'tip'
   | 'chat_command'
+
+export type NormalizedTimerEventSource = 'twitch-eventsub' | 'streamelements' | 'streamlabs'
 
 export type ChatTimerCommandAction = 'add' | 'remove' | 'pause' | 'resume' | 'start' | 'reset' | 'set' | 'help'
 export type TimerCommandPermission = 'streamer' | 'mod' | 'both'
@@ -30,21 +33,24 @@ export interface ChatTimerCommand {
   isModerator: boolean
 }
 
-export interface NormalizedTwitchEvent {
+export interface NormalizedTimerEvent {
   id: string
-  source: 'twitch-eventsub'
-  eventType: NormalizedTwitchEventType
+  source: NormalizedTimerEventSource
+  eventType: NormalizedTimerEventType
   occurredAt: string
   userId: string | null
   userLogin: string | null
   displayName: string | null
   anonymous: boolean
   amount: number | null
+  currency: string | null
   tier: string | null
   count: number | null
   command: ChatTimerCommand | null
   rawPayload: Record<string, unknown>
 }
+
+export type NormalizedTwitchEvent = NormalizedTimerEvent
 
 export interface TimerRuleConfig {
   baseValueSeconds: number
@@ -52,6 +58,8 @@ export interface TimerRuleConfig {
   tier2SubSeconds: number
   tier3SubSeconds: number
   donationMultiplier: number
+  tipAmountUnit: number
+  tipUnitSeconds: number
   bitsPerUnit: number
   bitsUnitSeconds: number
   followSeconds: number
@@ -76,6 +84,7 @@ export interface TimerRuleConfig {
   giftBombTier1Seconds: number
   giftBombTier2Seconds: number
   giftBombTier3Seconds: number
+  tipEnabled: boolean
   cheerEnabled: boolean
   followEnabled: boolean
   raidEnabled: boolean
@@ -89,6 +98,8 @@ export type TimerRuleNumericKey =
   | 'tier2SubSeconds'
   | 'tier3SubSeconds'
   | 'donationMultiplier'
+  | 'tipAmountUnit'
+  | 'tipUnitSeconds'
   | 'bitsPerUnit'
   | 'bitsUnitSeconds'
   | 'followSeconds'
@@ -117,6 +128,7 @@ export type TimerRuleToggleKey =
   | 'resubscriptionUseCustomValues'
   | 'giftSubscriptionUseCustomValues'
   | 'giftBombUseCustomValues'
+  | 'tipEnabled'
   | 'cheerEnabled'
   | 'followEnabled'
   | 'raidEnabled'

@@ -37,13 +37,17 @@ export function importLegacyConfig(raw: string): LegacyConfigImportResult {
   const time = asRecord(root.time)
   const multipliers = asRecord(time?.multipliers)
   const baseValue = asNumber(time?.base_value, 60)
+  const donationMultiplier = asNumber(multipliers?.donation, 0.2)
 
   const rules = normalizeTimerRuleConfig({
     baseValueSeconds: baseValue,
     tier1SubSeconds: Math.round(baseValue * asNumber(multipliers?.tier_1, 1)),
     tier2SubSeconds: Math.round(baseValue * asNumber(multipliers?.tier_2, 2)),
     tier3SubSeconds: Math.round(baseValue * asNumber(multipliers?.tier_3, 5)),
-    donationMultiplier: asNumber(multipliers?.donation, 0.2),
+    donationMultiplier,
+    tipEnabled: donationMultiplier > 0,
+    tipAmountUnit: 1,
+    tipUnitSeconds: Math.round(baseValue * donationMultiplier),
     bitsPerUnit: 100,
     bitsUnitSeconds: Math.round(baseValue * asNumber(multipliers?.bits, 0.2)),
     followSeconds: Math.round(baseValue * asNumber(multipliers?.follow, 0)),

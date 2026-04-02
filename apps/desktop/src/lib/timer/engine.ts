@@ -1,5 +1,5 @@
 import type {
-  NormalizedTwitchEvent,
+  NormalizedTimerEvent,
   TimerAdjustmentResult,
   TimerRuleConfig,
   TimerRuleNumericKey,
@@ -16,6 +16,7 @@ const timerRuleToggleKeys: TimerRuleToggleKey[] = [
   'resubscriptionUseCustomValues',
   'giftSubscriptionUseCustomValues',
   'giftBombUseCustomValues',
+  'tipEnabled',
   'cheerEnabled',
   'followEnabled',
   'raidEnabled',
@@ -26,6 +27,7 @@ const timerRuleIntegerKeys: Exclude<TimerRuleNumericKey, 'donationMultiplier'>[]
   'tier1SubSeconds',
   'tier2SubSeconds',
   'tier3SubSeconds',
+  'tipUnitSeconds',
   'bitsPerUnit',
   'bitsUnitSeconds',
   'followSeconds',
@@ -46,7 +48,7 @@ const timerRuleIntegerKeys: Exclude<TimerRuleNumericKey, 'donationMultiplier'>[]
 ]
 
 type SubLikeEventType = Extract<
-  NormalizedTwitchEvent['eventType'],
+  NormalizedTimerEvent['eventType'],
   'subscription' | 'resubscription' | 'gift_subscription' | 'gift_bomb'
 >
 
@@ -131,6 +133,39 @@ function getTierSecondsForEvent(eventType: SubLikeEventType, tier: string | null
   }
 }
 
+function formatCurrencyAmount(amount: number | null, currency: string | null) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+    return 'a tip'
+  }
+
+  const normalizedCurrency = typeof currency === 'string' && currency.length === 3 ? currency.toUpperCase() : null
+
+  if (normalizedCurrency) {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: normalizedCurrency,
+        maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+      }).format(amount)
+    } catch {
+      return `${amount.toFixed(amount % 1 === 0 ? 0 : 2)} ${normalizedCurrency}`
+    }
+  }
+
+  return amount.toFixed(amount % 1 === 0 ? 0 : 2)
+}
+
+function getEventSourceLabel(source: NormalizedTimerEvent['source']) {
+  switch (source) {
+    case 'streamelements':
+      return 'StreamElements'
+    case 'streamlabs':
+      return 'Streamlabs'
+    default:
+      return 'Twitch'
+  }
+}
+
 export function formatDurationClock(totalSeconds: number) {
   const safeTotal = Math.max(0, Math.floor(totalSeconds))
   const hours = Math.floor(safeTotal / 3600)
@@ -155,6 +190,8 @@ export function getDefaultTimerRuleConfig(): TimerRuleConfig {
     tier2SubSeconds: 120,
     tier3SubSeconds: 300,
     donationMultiplier: 0.2,
+    tipAmountUnit: 1,
+    tipUnitSeconds: 12,
     bitsPerUnit: 100,
     bitsUnitSeconds: 12,
     followSeconds: 0,
@@ -179,6 +216,7 @@ export function getDefaultTimerRuleConfig(): TimerRuleConfig {
     giftBombTier1Seconds: 60,
     giftBombTier2Seconds: 120,
     giftBombTier3Seconds: 300,
+    tipEnabled: false,
     cheerEnabled: true,
     followEnabled: false,
     raidEnabled: false,
@@ -195,6 +233,8 @@ export function normalizeTimerRuleConfig(value: Partial<TimerRuleConfig> | null 
   }
   const legacyGiftSubscriptionSeconds = legacyValue.giftSubscriptionSeconds
   const legacyGiftBombSecondsPerGift = legacyValue.giftBombSecondsPerGift
+  const baseValueSeconds = value?.baseValueSeconds ?? fallback.baseValueSeconds
+  const legacyDonationMultiplier = value?.donationMultiplier ?? fallback.donationMultiplier
   const merged = {
     ...fallback,
     ...(value ?? {}),
@@ -213,9 +253,12 @@ export function normalizeTimerRuleConfig(value: Partial<TimerRuleConfig> | null 
     giftBombTier1Seconds: value?.giftBombTier1Seconds ?? legacyGiftBombSecondsPerGift ?? value?.tier1SubSeconds ?? fallback.giftBombTier1Seconds,
     giftBombTier2Seconds: value?.giftBombTier2Seconds ?? legacyGiftBombSecondsPerGift ?? value?.tier2SubSeconds ?? fallback.giftBombTier2Seconds,
     giftBombTier3Seconds: value?.giftBombTier3Seconds ?? legacyGiftBombSecondsPerGift ?? value?.tier3SubSeconds ?? fallback.giftBombTier3Seconds,
+    tipAmountUnit: value?.tipAmountUnit ?? fallback.tipAmountUnit,
+    tipUnitSeconds: value?.tipUnitSeconds ?? Math.round(baseValueSeconds * legacyDonationMultiplier),
     advancedSubEventOverridesEnabled: value?.advancedSubEventOverridesEnabled ?? fallback.advancedSubEventOverridesEnabled,
     giftSubscriptionUseCustomValues: value?.giftSubscriptionUseCustomValues ?? fallback.giftSubscriptionUseCustomValues,
     giftBombUseCustomValues: value?.giftBombUseCustomValues ?? fallback.giftBombUseCustomValues,
+    tipEnabled: value?.tipEnabled ?? legacyDonationMultiplier > 0,
   } satisfies TimerRuleConfig
 
   const normalized = { ...merged }
@@ -239,7 +282,7 @@ export function normalizeTimerRuleConfig(value: Partial<TimerRuleConfig> | null 
 }
 
 export function resolveTimerAdjustment(
-  event: NormalizedTwitchEvent,
+  event: NormalizedTimerEvent,
   config: TimerRuleConfig,
 ): TimerAdjustmentResult | null {
   switch (event.eventType) {
@@ -347,6 +390,30 @@ export function resolveTimerAdjustment(
         deltaSeconds,
         title: 'Raid applied',
         summary: `${event.displayName ?? 'Another streamer'} raided with ${viewerCount} viewer${viewerCount === 1 ? '' : 's'} and added ${formatSignedDuration(deltaSeconds)}.`,
+      }
+    }
+    case 'tip': {
+      if (!config.tipEnabled || config.tipAmountUnit <= 0 || config.tipUnitSeconds <= 0) {
+        return null
+      }
+
+      const tipAmount = Math.max(event.amount ?? 0, 0)
+      if (tipAmount <= 0) {
+        return null
+      }
+
+      const deltaSeconds = Math.round((tipAmount / config.tipAmountUnit) * config.tipUnitSeconds)
+      if (deltaSeconds <= 0) {
+        return null
+      }
+
+      return {
+        deltaSeconds,
+        title: 'Tip applied',
+        summary: `${event.displayName ?? event.userLogin ?? 'A viewer'} tipped ${formatCurrencyAmount(
+          tipAmount,
+          event.currency,
+        )} via ${getEventSourceLabel(event.source)} and added ${formatSignedDuration(deltaSeconds)}.`,
       }
     }
     case 'chat_command':

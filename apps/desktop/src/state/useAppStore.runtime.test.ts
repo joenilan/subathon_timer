@@ -19,6 +19,7 @@ describe('useAppStore runtime behavior', () => {
       displayName: 'Viewer 1',
       anonymous: false,
       amount: null,
+      currency: null,
       tier: '1000',
       count: null,
       command: null,

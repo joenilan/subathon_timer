@@ -898,7 +898,7 @@ export const useAppStore = create<AppState>()(
             summary: result.summary,
             deltaSeconds: result.deltaSeconds,
             occurredAt: now,
-            source: 'twitch-eventsub',
+            source: event.source,
             remainingSeconds: nextRemaining,
           } satisfies NativeTimerEventEntry
           const nextEvents = appendTimerEvent(state.timerEvents, nextEvent)

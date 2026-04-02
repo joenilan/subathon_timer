@@ -13,10 +13,15 @@ use tauri::Manager;
 const DEFAULT_OVERLAY_PORT: u16 = 31_847;
 const APP_STATE_FILENAME: &str = "app-state.json";
 const TWITCH_SESSION_FILENAME: &str = "twitch-session.dat";
+const TIP_PROVIDER_SESSION_FILENAME: &str = "tip-provider-session.dat";
 #[cfg(not(target_os = "windows"))]
 const TWITCH_SESSION_SERVICE: &str = "subathon-timer-desktop";
 #[cfg(not(target_os = "windows"))]
 const TWITCH_SESSION_ACCOUNT: &str = "twitch-session";
+#[cfg(not(target_os = "windows"))]
+const TIP_PROVIDER_SESSION_SERVICE: &str = "subathon-timer-desktop";
+#[cfg(not(target_os = "windows"))]
+const TIP_PROVIDER_SESSION_ACCOUNT: &str = "tip-provider-session";
 const LEXEND_REGULAR_TTF: &[u8] = include_bytes!("../../../../public/fonts/Lexend-Regular.ttf");
 const LEXEND_BOLD_TTF: &[u8] = include_bytes!("../../../../public/fonts/Lexend-Bold.ttf");
 const GRAPH_ICON_GIF: &[u8] = include_bytes!("../../public/assets/graph_icon.gif");
@@ -178,6 +183,15 @@ fn twitch_session_path<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<P
         .map_err(|error| format!("failed to resolve secure Twitch session path: {error}"))
 }
 
+fn tip_provider_session_path<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join(TIP_PROVIDER_SESSION_FILENAME))
+        .map_err(|error| format!("failed to resolve secure tip provider session path: {error}"))
+}
+
 fn load_native_snapshot<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
 ) -> Result<Option<Value>, String> {
@@ -318,6 +332,12 @@ fn twitch_session_entry() -> Result<keyring::Entry, String> {
         .map_err(|error| format!("failed to initialize secure Twitch session storage: {error}"))
 }
 
+#[cfg(not(target_os = "windows"))]
+fn tip_provider_session_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new(TIP_PROVIDER_SESSION_SERVICE, TIP_PROVIDER_SESSION_ACCOUNT)
+        .map_err(|error| format!("failed to initialize secure tip provider session storage: {error}"))
+}
+
 #[cfg(target_os = "windows")]
 fn load_native_twitch_session_snapshot<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
@@ -416,6 +436,107 @@ fn clear_native_twitch_session_snapshot() -> Result<(), String> {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(error) => Err(format!("failed to clear secure Twitch session: {error}")),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn load_native_tip_provider_session_snapshot<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<Option<Value>, String> {
+    let path = tip_provider_session_path(app)?;
+
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let encrypted = fs::read(&path)
+        .map_err(|error| format!("failed to read secure tip provider session: {error}"))?;
+    let decrypted = unprotect_session_payload(&encrypted)?;
+    let raw = String::from_utf8(decrypted)
+        .map_err(|error| format!("failed to decode secure tip provider session: {error}"))?;
+
+    serde_json::from_str::<Value>(&raw)
+        .map(Some)
+        .map_err(|error| format!("failed to parse secure tip provider session: {error}"))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn load_native_tip_provider_session_snapshot() -> Result<Option<Value>, String> {
+    let entry = tip_provider_session_entry()?;
+
+    match entry.get_password() {
+        Ok(raw) => serde_json::from_str::<Value>(&raw)
+            .map(Some)
+            .map_err(|error| format!("failed to parse secure tip provider session: {error}")),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(error) => Err(format!("failed to read secure tip provider session: {error}")),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn save_native_tip_provider_session_snapshot<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    snapshot: &Value,
+) -> Result<(), String> {
+    let path = tip_provider_session_path(app)?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("failed to create secure tip provider session dir: {error}"))?;
+    }
+
+    let payload = serde_json::to_vec(snapshot)
+        .map_err(|error| format!("failed to serialize secure tip provider session: {error}"))?;
+    let encrypted = protect_session_payload(&payload)?;
+    let temp_path = path.with_extension("dat.tmp");
+
+    fs::write(&temp_path, encrypted)
+        .map_err(|error| format!("failed to write secure tip provider session: {error}"))?;
+
+    if path.exists() {
+        fs::remove_file(&path)
+            .map_err(|error| format!("failed to replace secure tip provider session: {error}"))?;
+    }
+
+    fs::rename(&temp_path, &path)
+        .map_err(|error| format!("failed to finalize secure tip provider session: {error}"))?;
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn save_native_tip_provider_session_snapshot(snapshot: &Value) -> Result<(), String> {
+    let entry = tip_provider_session_entry()?;
+    let payload = serde_json::to_string(snapshot)
+        .map_err(|error| format!("failed to serialize secure tip provider session: {error}"))?;
+
+    entry
+        .set_password(&payload)
+        .map_err(|error| format!("failed to store secure tip provider session: {error}"))
+}
+
+#[cfg(target_os = "windows")]
+fn clear_native_tip_provider_session_snapshot<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<(), String> {
+    let path = tip_provider_session_path(app)?;
+
+    if !path.exists() {
+        return Ok(());
+    }
+
+    fs::remove_file(&path)
+        .map_err(|error| format!("failed to clear secure tip provider session: {error}"))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn clear_native_tip_provider_session_snapshot() -> Result<(), String> {
+    let entry = tip_provider_session_entry()?;
+
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(error) => Err(format!("failed to clear secure tip provider session: {error}")),
     }
 }
 
@@ -561,6 +682,55 @@ fn clear_native_twitch_session<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> R
     {
         let _ = app;
         clear_native_twitch_session_snapshot()
+    }
+}
+
+#[tauri::command]
+fn load_native_tip_provider_session<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Option<Value>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        load_native_tip_provider_session_snapshot(&app)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        load_native_tip_provider_session_snapshot()
+    }
+}
+
+#[tauri::command]
+fn save_native_tip_provider_session<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    snapshot: Value,
+) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        save_native_tip_provider_session_snapshot(&app, &snapshot)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        save_native_tip_provider_session_snapshot(&snapshot)
+    }
+}
+
+#[tauri::command]
+fn clear_native_tip_provider_session<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        clear_native_tip_provider_session_snapshot(&app)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        clear_native_tip_provider_session_snapshot()
     }
 }
 
@@ -1426,7 +1596,10 @@ pub fn run() {
             save_native_app_state,
             load_native_twitch_session,
             save_native_twitch_session,
-            clear_native_twitch_session
+            clear_native_twitch_session,
+            load_native_tip_provider_session,
+            save_native_tip_provider_session,
+            clear_native_tip_provider_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -3132,6 +3132,10 @@ select.rule-field__input {
     flex-shrink: 0;
 }
 
+.connections-grid--tips {
+    align-items: stretch;
+}
+
 .connections-panel--session {
     flex: 1.22 1 0;
     min-width: 0;
@@ -3140,6 +3144,11 @@ select.rule-field__input {
 .connections-panel--access {
     flex: 0.88 1 300px;
     min-width: 300px;
+}
+
+.connections-panel--provider {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 .panel {
@@ -3248,6 +3257,13 @@ select.rule-field__input {
 .connections-panel__body--access,
 .connections-panel__body--eventsub {
     flex: 0 0 auto;
+}
+
+.provider-field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    min-width: 0;
 }
 
 .session-summary,

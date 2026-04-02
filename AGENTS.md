@@ -55,6 +55,7 @@
 - For auth and UI changes, verify both `bun run dev` and `bun run tauri:dev` when the runtime matters.
 - Test Twitch auth from the `Connections` page, including reconnect and refresh paths when touched.
 - Test EventSub after auth by confirming the `Connections` page shows a WebSocket session, subscription count, and recent notifications when Twitch events occur.
+- Test tip providers from the `Connections` page when touched: verify StreamElements or Streamlabs tip events appear in the recent provider list and apply the configured tip rule to the timer.
 - Test the dashboard after Twitch events occur: timer adjustments, activity feed, and trend graph should move without manual refresh.
 - Test `Rules` by changing values and confirming new Twitch events use the updated seconds.
 - Test `Overlays` by opening the direct preview routes and confirming they reflect the same timer theme, timer state, and latest activity as the dashboard.

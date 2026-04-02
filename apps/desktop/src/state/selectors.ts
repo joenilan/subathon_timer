@@ -1,5 +1,6 @@
 import type { AppState } from './useAppStore'
 import type { EventSubState } from './useEventSubStore'
+import type { TipSessionState } from './useTipSessionStore'
 import type { TwitchSessionState } from './useTwitchSessionStore'
 
 export const selectBootstrapRuntimeState = (state: AppState) => ({
@@ -166,4 +167,25 @@ export const selectConnectionsEventSubState = (state: EventSubState) => ({
   eventSubSession: state.session,
   eventSubStatus: state.status,
   eventSubSubscriptions: state.subscriptions,
+})
+
+export const selectTipLifecycleState = (state: TipSessionState) => ({
+  bootstrap: state.bootstrap,
+  normalizedEvents: state.normalizedEvents,
+})
+
+export const selectConnectionsTipState = (state: TipSessionState) => ({
+  clearTipError: state.clearError,
+  connectStreamElements: state.connectStreamElements,
+  connectStreamlabs: state.connectStreamlabs,
+  disconnectTipProvider: state.disconnectProvider,
+  recentTipNotifications: state.recentNotifications,
+  streamElementsConnection: state.streamelementsConnection,
+  streamElementsLastError: state.streamelementsLastError,
+  streamElementsLastEventAt: state.streamelementsLastEventAt,
+  streamElementsStatus: state.streamelementsStatus,
+  streamlabsConnection: state.streamlabsConnection,
+  streamlabsLastError: state.streamlabsLastError,
+  streamlabsLastEventAt: state.streamlabsLastEventAt,
+  streamlabsStatus: state.streamlabsStatus,
 })

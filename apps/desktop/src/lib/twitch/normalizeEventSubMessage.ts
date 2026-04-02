@@ -206,6 +206,7 @@ export function normalizeEventSubMessage(message: EventSubEnvelope): NormalizedT
     displayName: getFirstString(event, ['chatter_user_name', 'user_name', 'from_broadcaster_user_name']),
     anonymous: getBoolean(event, 'is_anonymous'),
     amount: null,
+    currency: null,
     tier: getString(event, 'tier'),
     count: null,
     command: null,
