@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { timerEventRuleDefinitions, timerTierRuleDefinitions } from '../lib/timer/ruleDefinitions'
 import type { TipProviderStatus } from '../lib/tips/types'
@@ -52,6 +53,7 @@ function buildTipRuleOverlay(
 }
 
 export function RulesPage() {
+  const navigate = useNavigate()
   const ruleConfig = useAppStore((state) => state.ruleConfig)
   const setRuleValue = useAppStore((state) => state.setRuleValue)
   const { streamElementsStatus, streamlabsStatus } = useTipSessionStore(useShallow(selectRulesTipState))
@@ -164,60 +166,71 @@ export function RulesPage() {
                   </label>
                 </div>
 
-                {showTipOverlay ? (
-                  <div className="rule-event-card__overlay-warning">
-                    <strong>{tipRuleOverlay.title}</strong>
-                    <p>{tipRuleOverlay.detail}</p>
-                  </div>
-                ) : null}
+                {(eventRule.sharedValueNote || showCustomToggle || showControls) && (
+                  <div className="rule-event-card__body">
+                    <div className={showTipOverlay ? 'rule-event-card__content rule-event-card__content--obscured' : 'rule-event-card__content'}>
+                      {eventRule.sharedValueNote || showCustomToggle ? (
+                        <div className="rule-event-card__meta-row">
+                          {eventRule.sharedValueNote ? (
+                            <div className="rule-event-card__meta">
+                              {showCustomToggle && usesCustomValues ? 'Custom tier overrides are active for this event.' : eventRule.sharedValueNote}
+                            </div>
+                          ) : (
+                            <span />
+                          )}
 
-                {eventRule.sharedValueNote || showCustomToggle ? (
-                  <div className="rule-event-card__meta-row">
-                    {eventRule.sharedValueNote ? (
-                      <div className="rule-event-card__meta">
-                        {showCustomToggle && usesCustomValues ? 'Custom tier overrides are active for this event.' : eventRule.sharedValueNote}
+                          {showCustomToggle && eventRule.customToggleKey && eventRule.customToggleLabel ? (
+                            <label className={`rule-toggle rule-toggle--compact${usesCustomValues ? ' rule-toggle--enabled' : ''}`}>
+                              <input
+                                type="checkbox"
+                                checked={usesCustomValues}
+                                onChange={(event) => setRuleValue(eventRule.customToggleKey!, event.target.checked)}
+                                aria-label={`Toggle ${eventRule.customToggleLabel.toLowerCase()} for ${eventRule.label}`}
+                              />
+                              <span className="rule-toggle__track" aria-hidden="true">
+                                <span className="rule-toggle__thumb" />
+                              </span>
+                              <span className="rule-toggle__label">{eventRule.customToggleLabel}</span>
+                            </label>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {showControls && eventRule.controls ? (
+                        <div className="rule-event-card__controls">
+                          {eventRule.controls.map((control) => (
+                            <label key={control.key} className="rule-field rule-field--compact">
+                              <span className="rule-field__label">{control.label}</span>
+                              <div className="rule-inline-input">
+                                <input
+                                  className="rule-field__input"
+                                  type="number"
+                                  min={control.min ?? 0}
+                                  step={control.step ?? 1}
+                                  value={ruleConfig[control.key]}
+                                  onChange={(event) => setRuleValue(control.key, Number(event.target.value) || 0)}
+                                />
+                                {control.suffix ? <span className="rule-inline-input__suffix">{control.suffix}</span> : null}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {showTipOverlay ? (
+                      <div className="rule-event-card__overlay" role="presentation">
+                        <div className="rule-event-card__overlay-panel">
+                          <strong>{tipRuleOverlay.title}</strong>
+                          <p>{tipRuleOverlay.detail}</p>
+                          <button className="btn btn--primary" onClick={() => navigate('/connections')}>
+                            Open Connections
+                          </button>
+                        </div>
                       </div>
-                    ) : (
-                      <span />
-                    )}
-
-                    {showCustomToggle && eventRule.customToggleKey && eventRule.customToggleLabel ? (
-                      <label className={`rule-toggle rule-toggle--compact${usesCustomValues ? ' rule-toggle--enabled' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={usesCustomValues}
-                          onChange={(event) => setRuleValue(eventRule.customToggleKey!, event.target.checked)}
-                          aria-label={`Toggle ${eventRule.customToggleLabel.toLowerCase()} for ${eventRule.label}`}
-                        />
-                        <span className="rule-toggle__track" aria-hidden="true">
-                          <span className="rule-toggle__thumb" />
-                        </span>
-                        <span className="rule-toggle__label">{eventRule.customToggleLabel}</span>
-                      </label>
                     ) : null}
                   </div>
-                ) : null}
-
-                {showControls && eventRule.controls ? (
-                  <div className="rule-event-card__controls">
-                    {eventRule.controls.map((control) => (
-                      <label key={control.key} className="rule-field rule-field--compact">
-                        <span className="rule-field__label">{control.label}</span>
-                        <div className="rule-inline-input">
-                          <input
-                            className="rule-field__input"
-                            type="number"
-                            min={control.min ?? 0}
-                            step={control.step ?? 1}
-                            value={ruleConfig[control.key]}
-                            onChange={(event) => setRuleValue(control.key, Number(event.target.value) || 0)}
-                          />
-                          {control.suffix ? <span className="rule-inline-input__suffix">{control.suffix}</span> : null}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                ) : null}
+                )}
               </article>
             )
           })}
