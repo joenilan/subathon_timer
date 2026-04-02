@@ -72,6 +72,10 @@
 - Keep commits focused and descriptive, for example: `Add Twitch device auth session store`.
 - `apps/desktop/VERSION` is the source of truth for the active desktop app version. Keep release prep on the desktop app flowing through the `version:*` scripts instead of editing scattered version fields by hand.
 - For desktop releases, update [CHANGELOG.md](/E:/git/subathon_timer/apps/desktop/CHANGELOG.md) and [PATCH_NOTES.md](/E:/git/subathon_timer/apps/desktop/PATCH_NOTES.md) in the same pass as the version bump.
+- Public app downloads are published to the Raspberry Pi path `/mnt/data/sites/apps/public/downloads/<app-slug>/`. For this app, the slug is `subathon-timer`.
+- The public site now reads `/downloads/<slug>/latest.json` at runtime. Do not require an Astro rebuild just to update the shown version or download button.
+- `release:publish` is the canonical publish path for this repo. It must upload the release artifacts, `latest.json`, `notes.md`, `manifest.json`, and matching hashes to `/mnt/data/sites/apps/public/downloads/subathon-timer/`.
+- Keep `.env.raspi` local-only. It contains publish credentials and must never be committed.
 - In pull requests, include:
   - what changed
   - how it was tested

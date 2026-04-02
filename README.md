@@ -114,6 +114,8 @@ When preparing a desktop release, update:
 
 `bun run release:publish` uses the local root `.env.raspi` file to upload those release artifacts plus `latest.json` and `notes.md` to the Raspberry Pi-hosted downloads directory.
 
+The public app site now reads `/downloads/<slug>/latest.json` at runtime, so publishing release metadata does not require an Astro rebuild. For this app, the publish target is `/mnt/data/sites/apps/public/downloads/subathon-timer/`.
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0. See `LICENSE`.

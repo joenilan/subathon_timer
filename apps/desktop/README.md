@@ -120,3 +120,25 @@ Windows release artifacts are copied to `apps/desktop/release/windows/` as:
 The portable zip contains `subathon-timer-portable.exe`. When that exe is launched, the app keeps its state in a local `data/` folder beside the executable instead of the normal Windows app-data location.
 
 `release:publish` expects a local root-level `.env.raspi` file with the Raspberry Pi SSH details. That file is ignored by git and should stay local-only.
+
+## Publish Contract
+
+The public site reads release metadata at runtime from:
+
+- `/downloads/subathon-timer/latest.json`
+
+So a publish from this repo must upload to:
+
+- `/mnt/data/sites/apps/public/downloads/subathon-timer/`
+
+`bun run release:publish` is the canonical path for that. It uploads:
+
+- `subathon-timer_<version>_x64_en-US.msi`
+- `subathon-timer_<version>_x64-setup.exe`
+- `subathon-timer_<version>_x64_portable.zip`
+- matching `.sha256` files
+- `manifest.json`
+- `latest.json`
+- `notes.md`
+
+`latest.json` is the website-facing source of truth for the current release, and the site picks it up without an Astro rebuild.
