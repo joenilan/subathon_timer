@@ -1,7 +1,7 @@
 {
   "name": "subathon-timer-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
@@ -18,9 +18,11 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "tauri:build:windows": "tauri build --bundles msi,nsis",
     "tauri:clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "tauri:clean:release": "cargo clean --manifest-path src-tauri/Cargo.toml --release",
-    "tauri:build:clean": "tauri build && cargo clean --manifest-path src-tauri/Cargo.toml --release"
+    "tauri:build:clean": "tauri build && cargo clean --manifest-path src-tauri/Cargo.toml --release",
+    "release:windows": "bun run tauri:build:windows && node ./scripts/package-release.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

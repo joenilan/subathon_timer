@@ -2,6 +2,13 @@
 
 All notable changes to the desktop app are tracked here.
 
+## 0.9.0
+
+- Added StreamElements and Streamlabs tip provider support, including tip-driven timer rules, provider connection health, and recent tip previews.
+- Hardened the desktop runtime around Zustand selectors, lifecycle hooks, native persistence, and overlay synchronization to avoid white-screen and feedback-loop regressions.
+- Polished the Connections and Rules flows with clearer provider setup, provider readiness gating for tip rules, and cleaner event-rule editing.
+- Added desktop-focused tests, CI updates, Bun-based Tauri commands, and a Windows release packaging script that emits normalized bundle filenames.
+
 ## 0.1.0
 
 - Built the active Tauri desktop app around a live dashboard, rules editor, overlays studio, wheel editor, Twitch connections, and settings.

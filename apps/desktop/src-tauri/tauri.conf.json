@@ -1,12 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Subathon Timer",
-  "version": "0.1.0",
+  "mainBinaryName": "subathon-timer",
+  "version": "0.9.0",
   "identifier": "com.yannismate.subathon-timer",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "bun run dev",
     "devUrl": "http://127.0.0.1:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
   "app": {

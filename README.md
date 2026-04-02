@@ -101,12 +101,15 @@ cd apps/desktop
 bun run version:check
 bun run version:check-notes
 bun run version:patch
+bun run release:windows
 ```
 
 When preparing a desktop release, update:
 
 - `apps/desktop/CHANGELOG.md`
 - `apps/desktop/PATCH_NOTES.md`
+
+`bun run release:windows` builds the Windows installers and copies normalized artifacts into `apps/desktop/release/windows/`.
 
 ## License
 
