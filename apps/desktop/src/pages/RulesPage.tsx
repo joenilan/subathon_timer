@@ -167,7 +167,7 @@ export function RulesPage() {
                 </div>
 
                 {(eventRule.sharedValueNote || showCustomToggle || showControls) && (
-                  <div className="rule-event-card__body">
+                  <div className={`rule-event-card__body${showTipOverlay ? ' rule-event-card__body--overlay' : ''}`}>
                     <div className={showTipOverlay ? 'rule-event-card__content rule-event-card__content--obscured' : 'rule-event-card__content'}>
                       {eventRule.sharedValueNote || showCustomToggle ? (
                         <div className="rule-event-card__meta-row">

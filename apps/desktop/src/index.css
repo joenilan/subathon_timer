@@ -1946,6 +1946,10 @@ select.rule-field__input {
     border-radius: var(--radius-sm);
 }
 
+.rule-event-card__body--overlay {
+    min-height: 156px;
+}
+
 .rule-event-card__content {
     display: grid;
     gap: 12px;
