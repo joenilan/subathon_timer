@@ -1,10 +1,68 @@
+import { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { timerEventRuleDefinitions, timerTierRuleDefinitions } from '../lib/timer/ruleDefinitions'
+import type { TipProviderStatus } from '../lib/tips/types'
 import { useAppStore } from '../state/useAppStore'
+import { useTipSessionStore } from '../state/useTipSessionStore'
+import { selectRulesTipState } from '../state/selectors'
+
+function buildTipRuleOverlay(
+  streamElementsStatus: TipProviderStatus,
+  streamlabsStatus: TipProviderStatus,
+) {
+  const notConnectedProviders: string[] = []
+  const connectingProviders: string[] = []
+
+  if (streamElementsStatus === 'connecting') {
+    connectingProviders.push('StreamElements')
+  } else if (streamElementsStatus !== 'connected') {
+    notConnectedProviders.push('StreamElements')
+  }
+
+  if (streamlabsStatus === 'connecting') {
+    connectingProviders.push('Streamlabs')
+  } else if (streamlabsStatus !== 'connected') {
+    notConnectedProviders.push('Streamlabs')
+  }
+
+  if (notConnectedProviders.length === 0 && connectingProviders.length === 0) {
+    return null
+  }
+
+  const waitingLabel = [...connectingProviders, ...notConnectedProviders].join(' and ')
+
+  if (notConnectedProviders.length === 0) {
+    return {
+      title: `${waitingLabel} still connecting`,
+      detail: 'Tips will start adding time once the live connection finishes.',
+    }
+  }
+
+  if (connectingProviders.length === 0) {
+    return {
+      title: `${waitingLabel} not connected`,
+      detail: 'Tips from that provider will not add time until you connect it on the Connections page.',
+    }
+  }
+
+  return {
+    title: `${notConnectedProviders.join(' and ')} not connected`,
+    detail: `${connectingProviders.join(' and ')} is still connecting. Tips only count from providers that are fully connected.`,
+  }
+}
 
 export function RulesPage() {
   const ruleConfig = useAppStore((state) => state.ruleConfig)
   const setRuleValue = useAppStore((state) => state.setRuleValue)
+  const { streamElementsStatus, streamlabsStatus } = useTipSessionStore(useShallow(selectRulesTipState))
   const advancedSubOverridesEnabled = ruleConfig.advancedSubEventOverridesEnabled
+  const tipRuleOverlay = useMemo(
+    () =>
+      ruleConfig.tipEnabled
+        ? buildTipRuleOverlay(streamElementsStatus, streamlabsStatus)
+        : null,
+    [ruleConfig.tipEnabled, streamElementsStatus, streamlabsStatus],
+  )
 
   return (
     <div className="page-container rules-page">
@@ -79,9 +137,13 @@ export function RulesPage() {
             const showControls = Boolean(
               eventRule.controls?.length && (!eventRule.customToggleKey || (advancedSubOverridesEnabled && usesCustomValues)),
             )
+            const showTipOverlay = eventRule.key === 'tipEnabled' && enabled && tipRuleOverlay
 
             return (
-              <article key={eventRule.key} className={`rule-event-card${enabled ? ' rule-event-card--enabled' : ''}`}>
+              <article
+                key={eventRule.key}
+                className={`rule-event-card${enabled ? ' rule-event-card--enabled' : ''}${showTipOverlay ? ' rule-event-card--warning' : ''}`}
+              >
                 <div className="rule-event-card__header">
                   <div className="rule-event-card__copy">
                     <h3 className="rule-event-card__title">{eventRule.label}</h3>
@@ -101,6 +163,13 @@ export function RulesPage() {
                     <span className="rule-toggle__label">{enabled ? 'On' : 'Off'}</span>
                   </label>
                 </div>
+
+                {showTipOverlay ? (
+                  <div className="rule-event-card__overlay-warning">
+                    <strong>{tipRuleOverlay.title}</strong>
+                    <p>{tipRuleOverlay.detail}</p>
+                  </div>
+                ) : null}
 
                 {eventRule.sharedValueNote || showCustomToggle ? (
                   <div className="rule-event-card__meta-row">

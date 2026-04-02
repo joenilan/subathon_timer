@@ -1893,6 +1893,12 @@ select.rule-field__input {
         linear-gradient(180deg, rgba(34, 211, 238, 0.06) 0%, rgba(255, 255, 255, 0.015) 100%);
 }
 
+.rule-event-card--warning {
+    border-color: rgba(234, 179, 8, 0.28);
+    background:
+        linear-gradient(180deg, rgba(234, 179, 8, 0.08) 0%, rgba(255, 255, 255, 0.015) 100%);
+}
+
 .rule-event-card__header {
     display: flex;
     align-items: flex-start;
@@ -1930,6 +1936,28 @@ select.rule-field__input {
     justify-content: space-between;
     gap: 14px;
     flex-wrap: wrap;
+}
+
+.rule-event-card__overlay-warning {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid rgba(234, 179, 8, 0.24);
+    border-radius: var(--radius-sm);
+    background: rgba(113, 63, 18, 0.2);
+}
+
+.rule-event-card__overlay-warning strong {
+    font-size: 12px;
+    font-weight: 700;
+    color: #facc15;
+}
+
+.rule-event-card__overlay-warning p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #fef3c7;
 }
 
 .rule-event-card__controls {

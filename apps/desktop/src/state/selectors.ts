@@ -189,3 +189,8 @@ export const selectConnectionsTipState = (state: TipSessionState) => ({
   streamlabsLastEventAt: state.streamlabsLastEventAt,
   streamlabsStatus: state.streamlabsStatus,
 })
+
+export const selectRulesTipState = (state: TipSessionState) => ({
+  streamElementsStatus: state.streamelementsStatus,
+  streamlabsStatus: state.streamlabsStatus,
+})
