@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { useShallow } from 'zustand/react/shallow'
 import { TWITCH_SCOPE_LABELS, TWITCH_SCOPES } from '../lib/twitch/constants'
 import type { StreamElementsTokenType, TipProviderStatus } from '../lib/tips/types'
@@ -6,6 +7,15 @@ import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
 import { useEventSubStore } from '../state/useEventSubStore'
 import { useTipSessionStore } from '../state/useTipSessionStore'
 import { selectConnectionsEventSubState, selectConnectionsTipState, selectConnectionsTwitchState } from '../state/selectors'
+
+const STREAMELEMENTS_DASHBOARD_URL = 'https://streamelements.com/dashboard'
+const STREAMELEMENTS_WEBSOCKET_DOCS_URL = 'https://docs.streamelements.com/websockets'
+const STREAMELEMENTS_TIP_SETUP_URL = 'https://docs.streamelements.com/chatbot/commands/default/tip'
+const STREAMLABS_DASHBOARD_URL = 'https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard'
+const STREAMLABS_REGISTER_APP_URL = 'https://dev.streamlabs.com/docs/register-your-application'
+const STREAMLABS_TOKEN_GUIDE_URL = 'https://dev.streamlabs.com/docs/obtain-an-access_token'
+const STREAMLABS_DONATIONS_DOCS_URL = 'https://dev.streamlabs.com/reference/donations'
+const STREAMLABS_SCOPES_URL = 'https://dev.streamlabs.com/docs/scopes'
 
 function formatTimestamp(value: number | null) {
   if (!value) {
@@ -64,6 +74,19 @@ function getProviderStatusLabel(status: TipProviderStatus) {
     default:
       return 'Not connected'
   }
+}
+
+async function openExternalUrl(url: string) {
+  try {
+    if ('__TAURI_INTERNALS__' in window) {
+      await openUrl(url)
+      return
+    }
+  } catch {
+    // Fall back to the browser path below.
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 export function ConnectionsPage() {
@@ -381,6 +404,7 @@ export function ConnectionsPage() {
           <div>
             <h2 className="panel-title">Tips & donations</h2>
             <p className="panel-copy">Connect StreamElements and Streamlabs tip feeds here. Both providers feed the same tip rule on the Rules page, so you only configure the timer math once.</p>
+            <p className="panel-copy">If you want the easiest nontechnical setup, start with StreamElements. Streamlabs still requires a developer app and OAuth access token.</p>
           </div>
         </div>
 
@@ -389,7 +413,7 @@ export function ConnectionsPage() {
             <div className="panel-header">
               <div>
                 <h3 className="panel-title">StreamElements</h3>
-                <p className="panel-copy">Uses the 2026 Astro websocket gateway. Paste a channel token from the correct StreamElements dashboard account, then the app subscribes to `channel.tips`.</p>
+                <p className="panel-copy">Uses the 2026 Astro websocket gateway. Open the dashboard, switch to the right channel, copy the overlay token or API key, then paste it here.</p>
               </div>
               <div className={`status-chip status-chip--${getProviderStatusTone(streamElementsStatus)}`}>{streamElementsStatusLabel}</div>
             </div>
@@ -413,6 +437,34 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
+              <div className="scope-list connections-list">
+                <div className="panel-subtitle">Quick setup</div>
+                <div className="scope-row">
+                  <code>1. Open StreamElements dashboard</code>
+                  <p>Use the dashboard button below, then click your avatar in the top-right corner and switch to the exact channel you stream from before copying any token.</p>
+                </div>
+                <div className="scope-row">
+                  <code>2. Copy the channel token</code>
+                  <p>For the Astro websocket, the easiest path is usually the overlay token / API key for that channel. If you pick the wrong linked account, the app can connect but never receive tips.</p>
+                </div>
+                <div className="scope-row">
+                  <code>3. Paste token here and connect</code>
+                  <p>Once connected, new tips will appear in the recent list below and can add time through the shared Tips / donations rule.</p>
+                </div>
+              </div>
+
+              <div className="action-row">
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_DASHBOARD_URL)}>
+                  Open Dashboard
+                </button>
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_WEBSOCKET_DOCS_URL)}>
+                  Open Astro Docs
+                </button>
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMELEMENTS_TIP_SETUP_URL)}>
+                  Open Tip Setup Docs
+                </button>
+              </div>
+
               <div className="provider-field-grid">
                 <label className="rule-field rule-field--compact">
                   <span className="rule-field__label">Token type</span>
@@ -425,7 +477,7 @@ export function ConnectionsPage() {
                     <option value="jwt">JWT</option>
                     <option value="oauth2">OAuth2 token</option>
                   </select>
-                  <span className="rule-field__hint">The Astro docs support `apikey`, `jwt`, and `oauth2`. The easiest path is the dashboard overlay token for the correct channel.</span>
+                  <span className="rule-field__hint">The Astro docs support `apikey`, `jwt`, and `oauth2`. If you are unsure, start with the overlay token / API key from the correct StreamElements channel.</span>
                 </label>
 
                 <label className="rule-field rule-field--compact">
@@ -477,7 +529,7 @@ export function ConnectionsPage() {
             <div className="panel-header">
               <div>
                 <h3 className="panel-title">Streamlabs</h3>
-                <p className="panel-copy">Uses the official donations API with polling. Paste an OAuth access token that includes `donations.read`, and the app will poll for new donations without pulling in the legacy Socket.IO client Streamlabs still documents.</p>
+                <p className="panel-copy">Uses the official donations API with polling. This setup is more technical: you need a Streamlabs developer app, then an OAuth access token with `donations.read`.</p>
               </div>
               <div className={`status-chip status-chip--${getProviderStatusTone(streamlabsStatus)}`}>{streamlabsStatusLabel}</div>
             </div>
@@ -499,6 +551,40 @@ export function ConnectionsPage() {
                   <span className="fact-label">Last tip</span>
                   <strong>{formatTimestamp(streamlabsLastEventAt)}</strong>
                 </div>
+              </div>
+
+              <div className="scope-list connections-list">
+                <div className="panel-subtitle">Quick setup</div>
+                <div className="scope-row">
+                  <code>1. Open Streamlabs dashboard</code>
+                  <p>Log in first, then create a developer app from the official Streamlabs API docs. This is required before the app can issue an access token for donations.</p>
+                </div>
+                <div className="scope-row">
+                  <code>2. Get an access token with donations.read</code>
+                  <p>Follow the official token guide, approve your own app, and request the `donations.read` scope. The app polls the donations endpoint and only applies new donation IDs once.</p>
+                </div>
+                <div className="scope-row">
+                  <code>3. Paste token here and connect</code>
+                  <p>If you want the fastest path with less OAuth friction, use StreamElements instead. Streamlabs works, but their official flow is still developer-oriented.</p>
+                </div>
+              </div>
+
+              <div className="action-row">
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_DASHBOARD_URL)}>
+                  Open Dashboard
+                </button>
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_REGISTER_APP_URL)}>
+                  Register App
+                </button>
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_TOKEN_GUIDE_URL)}>
+                  Open Token Guide
+                </button>
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_DONATIONS_DOCS_URL)}>
+                  Open Donations Docs
+                </button>
+                <button className="btn btn--ghost" onClick={() => void openExternalUrl(STREAMLABS_SCOPES_URL)}>
+                  Open Scopes
+                </button>
               </div>
 
               <div className="provider-field-grid">

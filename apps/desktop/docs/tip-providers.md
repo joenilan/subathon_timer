@@ -2,6 +2,24 @@
 
 This desktop app can add time from third-party tip providers without using `.env` files.
 
+## Quick links
+
+### StreamElements
+
+- Dashboard: https://streamelements.com/dashboard
+- Astro websocket docs: https://docs.streamelements.com/websockets
+- Tip setup docs: https://docs.streamelements.com/chatbot/commands/default/tip
+
+### Streamlabs
+
+- Dashboard login: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard
+- Register your application: https://dev.streamlabs.com/docs/register-your-application
+- Obtain an access token: https://dev.streamlabs.com/docs/obtain-an-access_token
+- Donations endpoint docs: https://dev.streamlabs.com/reference/donations
+- Scope list: https://dev.streamlabs.com/docs/scopes
+
+If you want the least technical setup, use StreamElements first. Streamlabs still requires a developer app and OAuth token flow.
+
 ## StreamElements
 
 As of March 2026, StreamElements documents tip events on the Astro websocket gateway:
@@ -18,10 +36,12 @@ The app uses:
 
 Recommended setup in this app:
 
-1. Open the StreamElements dashboard for the correct channel.
-2. Copy a websocket-capable token for that channel. The docs note that token/channel mismatches are a common source of silent subscriptions.
-3. In `Connections`, choose the StreamElements token type and paste the token.
-4. Connect the provider and verify that incoming tips appear in `Recent StreamElements tips`.
+1. Open the StreamElements dashboard: https://streamelements.com/dashboard
+2. Switch to the exact channel you stream from before copying any token.
+3. Copy a websocket-capable token for that channel. The docs note that token/channel mismatches are a common source of silent subscriptions.
+4. If you need the provider-side tipping page configured, use the official tip setup docs: https://docs.streamelements.com/chatbot/commands/default/tip
+5. In `Connections`, choose the StreamElements token type and paste the token.
+6. Connect the provider and verify that incoming tips appear in `Recent StreamElements tips`.
 
 ## Streamlabs
 
@@ -35,10 +55,12 @@ As of April 2026, Streamlabs still documents realtime donation events through th
 
 This app intentionally uses the donations endpoint instead of the legacy Socket.IO sample client:
 
-1. Obtain an OAuth access token for a registered Streamlabs app.
-2. Paste that access token into `Connections`.
-3. The app polls `GET https://streamlabs.com/api/v2.0/donations?limit=10`.
-4. Only donation IDs newer than the last seen donation are applied to the timer.
+1. Open the Streamlabs dashboard: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard
+2. Register a Streamlabs developer app: https://dev.streamlabs.com/docs/register-your-application
+3. Follow the official access token guide and request `donations.read`: https://dev.streamlabs.com/docs/obtain-an-access_token
+4. Paste that access token into `Connections`.
+5. The app polls `GET https://streamlabs.com/api/v2.0/donations?limit=10`.
+6. Only donation IDs newer than the last seen donation are applied to the timer.
 
 Why this implementation:
 
