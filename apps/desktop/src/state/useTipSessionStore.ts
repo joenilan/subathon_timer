@@ -1,3 +1,4 @@
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { create } from 'zustand'
 import {
   buildNativeTipProviderSnapshot,
@@ -5,6 +6,12 @@ import {
   loadNativeTipProviderSnapshot,
   saveNativeTipProviderSnapshot,
 } from '../lib/platform/nativeTipSession'
+import {
+  cancelNativeStreamlabsOAuth,
+  consumeNativeStreamlabsOAuthResult,
+  startNativeStreamlabsOAuth,
+  STREAMLABS_DEFAULT_REDIRECT_URI,
+} from '../lib/platform/nativeStreamlabsAuth'
 import {
   buildStreamElementsSubscribeMessage,
   normalizeStreamElementsTipMessage,
@@ -18,6 +25,7 @@ import {
 } from '../lib/tips/streamlabs'
 import type {
   StreamElementsTipConnection,
+  StreamlabsOAuthAppConfig,
   StreamlabsTipConnection,
   TipProviderNotification,
   TipProviderStatus,
@@ -27,12 +35,14 @@ import type { NormalizedTimerEvent } from '../lib/timer/types'
 const MAX_TIP_EVENTS = 24
 const MAX_TIP_NOTIFICATIONS = 12
 const STREAMELEMENTS_SOCKET_URL = 'wss://astro.streamelements.com/'
+const STREAMLABS_OAUTH_SCOPES = ['donations.read']
 
 let activeStreamElementsSocket: WebSocket | null = null
 let activeStreamElementsReconnectTimer: number | null = null
 let desiredStreamElementsConnection: StreamElementsTipConnection | null = null
 
 let activeStreamlabsPollTimer: number | null = null
+let activeStreamlabsAuthPollTimer: number | null = null
 let desiredStreamlabsConnection: StreamlabsTipConnection | null = null
 let lastSeenStreamlabsDonationId: string | null = null
 
@@ -83,11 +93,34 @@ function clearStreamlabsPollTimer() {
   activeStreamlabsPollTimer = null
 }
 
+function clearStreamlabsAuthPollTimer() {
+  if (activeStreamlabsAuthPollTimer === null) {
+    return
+  }
+
+  window.clearTimeout(activeStreamlabsAuthPollTimer)
+  activeStreamlabsAuthPollTimer = null
+}
+
+async function openExternalUrl(url: string) {
+  try {
+    if ('__TAURI_INTERNALS__' in window) {
+      await openUrl(url)
+      return
+    }
+  } catch {
+    // Fall back to the browser path below.
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 async function persistTipSnapshot(input: {
   streamelements: StreamElementsTipConnection | null
+  streamlabsApp: StreamlabsOAuthAppConfig | null
   streamlabs: StreamlabsTipConnection | null
 }) {
-  if (!input.streamelements && !input.streamlabs) {
+  if (!input.streamelements && !input.streamlabsApp && !input.streamlabs) {
     await clearNativeTipProviderSnapshot()
     return
   }
@@ -101,6 +134,8 @@ export interface TipSessionState {
   streamelementsStatus: TipProviderStatus
   streamelementsLastError: string | null
   streamelementsLastEventAt: number | null
+  streamlabsAppConfig: StreamlabsOAuthAppConfig | null
+  streamlabsAuthorizationPending: boolean
   streamlabsConnection: StreamlabsTipConnection | null
   streamlabsStatus: TipProviderStatus
   streamlabsLastError: string | null
@@ -110,7 +145,7 @@ export interface TipSessionState {
 
   bootstrap: () => Promise<void>
   connectStreamElements: (connection: StreamElementsTipConnection) => Promise<void>
-  connectStreamlabs: (connection: StreamlabsTipConnection) => Promise<void>
+  startStreamlabsOAuth: (config: StreamlabsOAuthAppConfig) => Promise<void>
   disconnectProvider: (provider: 'streamelements' | 'streamlabs') => Promise<void>
   clearError: (provider: 'streamelements' | 'streamlabs') => void
 }
@@ -202,7 +237,10 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
             typeof envelope.data?.reconnect_token === 'string' ? envelope.data.reconnect_token : null
 
           if (reconnectToken) {
-            void connectStreamElementsRuntime(connection, `${STREAMELEMENTS_SOCKET_URL}?reconnect_token=${encodeURIComponent(reconnectToken)}`)
+            void connectStreamElementsRuntime(
+              connection,
+              `${STREAMELEMENTS_SOCKET_URL}?reconnect_token=${encodeURIComponent(reconnectToken)}`,
+            )
           }
           return
         }
@@ -312,12 +350,70 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
     }
   }
 
+  const pollStreamlabsOAuthResult = async () => {
+    try {
+      const result = await consumeNativeStreamlabsOAuthResult()
+
+      if (!get().streamlabsAuthorizationPending) {
+        return
+      }
+
+      if (!result) {
+        activeStreamlabsAuthPollTimer = window.setTimeout(() => {
+          void pollStreamlabsOAuthResult()
+        }, 1000)
+        return
+      }
+
+      clearStreamlabsAuthPollTimer()
+
+      if (result.status !== 'success' || !result.accessToken) {
+        set({
+          streamlabsAuthorizationPending: false,
+          streamlabsStatus: 'error',
+          streamlabsLastError: result.error ?? 'Streamlabs authorization failed.',
+        })
+        return
+      }
+
+      const nextConnection = {
+        accessToken: trimSecret(result.accessToken),
+        refreshToken: result.refreshToken ? trimSecret(result.refreshToken) : null,
+        tokenType: result.tokenType ? trimSecret(result.tokenType) : null,
+      } satisfies StreamlabsTipConnection
+
+      set({
+        streamlabsAuthorizationPending: false,
+        streamlabsConnection: nextConnection,
+        streamlabsLastError: null,
+      })
+
+      await persistTipSnapshot({
+        streamelements: get().streamelementsConnection,
+        streamlabsApp: get().streamlabsAppConfig,
+        streamlabs: nextConnection,
+      })
+
+      await connectStreamlabsRuntime(nextConnection)
+    } catch (error) {
+      clearStreamlabsAuthPollTimer()
+      set({
+        streamlabsAuthorizationPending: false,
+        streamlabsStatus: 'error',
+        streamlabsLastError:
+          error instanceof Error ? error.message : 'Unable to finish Streamlabs authorization.',
+      })
+    }
+  }
+
   return {
     isBootstrapped: false,
     streamelementsConnection: null,
     streamelementsStatus: 'idle',
     streamelementsLastError: null,
     streamelementsLastEventAt: null,
+    streamlabsAppConfig: null,
+    streamlabsAuthorizationPending: false,
     streamlabsConnection: null,
     streamlabsStatus: 'idle',
     streamlabsLastError: null,
@@ -335,6 +431,7 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
         set({
           streamelementsConnection: snapshot?.streamelements ?? null,
+          streamlabsAppConfig: snapshot?.streamlabsApp ?? null,
           streamlabsConnection: snapshot?.streamlabs ?? null,
           isBootstrapped: true,
         })
@@ -372,30 +469,63 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
       set({ streamelementsConnection: nextConnection })
       await persistTipSnapshot({
         streamelements: nextConnection,
+        streamlabsApp: get().streamlabsAppConfig,
         streamlabs: get().streamlabsConnection,
       })
       await connectStreamElementsRuntime(nextConnection)
     },
 
-    connectStreamlabs: async (connection) => {
-      const nextConnection = {
-        accessToken: trimSecret(connection.accessToken),
-      } satisfies StreamlabsTipConnection
+    startStreamlabsOAuth: async (config) => {
+      const nextConfig = {
+        clientId: trimSecret(config.clientId),
+        clientSecret: trimSecret(config.clientSecret),
+        redirectUri: trimSecret(config.redirectUri) || STREAMLABS_DEFAULT_REDIRECT_URI,
+      } satisfies StreamlabsOAuthAppConfig
 
-      if (!nextConnection.accessToken) {
+      if (!nextConfig.clientId || !nextConfig.clientSecret) {
         set({
           streamlabsStatus: 'error',
-          streamlabsLastError: 'Paste a Streamlabs access token before connecting.',
+          streamlabsLastError: 'Enter the Streamlabs client ID and client secret before connecting.',
         })
         return
       }
 
-      set({ streamlabsConnection: nextConnection })
+      set({
+        streamlabsAppConfig: nextConfig,
+        streamlabsAuthorizationPending: true,
+        streamlabsLastError: null,
+      })
+
       await persistTipSnapshot({
         streamelements: get().streamelementsConnection,
-        streamlabs: nextConnection,
+        streamlabsApp: nextConfig,
+        streamlabs: get().streamlabsConnection,
       })
-      await connectStreamlabsRuntime(nextConnection)
+
+      clearStreamlabsAuthPollTimer()
+      await cancelNativeStreamlabsOAuth()
+
+      try {
+        const { authorizeUrl } = await startNativeStreamlabsOAuth({
+          clientId: nextConfig.clientId,
+          clientSecret: nextConfig.clientSecret,
+          redirectUri: nextConfig.redirectUri,
+          scopes: STREAMLABS_OAUTH_SCOPES,
+        })
+
+        await openExternalUrl(authorizeUrl)
+        activeStreamlabsAuthPollTimer = window.setTimeout(() => {
+          void pollStreamlabsOAuthResult()
+        }, 1000)
+      } catch (error) {
+        clearStreamlabsAuthPollTimer()
+        set({
+          streamlabsAuthorizationPending: false,
+          streamlabsStatus: 'error',
+          streamlabsLastError:
+            error instanceof Error ? error.message : 'Unable to begin Streamlabs authorization.',
+        })
+      }
     },
 
     disconnectProvider: async (provider) => {
@@ -414,10 +544,14 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
         await persistTipSnapshot({
           streamelements: null,
+          streamlabsApp: get().streamlabsAppConfig,
           streamlabs: nextStreamlabsConnection,
         })
         return
       }
+
+      clearStreamlabsAuthPollTimer()
+      await cancelNativeStreamlabsOAuth()
 
       desiredStreamlabsConnection = null
       clearStreamlabsPollTimer()
@@ -425,6 +559,7 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
       const nextStreamElementsConnection = get().streamelementsConnection
       set({
+        streamlabsAuthorizationPending: false,
         streamlabsConnection: null,
         streamlabsStatus: 'idle',
         streamlabsLastError: null,
@@ -433,6 +568,7 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
 
       await persistTipSnapshot({
         streamelements: nextStreamElementsConnection,
+        streamlabsApp: get().streamlabsAppConfig,
         streamlabs: null,
       })
     },

@@ -14,7 +14,9 @@ This desktop app can add time from third-party tip providers without using `.env
 
 - Dashboard login: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard
 - Register your application: https://dev.streamlabs.com/docs/register-your-application
+- Connecting users to your app: https://dev.streamlabs.com/docs/connecting-to-an-account
 - Obtain an access token: https://dev.streamlabs.com/docs/obtain-an-access_token
+- Submit your application: https://dev.streamlabs.com/docs/submit-your-application
 - Donations endpoint docs: https://dev.streamlabs.com/reference/donations
 - Scope list: https://dev.streamlabs.com/docs/scopes
 
@@ -53,20 +55,41 @@ As of April 2026, Streamlabs still documents realtime donation events through th
 - Obtain access token: https://dev.streamlabs.com/docs/obtain-an-access_token
 - Socket API guide: https://dev.streamlabs.com/docs/socket-api
 
-This app intentionally uses the donations endpoint instead of the legacy Socket.IO sample client:
+This app intentionally uses the donations endpoint instead of the legacy Socket.IO sample client.
+
+The desktop app now supports an app-owned OAuth flow for Streamlabs. That means:
+
+- you register the Streamlabs app once
+- you paste the client ID and client secret into the desktop app once
+- users click `Authorize Streamlabs` instead of pasting raw access tokens
+- the desktop app receives the local callback and stores the resulting access token securely
+
+Required redirect URI for the desktop app:
+
+- `http://127.0.0.1:31847/auth/streamlabs/callback`
+
+Owner setup:
 
 1. Open the Streamlabs dashboard: https://streamlabs.com/login?r=https%3A%2F%2Fstreamlabs.com%2Fdashboard
 2. Register a Streamlabs developer app: https://dev.streamlabs.com/docs/register-your-application
-3. Follow the official access token guide and request `donations.read`: https://dev.streamlabs.com/docs/obtain-an-access_token
-4. Paste that access token into `Connections`.
-5. The app polls `GET https://streamlabs.com/api/v2.0/donations?limit=10`.
-6. Only donation IDs newer than the last seen donation are applied to the timer.
+3. Add this redirect URI to that app exactly: `http://127.0.0.1:31847/auth/streamlabs/callback`
+4. In `Connections`, paste the Streamlabs client ID and client secret once.
+5. Click `Authorize Streamlabs`.
+6. Approve your app in the browser when Streamlabs opens.
+7. The app polls `GET https://streamlabs.com/api/v2.0/donations?limit=10`.
+8. Only donation IDs newer than the last seen donation are applied to the timer.
 
 Why this implementation:
 
 - Streamlabs still recommends the Socket API in docs.
 - Their documented sample uses the legacy Socket.IO 2 client.
 - This app avoids reintroducing that legacy client dependency and instead uses the official donations endpoint with `donations.read`.
+- Streamlabs OAuth still requires a client secret for token exchange, so the clean desktop flow depends on an app you register and control.
+
+Approval note:
+
+- Before Streamlabs approves the app, only up to 10 whitelisted users can authorize it.
+- For broader/public use, submit the app for review: https://dev.streamlabs.com/docs/submit-your-application
 
 After connecting, verify that incoming donations appear in `Recent Streamlabs tips` on the `Connections` page.
 

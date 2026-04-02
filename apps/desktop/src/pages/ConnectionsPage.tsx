@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useShallow } from 'zustand/react/shallow'
+import { STREAMLABS_DEFAULT_REDIRECT_URI } from '../lib/platform/nativeStreamlabsAuth'
 import { TWITCH_SCOPE_LABELS, TWITCH_SCOPES } from '../lib/twitch/constants'
 import type { StreamElementsTokenType, TipProviderStatus } from '../lib/tips/types'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
@@ -93,7 +94,8 @@ export function ConnectionsPage() {
   const [copied, setCopied] = useState(false)
   const [streamElementsToken, setStreamElementsToken] = useState('')
   const [streamElementsTokenType, setStreamElementsTokenType] = useState<StreamElementsTokenType>('apikey')
-  const [streamlabsToken, setStreamlabsToken] = useState('')
+  const [streamlabsClientId, setStreamlabsClientId] = useState('')
+  const [streamlabsClientSecret, setStreamlabsClientSecret] = useState('')
   const {
     status,
     tokens,
@@ -118,13 +120,15 @@ export function ConnectionsPage() {
   const {
     clearTipError,
     connectStreamElements,
-    connectStreamlabs,
     disconnectTipProvider,
     recentTipNotifications,
+    startStreamlabsOAuth,
     streamElementsConnection,
     streamElementsLastError,
     streamElementsLastEventAt,
     streamElementsStatus,
+    streamlabsAppConfig,
+    streamlabsAuthorizationPending,
     streamlabsConnection,
     streamlabsLastError,
     streamlabsLastEventAt,
@@ -152,8 +156,9 @@ export function ConnectionsPage() {
   }, [streamElementsConnection])
 
   useEffect(() => {
-    setStreamlabsToken(streamlabsConnection?.accessToken ?? '')
-  }, [streamlabsConnection])
+    setStreamlabsClientId(streamlabsAppConfig?.clientId ?? '')
+    setStreamlabsClientSecret(streamlabsAppConfig?.clientSecret ?? '')
+  }, [streamlabsAppConfig])
 
   const statusTone = useMemo(() => {
     if (hasScopeGap) {
@@ -226,10 +231,15 @@ export function ConnectionsPage() {
     () => getProviderStatusLabel(streamElementsStatus),
     [streamElementsStatus],
   )
-  const streamlabsStatusLabel = useMemo(
-    () => getProviderStatusLabel(streamlabsStatus),
-    [streamlabsStatus],
+  const streamlabsStatusTone = useMemo(
+    () => (streamlabsAuthorizationPending ? 'pending' : getProviderStatusTone(streamlabsStatus)),
+    [streamlabsAuthorizationPending, streamlabsStatus],
   )
+  const streamlabsStatusLabel = useMemo(
+    () => (streamlabsAuthorizationPending ? 'Waiting for approval' : getProviderStatusLabel(streamlabsStatus)),
+    [streamlabsAuthorizationPending, streamlabsStatus],
+  )
+  const streamlabsOAuthSupported = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
   const handleCopyCode = async () => {
     if (!deviceFlow) {
@@ -253,8 +263,10 @@ export function ConnectionsPage() {
   }
 
   const handleConnectStreamlabs = async () => {
-    await connectStreamlabs({
-      accessToken: streamlabsToken,
+    await startStreamlabsOAuth({
+      clientId: streamlabsClientId,
+      clientSecret: streamlabsClientSecret,
+      redirectUri: STREAMLABS_DEFAULT_REDIRECT_URI,
     })
   }
 
@@ -526,12 +538,12 @@ export function ConnectionsPage() {
           </section>
 
           <section className="panel connections-panel connections-panel--provider">
-            <div className="panel-header">
-              <div>
-                <h3 className="panel-title">Streamlabs</h3>
-                <p className="panel-copy">Uses the official donations API with polling. This setup is more technical: you need a Streamlabs developer app, then an OAuth access token with `donations.read`.</p>
-              </div>
-              <div className={`status-chip status-chip--${getProviderStatusTone(streamlabsStatus)}`}>{streamlabsStatusLabel}</div>
+              <div className="panel-header">
+                <div>
+                  <h3 className="panel-title">Streamlabs</h3>
+                <p className="panel-copy">Uses the official donations API with polling. You register the Streamlabs app once, save the client ID and secret here, then click Authorize Streamlabs so users only need to approve your app.</p>
+                </div>
+              <div className={`status-chip status-chip--${streamlabsStatusTone}`}>{streamlabsStatusLabel}</div>
             </div>
 
             <div className="connections-panel__body">
@@ -544,8 +556,8 @@ export function ConnectionsPage() {
 
               <div className="fact-grid">
                 <div className="fact">
-                  <span className="fact-label">Auth mode</span>
-                  <strong>{streamlabsConnection ? 'Access token' : 'Not set'}</strong>
+                  <span className="fact-label">App setup</span>
+                  <strong>{streamlabsAppConfig ? 'Client configured' : 'Not configured'}</strong>
                 </div>
                 <div className="fact">
                   <span className="fact-label">Last tip</span>
@@ -556,16 +568,16 @@ export function ConnectionsPage() {
               <div className="scope-list connections-list">
                 <div className="panel-subtitle">Quick setup</div>
                 <div className="scope-row">
-                  <code>1. Open Streamlabs dashboard</code>
-                  <p>Log in first, then create a developer app from the official Streamlabs API docs. This is required before the app can issue an access token for donations.</p>
+                  <code>1. Register your Streamlabs app once</code>
+                  <p>Open the Streamlabs developer docs, register this app, and add the redirect URI shown below exactly as written.</p>
                 </div>
                 <div className="scope-row">
-                  <code>2. Get an access token with donations.read</code>
-                  <p>Follow the official token guide, approve your own app, and request the `donations.read` scope. The app polls the donations endpoint and only applies new donation IDs once.</p>
+                  <code>2. Save client ID and secret here</code>
+                  <p>That is the one-time owner setup. After that, the app opens Streamlabs authorization in the browser and exchanges the code locally through the desktop callback.</p>
                 </div>
                 <div className="scope-row">
-                  <code>3. Paste token here and connect</code>
-                  <p>If you want the fastest path with less OAuth friction, use StreamElements instead. Streamlabs works, but their official flow is still developer-oriented.</p>
+                  <code>3. Click Authorize Streamlabs</code>
+                  <p>The user just approves your app. The desktop app then polls the donations endpoint and only applies new donation IDs once.</p>
                 </div>
               </div>
 
@@ -589,27 +601,69 @@ export function ConnectionsPage() {
 
               <div className="provider-field-grid">
                 <label className="rule-field rule-field--compact">
-                  <span className="rule-field__label">Access token</span>
+                  <span className="rule-field__label">Client ID</span>
+                  <input
+                    className="rule-field__input"
+                    type="text"
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="Paste Streamlabs client ID"
+                    value={streamlabsClientId}
+                    onChange={(event) => setStreamlabsClientId(event.target.value)}
+                  />
+                  <span className="rule-field__hint">This comes from the Streamlabs developer app you register for this desktop app.</span>
+                </label>
+
+                <label className="rule-field rule-field--compact">
+                  <span className="rule-field__label">Client secret</span>
                   <input
                     className="rule-field__input"
                     type="password"
                     spellCheck={false}
                     autoComplete="off"
-                    placeholder="Paste Streamlabs access token"
-                    value={streamlabsToken}
-                    onChange={(event) => setStreamlabsToken(event.target.value)}
+                    placeholder="Paste Streamlabs client secret"
+                    value={streamlabsClientSecret}
+                    onChange={(event) => setStreamlabsClientSecret(event.target.value)}
                   />
-                  <span className="rule-field__hint">Use a Streamlabs OAuth access token with `donations.read`. The app polls `GET /donations` and only applies newly seen donation IDs.</span>
+                  <span className="rule-field__hint">Stored locally in the native secure session store when you run under Tauri. Do not commit it.</span>
+                </label>
+
+                <label className="rule-field rule-field--compact">
+                  <span className="rule-field__label">Redirect URI</span>
+                  <input
+                    className="rule-field__input"
+                    type="text"
+                    spellCheck={false}
+                    autoComplete="off"
+                    readOnly
+                    value={STREAMLABS_DEFAULT_REDIRECT_URI}
+                  />
+                  <span className="rule-field__hint">Add this exact redirect URI to the Streamlabs app registration. This local callback is why the one-click flow requires the Tauri desktop app.</span>
                 </label>
               </div>
 
+              {!streamlabsOAuthSupported ? (
+                <div className="scope-row">
+                  <code>Desktop runtime required</code>
+                  <p>Streamlabs OAuth uses the local desktop callback at <code>{STREAMLABS_DEFAULT_REDIRECT_URI}</code>, so this connection flow works in <code>bun run tauri:dev</code> and release builds, not browser-only dev mode.</p>
+                </div>
+              ) : null}
+
               <div className="action-row">
-                <button className="btn btn--primary" onClick={() => void handleConnectStreamlabs()}>
-                  {streamlabsConnection ? 'Reconnect Streamlabs' : 'Connect Streamlabs'}
+                <button
+                  className="btn btn--primary"
+                  disabled={!streamlabsOAuthSupported || streamlabsAuthorizationPending}
+                  onClick={() => void handleConnectStreamlabs()}
+                >
+                  {streamlabsAuthorizationPending
+                    ? 'Waiting For Approval…'
+                    : streamlabsConnection
+                      ? 'Reconnect Streamlabs'
+                      : 'Authorize Streamlabs'}
                 </button>
-                {streamlabsConnection ? (
+                {streamlabsConnection || streamlabsAuthorizationPending ? (
                   <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamlabs')}>
-                    Disconnect
+                    {streamlabsAuthorizationPending ? 'Cancel' : 'Disconnect'}
                   </button>
                 ) : null}
               </div>

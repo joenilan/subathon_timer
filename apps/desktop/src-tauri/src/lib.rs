@@ -1,5 +1,7 @@
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{IpAddr, TcpListener, TcpStream};
@@ -9,6 +11,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use tauri::Manager;
+use url::form_urlencoded;
 
 const DEFAULT_OVERLAY_PORT: u16 = 31_847;
 const APP_STATE_FILENAME: &str = "app-state.json";
@@ -38,6 +41,25 @@ struct OverlayServerRuntime {
 struct OverlayServerHandle {
     shared_state: Arc<RwLock<OverlayState>>,
     runtime: Mutex<OverlayServerRuntime>,
+}
+
+#[derive(Default)]
+struct StreamlabsAuthRuntime {
+    pending: Option<StreamlabsAuthPending>,
+    last_result: Option<StreamlabsOAuthResult>,
+}
+
+struct StreamlabsAuthHandle {
+    runtime: Arc<Mutex<StreamlabsAuthRuntime>>,
+}
+
+#[derive(Clone)]
+struct StreamlabsAuthPending {
+    state: String,
+    client_id: String,
+    client_secret: String,
+    redirect_uri: String,
+    scopes: Vec<String>,
 }
 
 impl Drop for OverlayServerHandle {
@@ -153,6 +175,42 @@ struct BootstrapState {
     overlay_preview_base_url: Option<String>,
     overlay_lan_base_url: Option<String>,
     overlay_lan_access_enabled: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StreamlabsOAuthStartInput {
+    client_id: String,
+    client_secret: String,
+    redirect_uri: String,
+    scopes: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StreamlabsOAuthStartResult {
+    authorize_url: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StreamlabsOAuthResult {
+    status: String,
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    token_type: Option<String>,
+    scope: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct StreamlabsTokenPayload {
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    token_type: Option<String>,
+    scope: Option<String>,
+    error: Option<String>,
+    message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -562,6 +620,159 @@ fn build_bootstrap_state(runtime: &OverlayServerRuntime) -> BootstrapState {
     }
 }
 
+fn generate_streamlabs_oauth_state() -> String {
+    thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(48)
+        .map(char::from)
+        .collect()
+}
+
+fn build_streamlabs_authorize_url(input: &StreamlabsOAuthStartInput, state: &str) -> String {
+    let mut serializer = form_urlencoded::Serializer::new(String::new());
+    serializer.append_pair("client_id", input.client_id.trim());
+    serializer.append_pair("redirect_uri", input.redirect_uri.trim());
+    serializer.append_pair("response_type", "code");
+    serializer.append_pair("state", state);
+
+    if !input.scopes.is_empty() {
+        serializer.append_pair("scope", &input.scopes.join(" "));
+    }
+
+    format!(
+        "https://streamlabs.com/api/v2.0/authorize?{}",
+        serializer.finish()
+    )
+}
+
+fn exchange_streamlabs_authorization_code(
+    pending: &StreamlabsAuthPending,
+    code: &str,
+) -> Result<StreamlabsOAuthResult, String> {
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post("https://streamlabs.com/api/v2.0/token")
+        .header("Content-Type", "application/json")
+        .header("X-Requested-With", "XMLHttpRequest")
+        .json(&json!({
+            "grant_type": "authorization_code",
+            "client_id": &pending.client_id,
+            "client_secret": &pending.client_secret,
+            "redirect_uri": &pending.redirect_uri,
+            "code": code,
+        }))
+        .send()
+        .map_err(|error| format!("failed to exchange Streamlabs auth code: {error}"))?;
+
+    let status = response.status();
+    let payload = response
+        .json::<StreamlabsTokenPayload>()
+        .map_err(|error| format!("failed to parse Streamlabs token response: {error}"))?;
+
+    if !status.is_success() {
+        let detail = payload
+            .message
+            .or(payload.error)
+            .unwrap_or_else(|| format!("Streamlabs token exchange failed ({}).", status.as_u16()));
+        return Err(detail);
+    }
+
+    let access_token = payload
+        .access_token
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "Streamlabs token response did not include an access token.".to_string())?;
+
+    Ok(StreamlabsOAuthResult {
+        status: "success".into(),
+        access_token: Some(access_token),
+        refresh_token: payload.refresh_token.filter(|value| !value.trim().is_empty()),
+        token_type: payload.token_type.filter(|value| !value.trim().is_empty()),
+        scope: payload.scope.filter(|value| !value.trim().is_empty()),
+        error: None,
+    })
+}
+
+fn render_streamlabs_auth_html(title: &str, body: &str, tone: &str) -> String {
+    format!(
+        r#"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Streamlabs Authorization</title>
+    <style>
+      :root {{
+        color-scheme: dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        --bg: #090b10;
+        --panel: rgba(15, 18, 25, 0.94);
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #f4f4f5;
+        --muted: #afb4c3;
+        --accent: #38d7ff;
+        --ok: #67ee93;
+        --error: #ff6b8a;
+      }}
+      * {{ box-sizing: border-box; }}
+      body {{
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top left, rgba(56, 215, 255, 0.12), transparent 24%),
+          linear-gradient(180deg, #07090d 0%, var(--bg) 100%);
+        color: var(--text);
+      }}
+      .card {{
+        width: min(520px, 100%);
+        display: grid;
+        gap: 12px;
+        padding: 22px 24px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--panel);
+        box-shadow: 0 24px 48px rgba(0,0,0,0.32);
+      }}
+      .eyebrow {{
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }}
+      h1 {{
+        margin: 0;
+        font-size: 24px;
+      }}
+      p {{
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }}
+      .tone-success h1 {{ color: var(--ok); }}
+      .tone-error h1 {{ color: var(--error); }}
+      code {{
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        color: var(--text);
+      }}
+    </style>
+  </head>
+  <body>
+    <div class="card tone-{tone}">
+      <div class="eyebrow">Subathon Timer</div>
+      <h1>{title}</h1>
+      <p>{body}</p>
+      <p>You can close this browser tab and return to the desktop app.</p>
+    </div>
+  </body>
+</html>"#
+    )
+}
+
 #[tauri::command]
 fn get_bootstrap_state(overlay_server: tauri::State<'_, OverlayServerHandle>) -> BootstrapState {
     if let Ok(runtime) = overlay_server.runtime.lock() {
@@ -605,6 +816,7 @@ fn sync_overlay_state(
 fn set_overlay_network_mode(
     lan_enabled: bool,
     overlay_server: tauri::State<'_, OverlayServerHandle>,
+    streamlabs_auth: tauri::State<'_, StreamlabsAuthHandle>,
 ) -> Result<BootstrapState, String> {
     let mut runtime = overlay_server
         .runtime
@@ -618,7 +830,11 @@ fn set_overlay_network_mode(
     }
 
     stop_overlay_server(&mut runtime);
-    *runtime = spawn_overlay_server(Arc::clone(&overlay_server.shared_state), lan_enabled);
+    *runtime = spawn_overlay_server(
+        Arc::clone(&overlay_server.shared_state),
+        Arc::clone(&streamlabs_auth.runtime),
+        lan_enabled,
+    );
 
     Ok(build_bootstrap_state(&runtime))
 }
@@ -732,6 +948,68 @@ fn clear_native_tip_provider_session<R: tauri::Runtime>(
         let _ = app;
         clear_native_tip_provider_session_snapshot()
     }
+}
+
+#[tauri::command]
+fn begin_streamlabs_oauth(
+    input: StreamlabsOAuthStartInput,
+    streamlabs_auth: tauri::State<'_, StreamlabsAuthHandle>,
+) -> Result<StreamlabsOAuthStartResult, String> {
+    let client_id = input.client_id.trim();
+    let client_secret = input.client_secret.trim();
+    let redirect_uri = input.redirect_uri.trim();
+
+    if client_id.is_empty() || client_secret.is_empty() {
+        return Err("Enter the Streamlabs client ID and client secret before connecting.".into());
+    }
+
+    if redirect_uri.is_empty() {
+        return Err("Enter a Streamlabs redirect URI before connecting.".into());
+    }
+
+    let state = generate_streamlabs_oauth_state();
+    let authorize_url = build_streamlabs_authorize_url(&input, &state);
+    let mut runtime = streamlabs_auth
+        .runtime
+        .lock()
+        .map_err(|_| "streamlabs auth lock poisoned".to_string())?;
+
+    runtime.pending = Some(StreamlabsAuthPending {
+        state,
+        client_id: client_id.into(),
+        client_secret: client_secret.into(),
+        redirect_uri: redirect_uri.into(),
+        scopes: input.scopes,
+    });
+    runtime.last_result = None;
+
+    Ok(StreamlabsOAuthStartResult { authorize_url })
+}
+
+#[tauri::command]
+fn consume_streamlabs_oauth_result(
+    streamlabs_auth: tauri::State<'_, StreamlabsAuthHandle>,
+) -> Result<Option<StreamlabsOAuthResult>, String> {
+    let mut runtime = streamlabs_auth
+        .runtime
+        .lock()
+        .map_err(|_| "streamlabs auth lock poisoned".to_string())?;
+
+    Ok(runtime.last_result.take())
+}
+
+#[tauri::command]
+fn cancel_streamlabs_oauth(
+    streamlabs_auth: tauri::State<'_, StreamlabsAuthHandle>,
+) -> Result<(), String> {
+    let mut runtime = streamlabs_auth
+        .runtime
+        .lock()
+        .map_err(|_| "streamlabs auth lock poisoned".to_string())?;
+
+    runtime.pending = None;
+    runtime.last_result = None;
+    Ok(())
 }
 
 fn format_http_response(status_line: &str, content_type: &str, body: &str) -> Vec<u8> {
@@ -1406,7 +1684,175 @@ fn reason_overlay_html() -> &'static str {
 </html>"#
 }
 
-fn try_handle_connection(mut stream: TcpStream, shared_state: Arc<RwLock<OverlayState>>) {
+fn handle_streamlabs_auth_callback(
+    query: &str,
+    streamlabs_auth: Arc<Mutex<StreamlabsAuthRuntime>>,
+) -> Vec<u8> {
+    let params: std::collections::HashMap<String, String> =
+        form_urlencoded::parse(query.as_bytes()).into_owned().collect();
+    let returned_state = params.get("state").cloned().unwrap_or_default();
+
+    let pending = {
+        let runtime = match streamlabs_auth.lock() {
+            Ok(runtime) => runtime,
+            Err(_) => {
+                return format_http_response(
+                    "HTTP/1.1 500 Internal Server Error",
+                    "text/html; charset=utf-8",
+                    &render_streamlabs_auth_html(
+                        "Authorization failed",
+                        "The desktop app auth state was unavailable.",
+                        "error",
+                    ),
+                )
+            }
+        };
+
+        match runtime.pending.clone() {
+            Some(pending) => pending,
+            None => {
+                return format_http_response(
+                    "HTTP/1.1 400 Bad Request",
+                    "text/html; charset=utf-8",
+                    &render_streamlabs_auth_html(
+                        "Authorization is no longer pending",
+                        "Start the Streamlabs connection again from the desktop app, then approve it in the browser.",
+                        "error",
+                    ),
+                )
+            }
+        }
+    };
+
+    if returned_state != pending.state {
+        if let Ok(mut runtime) = streamlabs_auth.lock() {
+            runtime.pending = None;
+            runtime.last_result = Some(StreamlabsOAuthResult {
+                status: "error".into(),
+                access_token: None,
+                refresh_token: None,
+                token_type: None,
+                scope: None,
+                error: Some("Streamlabs returned an invalid OAuth state.".into()),
+            });
+        }
+
+        return format_http_response(
+            "HTTP/1.1 400 Bad Request",
+            "text/html; charset=utf-8",
+            &render_streamlabs_auth_html(
+                "Authorization failed",
+                "The Streamlabs OAuth state did not match the request started by the desktop app.",
+                "error",
+            ),
+        );
+    }
+
+    if let Some(error) = params.get("error") {
+        let description = params
+            .get("error_description")
+            .cloned()
+            .unwrap_or_else(|| error.clone());
+
+        if let Ok(mut runtime) = streamlabs_auth.lock() {
+            runtime.pending = None;
+            runtime.last_result = Some(StreamlabsOAuthResult {
+                status: "error".into(),
+                access_token: None,
+                refresh_token: None,
+                token_type: None,
+                scope: None,
+                error: Some(description.clone()),
+            });
+        }
+
+        return format_http_response(
+            "HTTP/1.1 400 Bad Request",
+            "text/html; charset=utf-8",
+            &render_streamlabs_auth_html("Authorization cancelled", &description, "error"),
+        );
+    }
+
+    let code = match params.get("code") {
+        Some(code) if !code.trim().is_empty() => code.clone(),
+        _ => {
+            if let Ok(mut runtime) = streamlabs_auth.lock() {
+                runtime.pending = None;
+                runtime.last_result = Some(StreamlabsOAuthResult {
+                    status: "error".into(),
+                    access_token: None,
+                    refresh_token: None,
+                    token_type: None,
+                    scope: None,
+                    error: Some("Streamlabs did not return an authorization code.".into()),
+                });
+            }
+
+            return format_http_response(
+                "HTTP/1.1 400 Bad Request",
+                "text/html; charset=utf-8",
+                &render_streamlabs_auth_html(
+                    "Authorization failed",
+                    "Streamlabs did not return an authorization code to the desktop app.",
+                    "error",
+                ),
+            );
+        }
+    };
+
+    match exchange_streamlabs_authorization_code(&pending, &code) {
+        Ok(result) => {
+            if let Ok(mut runtime) = streamlabs_auth.lock() {
+                runtime.pending = None;
+                runtime.last_result = Some(result);
+            }
+
+            let scopes_summary = if pending.scopes.is_empty() {
+                "requested scopes".to_string()
+            } else {
+                pending.scopes.join(", ")
+            };
+
+            format_http_response(
+                "HTTP/1.1 200 OK",
+                "text/html; charset=utf-8",
+                &render_streamlabs_auth_html(
+                    "Streamlabs connected",
+                    &format!(
+                        "The desktop app finished the Streamlabs OAuth exchange and can now poll donations with {}.",
+                        scopes_summary
+                    ),
+                    "success",
+                ),
+            )
+        }
+        Err(error) => {
+            if let Ok(mut runtime) = streamlabs_auth.lock() {
+                runtime.pending = None;
+                runtime.last_result = Some(StreamlabsOAuthResult {
+                    status: "error".into(),
+                    access_token: None,
+                    refresh_token: None,
+                    token_type: None,
+                    scope: None,
+                    error: Some(error.clone()),
+                });
+            }
+
+            format_http_response(
+                "HTTP/1.1 500 Internal Server Error",
+                "text/html; charset=utf-8",
+                &render_streamlabs_auth_html("Authorization failed", &error, "error"),
+            )
+        }
+    }
+}
+
+fn try_handle_connection(
+    mut stream: TcpStream,
+    shared_state: Arc<RwLock<OverlayState>>,
+    streamlabs_auth: Arc<Mutex<StreamlabsAuthRuntime>>,
+) {
     let mut request_line = String::new();
     {
         let mut reader = BufReader::new(&stream);
@@ -1415,13 +1861,10 @@ fn try_handle_connection(mut stream: TcpStream, shared_state: Arc<RwLock<Overlay
         }
     }
 
-    let path = request_line
-        .split_whitespace()
-        .nth(1)
-        .unwrap_or("/")
-        .split('?')
-        .next()
-        .unwrap_or("/");
+    let request_target = request_line.split_whitespace().nth(1).unwrap_or("/");
+    let mut request_target_parts = request_target.splitn(2, '?');
+    let path = request_target_parts.next().unwrap_or("/");
+    let query = request_target_parts.next().unwrap_or("");
 
     let response = match path {
         "/health" => format_http_response("HTTP/1.1 200 OK", "text/plain; charset=utf-8", "ok"),
@@ -1463,6 +1906,7 @@ fn try_handle_connection(mut stream: TcpStream, shared_state: Arc<RwLock<Overlay
             "text/html; charset=utf-8",
             reason_overlay_html(),
         ),
+        "/auth/streamlabs/callback" => handle_streamlabs_auth_callback(query, streamlabs_auth),
         _ => format_http_response(
             "HTTP/1.1 404 Not Found",
             "text/plain; charset=utf-8",
@@ -1497,6 +1941,7 @@ fn stop_overlay_server(runtime: &mut OverlayServerRuntime) {
 
 fn spawn_overlay_server(
     shared_state: Arc<RwLock<OverlayState>>,
+    streamlabs_auth: Arc<Mutex<StreamlabsAuthRuntime>>,
     lan_enabled: bool,
 ) -> OverlayServerRuntime {
     let shutdown = Arc::new(AtomicBool::new(false));
@@ -1540,12 +1985,17 @@ fn spawn_overlay_server(
         overlay_preview_base_url.clone()
     };
     let state_for_thread = Arc::clone(&shared_state);
+    let auth_for_thread = Arc::clone(&streamlabs_auth);
     let shutdown_for_thread = Arc::clone(&shutdown);
 
     let handle = std::thread::spawn(move || {
         while !shutdown_for_thread.load(Ordering::Relaxed) {
             match listener.accept() {
-                Ok((stream, _)) => try_handle_connection(stream, Arc::clone(&state_for_thread)),
+                Ok((stream, _)) => try_handle_connection(
+                    stream,
+                    Arc::clone(&state_for_thread),
+                    Arc::clone(&auth_for_thread),
+                ),
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(Duration::from_millis(50));
                 }
@@ -1567,11 +2017,13 @@ fn spawn_overlay_server(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let shared_state = Arc::new(RwLock::new(OverlayState::default()));
+    let streamlabs_auth_runtime = Arc::new(Mutex::new(StreamlabsAuthRuntime::default()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup({
             let shared_state = Arc::clone(&shared_state);
+            let streamlabs_auth_runtime = Arc::clone(&streamlabs_auth_runtime);
 
             move |app| {
                 let app_handle = app.handle().clone();
@@ -1580,11 +2032,16 @@ pub fn run() {
                     shared_state: Arc::clone(&shared_state),
                     runtime: Mutex::new(spawn_overlay_server(
                         Arc::clone(&shared_state),
+                        Arc::clone(&streamlabs_auth_runtime),
                         lan_enabled,
                     )),
                 };
+                let streamlabs_auth = StreamlabsAuthHandle {
+                    runtime: Arc::clone(&streamlabs_auth_runtime),
+                };
 
                 app.manage(overlay_server);
+                app.manage(streamlabs_auth);
                 Ok(())
             }
         })
@@ -1599,7 +2056,10 @@ pub fn run() {
             clear_native_twitch_session,
             load_native_tip_provider_session,
             save_native_tip_provider_session,
-            clear_native_tip_provider_session
+            clear_native_tip_provider_session,
+            begin_streamlabs_oauth,
+            consume_streamlabs_oauth_result,
+            cancel_streamlabs_oauth
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
