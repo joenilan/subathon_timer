@@ -1958,23 +1958,26 @@ select.rule-field__input {
 .rule-event-card__overlay {
     position: absolute;
     inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 12px;
+    padding: 0;
     border-radius: var(--radius-sm);
-    background: rgba(7, 9, 14, 0.72);
-    backdrop-filter: blur(4px);
+    overflow: hidden;
 }
 
 .rule-event-card__overlay-panel {
-    display: grid;
-    gap: 10px;
-    width: min(100%, 320px);
-    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 100%;
+    padding: 20px;
+    box-sizing: border-box;
     border: 1px solid rgba(234, 179, 8, 0.24);
-    border-radius: var(--radius-sm);
-    background: rgba(113, 63, 18, 0.32);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    border-radius: inherit;
+    background: rgba(7, 9, 14, 0.74);
+    backdrop-filter: blur(4px);
+    text-align: center;
 }
 
 .rule-event-card__overlay-panel strong {
@@ -1988,6 +1991,11 @@ select.rule-field__input {
     font-size: 12px;
     line-height: 1.5;
     color: #fef3c7;
+    max-width: 44ch;
+}
+
+.rule-event-card__overlay-panel .btn {
+    align-self: center;
 }
 
 .rule-event-card__controls {
