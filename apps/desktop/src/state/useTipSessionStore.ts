@@ -7,7 +7,7 @@ import {
   saveNativeTipProviderSnapshot,
 } from '../lib/platform/nativeTipSession'
 import {
-  buildStreamElementsSubscribeMessage,
+  buildStreamElementsSubscribeMessages,
   normalizeStreamElementsTipMessage,
   parseStreamElementsSocketEnvelope,
   summarizeStreamElementsTip,
@@ -60,6 +60,41 @@ function prependNormalizedEvents(
   currentEvents: NormalizedTimerEvent[],
 ) {
   return [...nextEvents.reverse(), ...currentEvents].slice(0, MAX_TIP_EVENTS)
+}
+
+function getNormalizedEventSignature(event: NormalizedTimerEvent) {
+  return [
+    event.source,
+    event.eventType,
+    event.occurredAt,
+    event.displayName ?? '',
+    event.userLogin ?? '',
+    event.amount ?? '',
+    event.currency ?? '',
+  ].join('|')
+}
+
+function filterNewNormalizedEvents(
+  nextEvents: NormalizedTimerEvent[],
+  currentEvents: NormalizedTimerEvent[],
+) {
+  const knownIds = new Set(currentEvents.map((event) => event.id))
+  const knownSignatures = new Set(currentEvents.map(getNormalizedEventSignature))
+  const accepted: NormalizedTimerEvent[] = []
+
+  for (const event of nextEvents) {
+    const signature = getNormalizedEventSignature(event)
+
+    if (knownIds.has(event.id) || knownSignatures.has(signature)) {
+      continue
+    }
+
+    knownIds.add(event.id)
+    knownSignatures.add(signature)
+    accepted.push(event)
+  }
+
+  return accepted
 }
 
 function prependNotifications(
@@ -162,7 +197,9 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
       activeStreamElementsSocket = socket
 
       socket.onopen = () => {
-        socket.send(buildStreamElementsSubscribeMessage(connection))
+        for (const message of buildStreamElementsSubscribeMessages(connection)) {
+          socket.send(message)
+        }
       }
 
       socket.onerror = () => {
@@ -231,16 +268,27 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
           return
         }
 
-        const notification = summarizeStreamElementsTip(normalizedEvent)
-        const occurredAt = notification.occurredAt
+        set((state) => {
+          const acceptedEvents = filterNewNormalizedEvents([normalizedEvent], state.normalizedEvents)
 
-        set((state) => ({
-          streamelementsStatus: 'connected',
-          streamelementsLastError: null,
-          streamelementsLastEventAt: occurredAt,
-          normalizedEvents: prependNormalizedEvents([normalizedEvent], state.normalizedEvents),
-          recentNotifications: prependNotifications([notification], state.recentNotifications),
-        }))
+          if (acceptedEvents.length === 0) {
+            return {
+              streamelementsStatus: 'connected',
+              streamelementsLastError: null,
+            }
+          }
+
+          const notifications = acceptedEvents.map((event) => summarizeStreamElementsTip(event))
+          const occurredAt = notifications[0]?.occurredAt ?? Date.now()
+
+          return {
+            streamelementsStatus: 'connected',
+            streamelementsLastError: null,
+            streamelementsLastEventAt: occurredAt,
+            normalizedEvents: prependNormalizedEvents(acceptedEvents, state.normalizedEvents),
+            recentNotifications: prependNotifications(notifications, state.recentNotifications),
+          }
+        })
       }
     } catch (error) {
       set({
@@ -320,16 +368,27 @@ export const useTipSessionStore = create<TipSessionState>((set, get) => {
           return
         }
 
-        const notifications = normalizedEvents.map((event) => summarizeStreamlabsTip(event))
-        const occurredAt = notifications[0]?.occurredAt ?? Date.now()
+        set((state) => {
+          const acceptedEvents = filterNewNormalizedEvents(normalizedEvents, state.normalizedEvents)
 
-        set((state) => ({
-          streamlabsStatus: 'connected',
-          streamlabsLastError: null,
-          streamlabsLastEventAt: occurredAt,
-          normalizedEvents: prependNormalizedEvents(normalizedEvents, state.normalizedEvents),
-          recentNotifications: prependNotifications(notifications, state.recentNotifications),
-        }))
+          if (acceptedEvents.length === 0) {
+            return {
+              streamlabsStatus: 'connected',
+              streamlabsLastError: null,
+            }
+          }
+
+          const notifications = acceptedEvents.map((event) => summarizeStreamlabsTip(event))
+          const occurredAt = notifications[0]?.occurredAt ?? Date.now()
+
+          return {
+            streamlabsStatus: 'connected',
+            streamlabsLastError: null,
+            streamlabsLastEventAt: occurredAt,
+            normalizedEvents: prependNormalizedEvents(acceptedEvents, state.normalizedEvents),
+            recentNotifications: prependNotifications(notifications, state.recentNotifications),
+          }
+        })
       })
     } catch (error) {
       set({

@@ -25,19 +25,39 @@ function getString(record: Record<string, unknown> | null, key: string) {
 
 function getNumber(record: Record<string, unknown> | null, key: string) {
   const value = record?.[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.length > 0) {
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
 }
 
-export function buildStreamElementsSubscribeMessage(connection: StreamElementsTipConnection) {
+function buildStreamElementsSubscribeMessage(
+  connection: StreamElementsTipConnection,
+  topic: 'channel.tips' | 'channel.activities',
+) {
   return JSON.stringify({
     type: 'subscribe',
-    nonce: `streamelements-tip-${crypto.randomUUID()}`,
+    nonce: `streamelements-${topic}-${crypto.randomUUID()}`,
     data: {
-      topic: 'channel.tips',
+      topic,
       token: connection.token,
       token_type: connection.tokenType,
     },
   })
+}
+
+export function buildStreamElementsSubscribeMessages(connection: StreamElementsTipConnection) {
+  return [
+    buildStreamElementsSubscribeMessage(connection, 'channel.tips'),
+    buildStreamElementsSubscribeMessage(connection, 'channel.activities'),
+  ]
 }
 
 export function parseStreamElementsSocketEnvelope(raw: string): StreamElementsSocketEnvelope | null {
@@ -49,11 +69,7 @@ export function parseStreamElementsSocketEnvelope(raw: string): StreamElementsSo
   }
 }
 
-export function normalizeStreamElementsTipMessage(envelope: StreamElementsSocketEnvelope | null): NormalizedTimerEvent | null {
-  if (!envelope || envelope.type !== 'message' || envelope.topic !== 'channel.tips') {
-    return null
-  }
-
+function normalizeStreamElementsChannelTip(envelope: StreamElementsSocketEnvelope) {
   const payload = asRecord(envelope.data)
   const donation = asRecord(payload?.donation)
   const user = asRecord(donation?.user)
@@ -83,7 +99,72 @@ export function normalizeStreamElementsTipMessage(envelope: StreamElementsSocket
     count: null,
     command: null,
     rawPayload: payload ?? {},
+  } satisfies NormalizedTimerEvent
+}
+
+function normalizeStreamElementsActivityTip(envelope: StreamElementsSocketEnvelope) {
+  const payload = asRecord(envelope.data)
+  if (getString(payload, 'type') !== 'tip') {
+    return null
   }
+
+  const activityData = asRecord(payload?.data)
+  const amount =
+    getNumber(activityData, 'amount') ??
+    getNumber(activityData, 'tipAmount') ??
+    getNumber(activityData, 'donationAmount') ??
+    getNumber(payload, 'amount')
+
+  if (amount === null || amount <= 0) {
+    return null
+  }
+
+  const displayName =
+    getString(activityData, 'displayName') ??
+    getString(activityData, 'username') ??
+    getString(activityData, 'name')
+
+  return {
+    id:
+      envelope.id ??
+      getString(payload, 'activityId') ??
+      getString(payload, '_id') ??
+      getString(activityData, 'transactionId') ??
+      crypto.randomUUID(),
+    source: 'streamelements',
+    eventType: 'tip',
+    occurredAt:
+      envelope.ts ??
+      getString(payload, 'createdAt') ??
+      getString(payload, 'updatedAt') ??
+      new Date().toISOString(),
+    userId: getString(activityData, 'providerId'),
+    userLogin: getString(activityData, 'username'),
+    displayName,
+    anonymous: false,
+    amount,
+    currency: getString(activityData, 'currency') ?? getString(payload, 'currency'),
+    tier: null,
+    count: null,
+    command: null,
+    rawPayload: payload ?? {},
+  } satisfies NormalizedTimerEvent
+}
+
+export function normalizeStreamElementsTipMessage(envelope: StreamElementsSocketEnvelope | null): NormalizedTimerEvent | null {
+  if (!envelope || envelope.type !== 'message') {
+    return null
+  }
+
+  if (envelope.topic === 'channel.tips') {
+    return normalizeStreamElementsChannelTip(envelope)
+  }
+
+  if (envelope.topic === 'channel.activities') {
+    return normalizeStreamElementsActivityTip(envelope)
+  }
+
+  return null
 }
 
 export function summarizeStreamElementsTip(event: NormalizedTimerEvent): TipProviderNotification {
