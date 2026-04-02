@@ -483,19 +483,28 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="scope-list connections-list">
+              <div className="scope-list connections-list quick-setup-list quick-setup-list--streamelements">
                 <div className="panel-subtitle">Quick setup</div>
-                <div className="scope-row">
-                  <code>1. Click Get StreamElements Token</code>
-                  <p>It opens the exact page where the token lives.</p>
+                <div className="quick-setup-step">
+                  <div className="quick-setup-step__header">
+                    <span className="quick-setup-step__badge">1</span>
+                    <code className="quick-setup-step__title">Open channel secrets</code>
+                  </div>
+                  <p>Click <strong>Get StreamElements Token</strong>. It opens the exact page where your channel JWT lives.</p>
                 </div>
-                <div className="scope-row">
-                  <code>2. Turn on &quot;Show Secrets&quot;</code>
-                  <p>The JWT token appears on that same page.</p>
+                <div className="quick-setup-step">
+                  <div className="quick-setup-step__header">
+                    <span className="quick-setup-step__badge">2</span>
+                    <code className="quick-setup-step__title">Turn on Show Secrets</code>
+                  </div>
+                  <p>The JWT token appears on that same page as soon as secrets are visible.</p>
                 </div>
-                <div className="scope-row">
-                  <code>3. Copy the JWT token, paste it here, click Connect</code>
-                  <p>No client ID, client secret, or developer app needed.</p>
+                <div className="quick-setup-step">
+                  <div className="quick-setup-step__header">
+                    <span className="quick-setup-step__badge">3</span>
+                    <code className="quick-setup-step__title">Paste JWT and connect</code>
+                  </div>
+                  <p>Paste the JWT below and connect. No client ID, client secret, or developer app needed.</p>
                 </div>
               </div>
 
@@ -589,19 +598,28 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="scope-list connections-list">
+              <div className="scope-list connections-list quick-setup-list quick-setup-list--streamlabs">
                 <div className="panel-subtitle">Quick setup</div>
-                <div className="scope-row">
-                  <code>1. Click Get Streamlabs Token</code>
-                  <p>It opens Streamlabs directly on the API Settings screen. Sign in to the Streamlabs account that receives your donations.</p>
+                <div className="quick-setup-step">
+                  <div className="quick-setup-step__header">
+                    <span className="quick-setup-step__badge">1</span>
+                    <code className="quick-setup-step__title">Open API Settings</code>
+                  </div>
+                  <p>Click <strong>Get Streamlabs Token</strong>. It opens Streamlabs on the exact settings screen you need.</p>
                 </div>
-                <div className="scope-row">
-                  <code>2. Click the API Settings tab if it is not already selected</code>
-                  <p>On that page you can reveal both an API Access Token and a Socket API Token.</p>
+                <div className="quick-setup-step">
+                  <div className="quick-setup-step__header">
+                    <span className="quick-setup-step__badge">2</span>
+                    <code className="quick-setup-step__title">Reveal the Socket API Token</code>
+                  </div>
+                  <p>Click the <strong>API Settings</strong> tab if needed, then reveal <strong>Your Socket API Token</strong>.</p>
                 </div>
-                <div className="scope-row">
-                  <code>3. Reveal &quot;Your Socket API Token&quot;, paste it here, click Connect</code>
-                  <p>Use the Socket API Token. Do not use the API Access Token, client ID, client secret, or a developer app.</p>
+                <div className="quick-setup-step">
+                  <div className="quick-setup-step__header">
+                    <span className="quick-setup-step__badge">3</span>
+                    <code className="quick-setup-step__title">Paste token and connect</code>
+                  </div>
+                  <p>Use the Socket API Token below. Do not use the API Access Token, client ID, client secret, or a developer app.</p>
                 </div>
               </div>
 

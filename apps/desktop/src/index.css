@@ -3496,6 +3496,103 @@ select.rule-field__input {
     color: var(--text-secondary);
 }
 
+.quick-setup-list {
+    --quick-setup-glow: rgba(56, 215, 255, 0.16);
+    --quick-setup-edge: rgba(121, 221, 255, 0.24);
+    --quick-setup-badge-bg: rgba(56, 215, 255, 0.14);
+    --quick-setup-badge-text: #92ecff;
+}
+
+.quick-setup-list--streamelements {
+    --quick-setup-glow: rgba(56, 215, 255, 0.18);
+    --quick-setup-edge: rgba(121, 221, 255, 0.28);
+    --quick-setup-badge-bg: rgba(56, 215, 255, 0.16);
+    --quick-setup-badge-text: #92ecff;
+}
+
+.quick-setup-list--streamlabs {
+    --quick-setup-glow: rgba(183, 243, 91, 0.16);
+    --quick-setup-edge: rgba(183, 243, 91, 0.24);
+    --quick-setup-badge-bg: rgba(183, 243, 91, 0.14);
+    --quick-setup-badge-text: #d8ffa0;
+}
+
+.quick-setup-step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--quick-setup-edge);
+    border-radius: var(--radius-md);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(11, 15, 22, 0.62) 100%),
+        rgba(7, 10, 15, 0.72);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 14px 30px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(16px);
+    overflow: hidden;
+}
+
+.quick-setup-step::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at top left, var(--quick-setup-glow) 0%, transparent 54%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 48%);
+    pointer-events: none;
+}
+
+.quick-setup-step__header,
+.quick-setup-step p {
+    position: relative;
+    z-index: 1;
+}
+
+.quick-setup-step__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.quick-setup-step__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--quick-setup-edge);
+    background: var(--quick-setup-badge-bg);
+    color: var(--quick-setup-badge-text);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.quick-setup-step__title {
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: normal;
+}
+
+.quick-setup-step p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+.quick-setup-step p strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
 .stack-note {
     display: flex;
     flex-direction: column;
