@@ -310,7 +310,7 @@ export function ConnectionsPage() {
       <section className="page-header connections-header">
         <div>
           <h1 className="page-title">Connections</h1>
-          <p className="page-desc">Connect Twitch here, keep the session healthy, and confirm live events are flowing into the app.</p>
+          <p className="page-desc">Connect Twitch and tip providers here, keep those sessions healthy, and confirm that live events are reaching the app before you go live.</p>
         </div>
         <div className={`status-chip status-chip--${statusTone}`}>{statusLabel}</div>
       </section>
@@ -327,7 +327,7 @@ export function ConnectionsPage() {
           <div className="panel-header">
             <div>
               <h2 className="panel-title">Twitch Session</h2>
-              <p className="panel-copy">Link your Twitch account once, then let the desktop app restore and refresh that session automatically.</p>
+              <p className="panel-copy">Connect the broadcaster account once, then let the desktop app restore, validate, and refresh that Twitch session automatically.</p>
             </div>
             {session && <div className="meta-kicker">@{session.login}</div>}
           </div>
@@ -429,7 +429,7 @@ export function ConnectionsPage() {
           <div className="panel-header">
             <div>
               <h2 className="panel-title">Permissions</h2>
-              <p className="panel-copy">These Twitch permissions cover the current desktop features. Expand them only when a feature actually needs more access.</p>
+              <p className="panel-copy">These Twitch permissions cover the current desktop feature set. Reconnect only when a new feature needs additional access.</p>
             </div>
           </div>
 
@@ -450,7 +450,7 @@ export function ConnectionsPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Tips & donations</h2>
-            <p className="panel-copy">Connect StreamElements or Streamlabs here, then enable the shared <strong>Tips / donations</strong> rule on the Rules page.</p>
+            <p className="panel-copy">Connect StreamElements or Streamlabs here, then turn on the shared <strong>Tips / donations</strong> rule on the Rules page when you want tips to add time.</p>
           </div>
         </div>
 
@@ -459,7 +459,7 @@ export function ConnectionsPage() {
             <div className="panel-header">
               <div>
                 <h3 className="panel-title">StreamElements</h3>
-                <p className="panel-copy">Click the button, turn on <strong>Show Secrets</strong>, copy the JWT token, paste it here, connect.</p>
+                <p className="panel-copy">Open your channel secrets, reveal the JWT token, paste it here, and connect the live tip feed.</p>
               </div>
               <div className={`status-chip status-chip--${getProviderStatusTone(streamElementsStatus)}`}>{streamElementsStatusLabel}</div>
             </div>
@@ -500,19 +500,19 @@ export function ConnectionsPage() {
                     </div>
                     <p>Click <strong>Get StreamElements Token</strong>. It opens the exact page where your channel JWT lives.</p>
                   </div>
-                  <div className="quick-setup-step">
-                    <div className="quick-setup-step__header">
-                      <span className="quick-setup-step__badge">2</span>
-                      <code className="quick-setup-step__title">Turn on Show Secrets</code>
-                    </div>
-                    <p>The JWT token appears on that same page as soon as secrets are visible.</p>
+                    <div className="quick-setup-step">
+                      <div className="quick-setup-step__header">
+                        <span className="quick-setup-step__badge">2</span>
+                        <code className="quick-setup-step__title">Turn on Show Secrets</code>
+                      </div>
+                    <p>The JWT token appears on the same page as soon as secrets are visible for the selected channel.</p>
                   </div>
                   <div className="quick-setup-step">
                     <div className="quick-setup-step__header">
                       <span className="quick-setup-step__badge">3</span>
                       <code className="quick-setup-step__title">Paste JWT and connect</code>
                     </div>
-                    <p>Paste the JWT below and connect. No client ID, client secret, or developer app needed.</p>
+                    <p>Paste the JWT below and connect. This feed only needs the channel token from your StreamElements dashboard.</p>
                   </div>
                 </div>
               </div>
@@ -578,7 +578,7 @@ export function ConnectionsPage() {
             <div className="panel-header">
               <div>
                 <h3 className="panel-title">Streamlabs</h3>
-                <p className="panel-copy">Click the button, open the <strong>API Settings</strong> page, reveal <strong>Your Socket API Token</strong>, paste it here, connect.</p>
+                <p className="panel-copy">Open the Streamlabs API settings page, reveal the Socket API Token, paste it here, and connect the live tip feed.</p>
               </div>
               <div className={`status-chip status-chip--${streamlabsStatusTone}`}>{streamlabsStatusLabel}</div>
             </div>
@@ -626,12 +626,12 @@ export function ConnectionsPage() {
                     </div>
                     <p>Click the <strong>API Settings</strong> tab if needed, then reveal <strong>Your Socket API Token</strong>.</p>
                   </div>
-                  <div className="quick-setup-step">
-                    <div className="quick-setup-step__header">
-                      <span className="quick-setup-step__badge">3</span>
-                      <code className="quick-setup-step__title">Paste token and connect</code>
-                    </div>
-                    <p>Use the Socket API Token below. Do not use the API Access Token, client ID, client secret, or a developer app.</p>
+                    <div className="quick-setup-step">
+                      <div className="quick-setup-step__header">
+                        <span className="quick-setup-step__badge">3</span>
+                        <code className="quick-setup-step__title">Paste token and connect</code>
+                      </div>
+                    <p>Use the Socket API Token below. The API Access Token is a different credential and will not connect this feed.</p>
                   </div>
                 </div>
               </div>
@@ -699,7 +699,7 @@ export function ConnectionsPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">EventSub</h2>
-            <p className="panel-copy">Once Twitch is connected, the app opens a live event session and keeps the timer subscriptions active in the background.</p>
+            <p className="panel-copy">Once Twitch is connected, the app opens a live EventSub session and keeps the timer subscriptions running in the background.</p>
           </div>
           <div className={`status-chip status-chip--${eventSubStatus === 'connected' ? 'connected' : eventSubStatus === 'error' ? 'critical' : 'pending'}`}>
             {eventSubLabel}
@@ -740,8 +740,8 @@ export function ConnectionsPage() {
                 ))
               ) : (
                 <div className="scope-row">
-                  <code>No active subscriptions yet</code>
-                  <p>Connect Twitch and give the live event session a moment to finish starting up.</p>
+                  <code>Waiting for subscriptions</code>
+                  <p>Connect Twitch and give the EventSub session a moment to finish starting before the live subscription list fills in.</p>
                 </div>
               )}
             </div>
@@ -757,8 +757,8 @@ export function ConnectionsPage() {
                 ))
               ) : (
                 <div className="scope-row">
-                  <code>No Twitch events yet</code>
-                  <p>This list will populate as Twitch events arrive.</p>
+                  <code>Waiting for incoming events</code>
+                  <p>Recent Twitch activity will appear here as soon as the connected channel starts sending live events.</p>
                 </div>
               )}
             </div>

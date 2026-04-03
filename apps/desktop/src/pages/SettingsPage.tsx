@@ -84,7 +84,7 @@ export function SettingsPage() {
       <section className="page-header rules-header">
         <div>
           <h1 className="page-title">Settings</h1>
-          <p className="page-desc">Only app-level controls live here. Everything else is edited where it happens and saves automatically.</p>
+          <p className="page-desc">App-wide defaults live here. Run-specific controls stay on their own pages and save automatically where you use them.</p>
         </div>
       </section>
 
@@ -92,7 +92,7 @@ export function SettingsPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Appearance</h2>
-            <p className="panel-copy">Choose the timer look used on the dashboard and in the OBS timer overlay.</p>
+            <p className="panel-copy">Choose the timer style used on the dashboard and in the timer overlay.</p>
           </div>
         </div>
 
@@ -144,7 +144,7 @@ export function SettingsPage() {
             <div className="wheel-config-actions settings-duration-actions">
               <button className="btn btn--primary" onClick={handleApplyTimerDefault}>Save Default</button>
             </div>
-            <span className="rule-field__hint">Reset uses this time. Editing the live timer on the dashboard no longer changes it.</span>
+            <span className="rule-field__hint">Reset returns the timer to this value. Editing the live timer on the dashboard does not change the saved default.</span>
           </div>
         </div>
       </section>
@@ -153,7 +153,7 @@ export function SettingsPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Chat command permissions</h2>
-            <p className="panel-copy">Choose whether each `!timer` command is usable by the streamer, mods, or both.</p>
+            <p className="panel-copy">Choose whether each `!timer` command is available to the streamer, moderators, or both.</p>
           </div>
         </div>
 
@@ -202,7 +202,7 @@ export function SettingsPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Import legacy config.json</h2>
-            <p className="panel-copy">Paste an older config here to bring over the parts that still matter: timing rules and wheel setup.</p>
+            <p className="panel-copy">Paste an older config here to bring over the parts that still matter in the desktop app: timing rules and wheel setup.</p>
           </div>
         </div>
 
@@ -217,7 +217,7 @@ export function SettingsPage() {
           </div>
           <div className="settings-mini-note">
             <strong>Next step</strong>
-            <span>Finish any edits on Rules, Wheel, Dashboard, and Overlays</span>
+            <span>Review the imported values on Rules, Wheel, Dashboard, and Overlays</span>
           </div>
         </div>
 
@@ -229,7 +229,7 @@ export function SettingsPage() {
               value={importText}
               onChange={(event) => setImportText(event.target.value)}
             />
-            <span className="rule-field__hint">Imports timer rules and wheel segments from the old config shape.</span>
+            <span className="rule-field__hint">Imports timer rules and wheel segments from the legacy config format.</span>
           </label>
           <div className="wheel-config-actions">
             <button className="btn btn--primary" onClick={handleImport} disabled={!importText.trim()}>Import Legacy Config</button>

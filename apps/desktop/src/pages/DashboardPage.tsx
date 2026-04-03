@@ -286,7 +286,7 @@ export function DashboardPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="chart-empty">Timer activity will appear here once Twitch events or manual adjustments land.</div>
+                  <div className="chart-empty">Recent timer changes appear here as soon as Twitch events, tips, wheel results, or manual adjustments hit the run.</div>
                 )}
               </div>
             </div>

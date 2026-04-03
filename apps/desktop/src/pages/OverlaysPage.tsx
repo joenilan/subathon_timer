@@ -157,7 +157,7 @@ export function OverlaysPage() {
             <div className="overlays-rail__header">
               <h2 className="panel-title">Source list</h2>
               <p className="panel-copy">
-                Select the source you want to configure. The details pane on the right shows the exact URL and the live preview for that source.
+                Select the source you want to configure. The panel on the right shows the exact browser-source URL, a live preview, and placement controls for that source.
               </p>
             </div>
 
@@ -243,7 +243,7 @@ export function OverlaysPage() {
                   <span className="panel-subtitle">Placement</span>
                   <h3 className="panel-title">Live transform</h3>
                   <p className="panel-copy">
-                    Move and scale the selected overlay in real time. {selectedAnchor} stays as the baseline. Both overlays start centered in the window, the embedded preview stays anchored, `Open Preview` reflects live placement, and the live overlay will stop at the viewport edges instead of drifting outside the window.
+                    Move and scale the selected overlay in real time. {selectedAnchor} stays as the baseline, the embedded preview mirrors the saved placement, and the live overlay stays inside the visible frame instead of drifting off-screen.
                   </p>
                 </div>
                 <button className="btn btn--ghost btn--compact" onClick={() => resetOverlayTransform(selected)}>

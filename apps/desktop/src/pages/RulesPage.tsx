@@ -72,7 +72,7 @@ export function RulesPage() {
         <div>
           <h1 className="page-title">Rules</h1>
           <p className="page-desc">
-            These rules drive the live timer, overlays, Twitch EventSub handling, and connected tip providers. Changes save immediately.
+            These rules control how the timer reacts to Twitch events, tips, and shared subscription values. Changes save immediately and apply to the live runtime.
           </p>
         </div>
       </section>
@@ -81,7 +81,7 @@ export function RulesPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Shared subscription values</h2>
-            <p className="panel-copy">These tier values are the default for new subscriptions, resubscriptions, single gifted subs, and gift bombs. Turn on advanced overrides only when one sub event needs its own tier values.</p>
+            <p className="panel-copy">These tier values act as the default time add for new subs, resubs, single gift subs, and gift bombs. Turn on advanced overrides only when a specific sub event needs its own values.</p>
           </div>
         </div>
 
@@ -105,7 +105,7 @@ export function RulesPage() {
         <div className="rule-advanced-bar">
           <div className="rule-advanced-bar__copy">
             <strong>Advanced sub overrides</strong>
-            <p>Keep this off to reuse the shared T1 / T2 / T3 values everywhere. Turn it on to optionally override new subs, resubs, gifted subs, or gift bombs with their own tier values.</p>
+            <p>Keep this off to reuse the shared T1 / T2 / T3 values everywhere. Turn it on only when a specific subscription event needs its own tier values.</p>
           </div>
 
           <label className={`rule-toggle${advancedSubOverridesEnabled ? ' rule-toggle--enabled' : ''}`}>
@@ -127,7 +127,7 @@ export function RulesPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Live event rules</h2>
-            <p className="panel-copy">Toggle any Twitch event on or off. Enabled events affect the timer immediately; disabled events still keep their values so you can prep them before going live.</p>
+            <p className="panel-copy">Toggle each event on or off. Enabled events affect the timer immediately; disabled events keep their saved values so you can prepare them before a run.</p>
           </div>
         </div>
 

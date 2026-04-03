@@ -168,7 +168,7 @@ export function WheelPage() {
             )}
 
             {wheelSpin.status === 'idle' && (
-              <p className="panel-copy">Spin first, then review before applying.</p>
+              <p className="panel-copy">Spin the wheel, review the selected outcome, then apply it when you are ready.</p>
             )}
 
             {wheelSpin.requiresModeration && wheelSpin.status === 'ready' && missingModerationScopes.length > 0 && (
@@ -206,6 +206,7 @@ export function WheelPage() {
             <div className="wheel-editor-header">
               <div>
                 <h2 className="panel-title">Segments</h2>
+                <p className="panel-copy">Edit the wheel entries, their odds, and the outcome each one applies when selected.</p>
               </div>
               <div className="wheel-page-actions">
                 <button className="btn" onClick={() => setSelectedId(addWheelSegment('time'))}>+ Time</button>
@@ -258,9 +259,9 @@ export function WheelPage() {
                           })
                         }
                       >
-                        <option value="time">time</option>
-                        <option value="timeout">timeout</option>
-                        <option value="custom">custom</option>
+                        <option value="time">Time</option>
+                        <option value="timeout">Timeout</option>
+                        <option value="custom">Custom</option>
                       </select>
                     </label>
 
@@ -334,8 +335,8 @@ export function WheelPage() {
                               })
                             }
                           >
-                            <option value="self">sender</option>
-                            <option value="random">random</option>
+                            <option value="self">Sender</option>
+                            <option value="random">Random chatter</option>
                           </select>
                         </label>
                         <label className="rule-field rule-field--inline">
@@ -381,7 +382,7 @@ export function WheelPage() {
                 </div>
               ) : (
                 <div className="wheel-config-empty">
-                  <p>Select a segment or add one to edit it.</p>
+                  <p>Select a segment to edit it, or add a new one to expand the wheel.</p>
                 </div>
               )}
             </div>
