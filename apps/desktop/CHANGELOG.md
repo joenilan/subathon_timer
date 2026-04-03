@@ -2,6 +2,12 @@
 
 All notable changes to the desktop app are tracked here.
 
+## 0.9.2
+
+- Audited the routed desktop pages and rewrote page-level copy so About, Connections, Overlays, Rules, Settings, Wheel, and dashboard empty states read like finished production UI.
+- Reworked the About page into a fuller product-facing screen with clearer project history, current-version framing, and cleaner original-project attribution.
+- Tightened operator-facing labels and descriptions across the desktop app so setup and runtime screens read more clearly during real use.
+
 ## 0.9.1
 
 - Added a dedicated About page with live app version display, project links, and explicit credit to the original `yannismate/subathon_timer` repository.

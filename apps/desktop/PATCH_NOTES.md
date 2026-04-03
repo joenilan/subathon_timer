@@ -1,5 +1,11 @@
 # Patch Notes
 
+## 0.9.2
+
+- Rewrote the main desktop pages so the app reads like a finished release instead of an internal tool panel.
+- Expanded the About page into a cleaner product and credits screen.
+- Tightened setup, rules, overlay, and wheel copy for clearer day-to-day use.
+
 ## 0.9.1
 
 - Added a new About page with version info, source links, and original-project credits.
