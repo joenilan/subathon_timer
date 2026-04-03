@@ -1,8 +1,8 @@
 {
   "port": 8080,
-  "channel": "yannismate",
-  "admins": ["yannismate", "definitelynotyannis"],
-  "wheel_blacklist": ["definitelynotyannis", "fossabot"],
+  "channel": "dreadedzombie",
+  "admins": ["dreadedzombie", "modaccount"],
+  "wheel_blacklist": ["modaccount", "fossabot"],
   "twitch_token": "oauth:XXXXXXXXXX",
   "use_streamlabs": false,
   "streamlabs_token": "StreamlabsSocketToken",

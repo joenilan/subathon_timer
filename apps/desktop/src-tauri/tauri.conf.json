@@ -3,7 +3,7 @@
   "productName": "Subathon Timer",
   "mainBinaryName": "subathon-timer",
   "version": "0.9.0",
-  "identifier": "com.yannismate.subathon-timer",
+  "identifier": "com.dreadedzombie.subathon-timer",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://127.0.0.1:1420",

@@ -39,7 +39,7 @@ class AppState {
   endingAt: number;
   baseTime: number;
 
-  randomTarget = "definitelynotyannis";
+  randomTarget = "modaccount";
   randomTargetUserId = "";
   randomTargetIsMod = false;
 

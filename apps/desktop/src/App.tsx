@@ -7,6 +7,7 @@ import { OverlaysPage } from './pages/OverlaysPage'
 import { WheelPage } from './pages/WheelPage'
 import { RulesPage } from './pages/RulesPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { AboutPage } from './pages/AboutPage'
 import { TimerOverlayPage } from './overlays/TimerOverlayPage'
 import { ReasonOverlayPage } from './overlays/ReasonOverlayPage'
 
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: 'wheel', element: <WheelPage /> },
       { path: 'rules', element: <RulesPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'about', element: <AboutPage /> },
     ],
   },
   { path: '/overlay/timer', element: <TimerOverlayPage /> },

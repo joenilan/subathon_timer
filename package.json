@@ -9,7 +9,7 @@
     "start": "npm run build && node dist/src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "yannismate",
+  "author": "dreadedzombie",
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "@types/express": "^5.0.6",
