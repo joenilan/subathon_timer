@@ -2,6 +2,12 @@
 
 All notable changes to the desktop app are tracked here.
 
+## 0.9.1
+
+- Added a dedicated About page with live app version display, project links, and explicit credit to the original `yannismate/subathon_timer` repository.
+- Replaced the remaining active `yannismate` branding in the desktop bundle metadata with `dreadedzombie`, while keeping original-project attribution in the UI.
+- Cleaned up repo-facing example metadata so the default channel/admin examples no longer ship with legacy personal names.
+
 ## 0.9.0
 
 - Added StreamElements and Streamlabs tip provider support, including tip-driven timer rules, provider connection health, and recent tip previews.

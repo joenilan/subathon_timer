@@ -228,7 +228,6 @@ export function SettingsPage() {
               className="wheel-config-textarea settings-json-textarea"
               value={importText}
               onChange={(event) => setImportText(event.target.value)}
-              placeholder={'{\n  "time": {\n    "base_value": 60\n  },\n  ...\n}'}
             />
             <span className="rule-field__hint">Imports timer rules and wheel segments from the old config shape.</span>
           </label>

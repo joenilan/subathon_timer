@@ -1,6 +1,6 @@
 [package]
 name = "subathon-timer-desktop"
-version = "0.9.0"
+version = "0.9.1"
 description = "Desktop-first Twitch subathon timer with native overlays and EventSub runtime"
 authors = ["dreadedzombie"]
 edition = "2021"

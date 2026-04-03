@@ -539,7 +539,6 @@ export function ConnectionsPage() {
                       type="password"
                       spellCheck={false}
                       autoComplete="off"
-                      placeholder="Paste StreamElements JWT token"
                       value={streamElementsToken}
                       onChange={(event) => setStreamElementsToken(event.target.value)}
                     />
@@ -659,7 +658,6 @@ export function ConnectionsPage() {
                       type="password"
                       spellCheck={false}
                       autoComplete="off"
-                      placeholder="Paste Streamlabs Socket API Token"
                       value={streamlabsToken}
                       onChange={(event) => setStreamlabsToken(event.target.value)}
                     />

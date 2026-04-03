@@ -274,7 +274,6 @@ export function WheelPage() {
                         onBlur={(event) =>
                           updateWheelSegment(selectedSegment.id, { chance: normalizeChanceInput(event.target.value) })
                         }
-                        placeholder="28%"
                       />
                     </label>
 

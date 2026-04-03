@@ -1,5 +1,11 @@
 # Patch Notes
 
+## 0.9.1
+
+- Added a new About page with version info, source links, and original-project credits.
+- Updated the remaining desktop branding to `dreadedzombie` while preserving credit to `yannismate/subathon_timer`.
+- Cleaned up bundled example metadata and defaults that still carried old personal names.
+
 ## 0.9.0
 
 - StreamElements and Streamlabs tips can now add time directly through the shared `Tips / donations` rule.
