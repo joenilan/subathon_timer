@@ -29,6 +29,8 @@ const msiName = `subathon-timer_${version}_x64_en-US.msi`
 const manifestName = 'manifest.json'
 const notesName = 'notes.md'
 const latestName = 'latest.json'
+const remoteLatestPath = `${remoteDir}/${latestName}`
+const remoteArchiveRoot = `${remoteDir}/archive`
 
 const notesMarkdown = extractVersionNotes(patchNotesSource, version)
 const latest = {
@@ -78,6 +80,7 @@ try {
   })
 
   await sftp.mkdir(remoteDir, true)
+  await archiveCurrentTopLevelRelease(sftp)
 
   for (const localPath of uploadPaths) {
     const remotePath = `${remoteDir}/${basename(localPath)}`
@@ -90,6 +93,39 @@ try {
 console.log(`Published Subathon Timer ${version} to ${remoteDir}`)
 for (const localPath of uploadPaths) {
   console.log(`- ${basename(localPath)}`)
+}
+
+async function archiveCurrentTopLevelRelease(sftp) {
+  const latestExists = await sftp.exists(remoteLatestPath)
+  if (!latestExists) {
+    return
+  }
+
+  const latestSource = await sftp.get(remoteLatestPath)
+  const previousRelease = JSON.parse(bufferToString(latestSource))
+  const previousVersion = previousRelease?.version
+
+  if (!previousVersion || previousVersion === version) {
+    return
+  }
+
+  const archiveDir = `${remoteArchiveRoot}/${previousVersion}`
+  await sftp.mkdir(archiveDir, true)
+
+  const entries = await sftp.list(remoteDir)
+  for (const entry of entries) {
+    if (entry.name === 'archive' || entry.type !== '-') {
+      continue
+    }
+
+    const from = `${remoteDir}/${entry.name}`
+    const to = `${archiveDir}/${entry.name}`
+    if (await sftp.exists(to)) {
+      await sftp.delete(to)
+    }
+
+    await sftp.rename(from, to)
+  }
 }
 
 function loadEnvFile(path) {
@@ -149,4 +185,20 @@ function summarizeNotes(notesMarkdown) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function bufferToString(value) {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8')
+  }
+
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value).toString('utf8')
+  }
+
+  throw new Error('Unsupported SFTP response when reading latest.json')
 }

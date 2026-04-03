@@ -116,6 +116,12 @@ When preparing a desktop release, update:
 
 The public app site now reads `/downloads/<slug>/latest.json` at runtime, so publishing release metadata does not require an Astro rebuild. For this app, the publish target is `/mnt/data/sites/apps/public/downloads/subathon-timer/`.
 
+Publish layout policy:
+
+- keep only the current live release at the top level
+- move the previous top-level release into `/mnt/data/sites/apps/public/downloads/subathon-timer/archive/<version>/`
+- archive the previous installers, hashes, `manifest.json`, `latest.json`, and `notes.md` together
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0. See `LICENSE`.

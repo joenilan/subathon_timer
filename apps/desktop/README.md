@@ -141,4 +141,19 @@ So a publish from this repo must upload to:
 - `latest.json`
 - `notes.md`
 
+Before it uploads the new top-level files, the publish script reads the existing top-level `latest.json` and moves the previous live release into:
+
+- `/mnt/data/sites/apps/public/downloads/subathon-timer/archive/<old-version>/`
+
+That archive move includes:
+
+- installers
+- portable zip
+- `.sha256` files
+- `manifest.json`
+- `latest.json`
+- `notes.md`
+
+The top level should always contain only the current live release. Older versions live under `archive/<version>/`.
+
 `latest.json` is the website-facing source of truth for the current release, and the site picks it up without an Astro rebuild.

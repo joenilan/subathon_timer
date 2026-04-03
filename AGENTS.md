@@ -75,6 +75,8 @@
 - Public app downloads are published to the Raspberry Pi path `/mnt/data/sites/apps/public/downloads/<app-slug>/`. For this app, the slug is `subathon-timer`.
 - The public site now reads `/downloads/<slug>/latest.json` at runtime. Do not require an Astro rebuild just to update the shown version or download button.
 - `release:publish` is the canonical publish path for this repo. It must upload the release artifacts, `latest.json`, `notes.md`, `manifest.json`, and matching hashes to `/mnt/data/sites/apps/public/downloads/subathon-timer/`.
+- Publish layout rule: the top level of `/mnt/data/sites/apps/public/downloads/subathon-timer/` must contain only the current live release. Before uploading a new top-level release, move the previous release into `/mnt/data/sites/apps/public/downloads/subathon-timer/archive/<old-version>/`.
+- Archive the previous installers, portable zip, `.sha256` files, `manifest.json`, `latest.json`, and `notes.md` together. Never move the `archive/` directory itself.
 - Keep `.env.raspi` local-only. It contains publish credentials and must never be committed.
 - In pull requests, include:
   - what changed
