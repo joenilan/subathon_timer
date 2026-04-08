@@ -1741,6 +1741,7 @@ fn wheel_overlay_html() -> &'static str {
       </section>
     </div>
     <script>
+      const isStudioPreview = new URLSearchParams(window.location.search).get('studio') === '1';
       const stage = document.getElementById('stage');
       const rotor = document.getElementById('rotor');
       const eyebrow = document.getElementById('eyebrow');
@@ -1851,7 +1852,7 @@ fn wheel_overlay_html() -> &'static str {
       }
 
       function refreshVisibility(spin) {
-        const active = spin && spin.status !== 'idle' && spin.activeSegmentId;
+        const active = isStudioPreview || (spin && spin.status !== 'idle' && spin.activeSegmentId);
         stage.classList.toggle('visible', Boolean(active));
       }
 
@@ -1904,7 +1905,17 @@ fn wheel_overlay_html() -> &'static str {
           if (!response.ok) return;
           const payload = await response.json();
           const segments = Array.isArray(payload.wheelSegments) ? payload.wheelSegments : [];
-          const spin = payload.wheelSpin || { status: 'idle' };
+          const liveSpin = payload.wheelSpin || { status: 'idle' };
+          const spin = isStudioPreview && segments[0]
+            ? {
+                status: 'ready',
+                activeSegmentId: segments[0].id,
+                resultTitle: segments[0].label,
+                resultSummary: 'Studio preview stays visible so you can place and scale the wheel overlay before the next gifted sub spin.',
+                requiresModeration: Boolean(segments[0].moderationRequired),
+                autoApply: false,
+              }
+            : liveSpin;
           const transform = payload.wheelOverlayTransform || { x: 0, y: 0, scale: 1 };
 
           refreshVisibility(spin);
@@ -1923,7 +1934,7 @@ fn wheel_overlay_html() -> &'static str {
             summary.textContent = 'A gifted sub event triggered the wheel.';
             result.textContent = '';
           } else {
-            eyebrow.textContent = 'Wheel result';
+            eyebrow.textContent = isStudioPreview ? 'Wheel preview' : 'Wheel result';
             title.textContent = spin.resultTitle || 'Result ready';
             summary.textContent = spin.autoApply
               ? 'Gifted sub wheel results apply automatically after the reveal finishes.'

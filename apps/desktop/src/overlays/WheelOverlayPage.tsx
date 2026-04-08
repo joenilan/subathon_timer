@@ -12,8 +12,19 @@ export function WheelOverlayPage() {
   const isStudioPreview = new URLSearchParams(location.search).get('studio') === '1'
   const activeTransform = isStudioPreview ? defaultOverlayTransforms.wheel : wheelOverlayTransform
   const { canvasRef, canvasStyle } = useViewportBoundOverlayTransform(activeTransform, 'center')
+  const previewSpin = isStudioPreview && wheelSegments[0]
+    ? {
+        status: 'ready' as const,
+        activeSegmentId: wheelSegments[0].id,
+        resultTitle: wheelSegments[0].label,
+        resultSummary: 'Studio preview stays visible so you can place and scale the wheel overlay before the next gifted sub spin.',
+        requiresModeration: wheelSegments[0].moderationRequired,
+        autoApply: false,
+      }
+    : wheelSpin
+  const displaySpin = isStudioPreview ? previewSpin : wheelSpin
 
-  if (wheelSpin.status === 'idle' || !wheelSpin.activeSegmentId) {
+  if (displaySpin.status === 'idle' || !displaySpin.activeSegmentId) {
     return <div className="overlay overlay--wheel overlay--wheel-empty" />
   }
 
@@ -23,22 +34,22 @@ export function WheelOverlayPage() {
         <div className="wheel-overlay-card">
           <div className="wheel-overlay-card__header">
             <span className="wheel-overlay-card__eyebrow">
-              {wheelSpin.status === 'spinning' ? 'Gift bomb wheel' : 'Wheel result'}
+              {displaySpin.status === 'spinning' ? 'Gift bomb wheel' : isStudioPreview ? 'Wheel preview' : 'Wheel result'}
             </span>
             <strong className="wheel-overlay-card__title">
-              {wheelSpin.status === 'spinning'
+              {displaySpin.status === 'spinning'
                 ? 'Spinning now'
-                : (wheelSpin.resultTitle ?? 'Result ready')}
+                : (displaySpin.resultTitle ?? 'Result ready')}
             </strong>
             <p className="wheel-overlay-card__summary">
-              {wheelSpin.status === 'spinning'
+              {displaySpin.status === 'spinning'
                 ? 'A gifted sub event triggered the wheel.'
-                : wheelSpin.autoApply
+                : displaySpin.autoApply
                   ? 'Gifted sub wheel results apply automatically after the reveal finishes.'
-                  : (wheelSpin.resultSummary ?? 'Waiting for the operator to apply the result.')}
+                  : (displaySpin.resultSummary ?? 'Waiting for the operator to apply the result.')}
             </p>
           </div>
-          <WheelDisplay segments={wheelSegments} spin={wheelSpin} textScale={wheelTextScale} />
+          <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} />
         </div>
       </div>
     </div>
