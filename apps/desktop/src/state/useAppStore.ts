@@ -122,6 +122,7 @@ export interface AppState {
   updateWheelSegment: (id: string, patch: Partial<WheelSegment>) => void
   removeWheelSegment: (id: string) => void
   spinWheel: () => void
+  triggerGiftBombTest: (count: number) => void
   applyWheelResult: () => Promise<void>
 
   startTimer: () => void
@@ -437,6 +438,33 @@ export const useAppStore = create<AppState>()(
         }
 
         queueWheelSpinSelection(set, selectedSegment.id, selectedSegment.moderationRequired)
+      },
+      triggerGiftBombTest: (count) => {
+        const normalizedCount = Math.max(1, Math.floor(count || 0))
+        const now = new Date().toISOString()
+        const eventId = `gift-bomb-test-${Date.now()}-${normalizedCount}`
+
+        useAppStore.getState().processTwitchEvent({
+          id: eventId,
+          source: 'twitch-eventsub',
+          eventType: 'gift_bomb',
+          occurredAt: now,
+          userId: 'gift-bomb-test',
+          userLogin: 'giftbombtest',
+          displayName: 'Gift Bomb Test',
+          anonymous: false,
+          amount: null,
+          currency: null,
+          tier: '1000',
+          count: normalizedCount,
+          command: null,
+          rawPayload: {
+            test: true,
+            provider: 'subathon-timer',
+            simulatedEvent: 'gift_bomb',
+            count: normalizedCount,
+          },
+        })
       },
       applyWheelResult: async () => {
         const { wheelSpin, wheelSegments } = useAppStore.getState()

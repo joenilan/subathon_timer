@@ -109,4 +109,45 @@ describe('useAppStore runtime behavior', () => {
     expect(state.wheelSpin.activeSegmentId).toBe('wheel-gift-bomb')
     expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
   })
+
+  it('runs the gift bomb test through the live wheel auto-spin path', () => {
+    useAppStore.setState({
+      timerStatus: 'paused',
+      timerRemainingSeconds: 3600,
+      timerSessionBaseRemainingSeconds: 3600,
+      timerSessionBaseUptimeSeconds: 0,
+      timerSessionRunningSince: null,
+      timerEvents: [],
+      trendPoints: [3600],
+      activity: [],
+      processedEventIds: [],
+      wheelSegments: [
+        {
+          id: 'wheel-test-spin',
+          label: 'Test Spin',
+          chance: '100%',
+          outcome: 'Test reward',
+          outcomeType: 'time',
+          color: '#22d3ee',
+          minSubs: 3,
+          timeDeltaSeconds: 120,
+          moderationRequired: false,
+        },
+      ],
+      wheelSpin: {
+        status: 'idle',
+        activeSegmentId: null,
+        resultTitle: null,
+        resultSummary: null,
+        requiresModeration: false,
+      },
+    })
+
+    useAppStore.getState().triggerGiftBombTest(3)
+
+    const state = useAppStore.getState()
+    expect(state.wheelSpin.status).toBe('spinning')
+    expect(state.wheelSpin.activeSegmentId).toBe('wheel-test-spin')
+    expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
+  })
 })

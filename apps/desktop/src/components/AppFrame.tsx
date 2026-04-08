@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../state/useAppStore'
+import { useUpdateStore } from '../state/useUpdateStore'
+import { DOWNLOAD_BASE } from '../lib/update/checkForUpdate'
+import { WheelSpinOverlay } from './WheelSpinOverlay'
 import { applyWindowSizing } from '../lib/platform/windowSizing'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
 import { useEventSubStore } from '../state/useEventSubStore'
@@ -75,6 +79,20 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         }),
     )
     const eventSubStatus = useEventSubStore((state) => state.status)
+    const updateInfo = useUpdateStore((state) => state.updateInfo)
+    const updateChecking = useUpdateStore((state) => state.checking)
+    const updateFetchFailed = useUpdateStore((state) => state.fetchFailed)
+    const updateAvailable = !!updateInfo
+    const [dismissedVersion, setDismissedVersion] = useState<string | null>(
+        () => localStorage.getItem('dismissed-update')
+    )
+    const showUpdateBanner = updateAvailable && updateInfo!.version !== dismissedVersion
+    const dismissUpdate = () => {
+        if (updateInfo) {
+            localStorage.setItem('dismissed-update', updateInfo.version)
+            setDismissedVersion(updateInfo.version)
+        }
+    }
     const shellRef = useRef<HTMLDivElement>(null)
     const missingScopes = useMemo(
         () => TWITCH_SCOPES.filter((scope) => !(twitchSession?.scopes ?? []).includes(scope)),
@@ -169,17 +187,34 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                 </button>
 
                 <nav className="sidebar-nav">
-                    {navItems.map((item) => (
-                        <NavLink
-                            key={item.to}
-                            to={item.to}
-                            end={item.to === '/'}
-                            className={({ isActive }) => `nav-item${isActive ? ' nav-item--active' : ''}`}
-                        >
-                            <span className="nav-icon">{icons[item.icon as keyof typeof icons]}</span>
-                            {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
-                        </NavLink>
-                    ))}
+                    {navItems.map((item) => {
+                        const hasBadge = item.to === '/about' && updateAvailable
+                        return (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                end={item.to === '/'}
+                                className={({ isActive }) => `nav-item${isActive ? ' nav-item--active' : ''}`}
+                            >
+                                <span className="nav-icon" style={{ position: 'relative' }}>
+                                    {icons[item.icon as keyof typeof icons]}
+                                    {hasBadge && (
+                                        <span style={{
+                                            position: 'absolute', top: '-3px', right: '-3px',
+                                            width: '8px', height: '8px',
+                                            background: '#facc15', borderRadius: '50%',
+                                        }} />
+                                    )}
+                                </span>
+                                {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
+                                {!sidebarCollapsed && hasBadge && (
+                                    <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 700, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Update
+                                    </span>
+                                )}
+                            </NavLink>
+                        )
+                    })}
                 </nav>
 
                 <div className="sidebar-health">
@@ -260,6 +295,30 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                             <div className={`health-dot ${overlayHealthClass}`} title={overlayRuntimeReady ? overlayLanAccessEnabled ? overlayLanBaseUrl ? 'Overlay LAN source ready' : 'Overlay LAN source missing a private network address' : 'Overlay local server ready' : isNativeRuntime ? 'Overlay local server unavailable on port 31847' : 'Overlay preview mode'} />
                         ) : null}
                     </div>
+                    <div className="health-item">
+                        {!sidebarCollapsed && (
+                            <>
+                                <div className="health-item__meta">
+                                    <div
+                                        className={`health-dot ${updateAvailable ? 'action-required' : updateFetchFailed ? 'degraded' : updateChecking ? 'degraded' : 'connected'}`}
+                                        title={updateAvailable ? `Update v${updateInfo!.version} available` : updateChecking ? 'Checking for updates' : updateFetchFailed ? 'Update check failed' : 'App is up to date'}
+                                    />
+                                    <span className="health-label">App</span>
+                                </div>
+                                <div className="health-item__body">
+                                    <span className="health-status">
+                                        {updateChecking ? 'Checking…' : updateAvailable ? `v${updateInfo!.version} ready` : updateFetchFailed ? 'Check failed' : 'Up to date'}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                        {sidebarCollapsed && (
+                            <div
+                                className={`health-dot ${updateAvailable ? 'action-required' : updateFetchFailed ? 'degraded' : updateChecking ? 'degraded' : 'connected'}`}
+                                title={updateAvailable ? `Update v${updateInfo!.version} available` : 'App up to date'}
+                            />
+                        )}
+                    </div>
                 </div>
             </aside>
 
@@ -267,8 +326,38 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                 <header className="topbar">
                     <strong>{pageLabels[location.pathname] ?? 'Subathon Timer'}</strong>
                 </header>
+                {showUpdateBanner && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '8px 16px',
+                        background: 'rgba(250,204,21,0.08)',
+                        borderBottom: '1px solid rgba(250,204,21,0.2)',
+                        fontSize: '13px', flexShrink: 0,
+                    }}>
+                        <span style={{ color: '#fde047', fontWeight: 600, flex: 1 }}>
+                            Subathon Timer v{updateInfo!.version} is available
+                            {updateInfo!.notes ? <span style={{ fontWeight: 400, color: 'rgba(253,224,71,0.6)', marginLeft: '6px' }}>{updateInfo!.notes}</span> : null}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => void openUrl(`${DOWNLOAD_BASE}/${updateInfo!.files.setup}`).catch(() => {})}
+                            style={{ padding: '4px 12px', background: '#facc15', color: '#000', fontWeight: 700, fontSize: '12px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
+                        >
+                            Download
+                        </button>
+                        <button
+                            type="button"
+                            onClick={dismissUpdate}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(253,224,71,0.4)', fontSize: '16px', lineHeight: 1, padding: '0 2px' }}
+                            title="Dismiss"
+                        >
+                            ×
+                        </button>
+                    </div>
+                )}
                 <div className="workspace-content">
                     {children}
+                    <WheelSpinOverlay />
                 </div>
             </main>
         </div>

@@ -114,7 +114,15 @@ export const selectWheelPageState = (state: AppState) => ({
   removeWheelSegment: state.removeWheelSegment,
   setWheelTextScale: state.setWheelTextScale,
   spinWheel: state.spinWheel,
+  triggerGiftBombTest: state.triggerGiftBombTest,
   updateWheelSegment: state.updateWheelSegment,
+  wheelSegments: state.wheelSegments,
+  wheelSpin: state.wheelSpin,
+  wheelTextScale: state.wheelTextScale,
+})
+
+export const selectWheelOverlayState = (state: AppState) => ({
+  applyWheelResult: state.applyWheelResult,
   wheelSegments: state.wheelSegments,
   wheelSpin: state.wheelSpin,
   wheelTextScale: state.wheelTextScale,

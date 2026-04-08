@@ -137,6 +137,31 @@ describe('StreamElements tip helpers', () => {
     expect(event?.amount).toBe(7)
   })
 
+  it('ignores marked test activity payloads that represent gifted subs instead of tips', () => {
+    const envelope = parseStreamElementsSocketEnvelope(
+      JSON.stringify({
+        id: 'activity-test-subs-1',
+        ts: '2026-04-08T15:07:17Z',
+        type: 'message',
+        topic: 'channel.activities',
+        data: {
+          type: 'test',
+          isTest: true,
+          activityId: 'activity-test-subs-1',
+          createdAt: '2026-04-08T15:07:09.302Z',
+          data: {
+            type: 'subscriber-latest',
+            username: 'Styler',
+            amount: '5.00',
+            currency: 'USD',
+          },
+        },
+      }),
+    )
+
+    expect(normalizeStreamElementsTipMessage(envelope)).toBeNull()
+  })
+
   it('formats the tip summary with a currency symbol when possible', () => {
     const summary = summarizeStreamElementsTip({
       id: 'tip-1',

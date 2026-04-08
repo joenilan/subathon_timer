@@ -93,4 +93,20 @@ describe('Streamlabs tip helpers', () => {
     expect(events[0]?.eventType).toBe('tip')
     expect(events[0]?.amount).toBe(5)
   })
+
+  it('ignores non-donation test events from the socket feed', () => {
+    expect(
+      normalizeStreamlabsSocketEvent({
+        type: 'subscription_test',
+        for: 'streamlabs',
+        message: [
+          {
+            name: 'Test Viewer',
+            amount: '5.00',
+            currency: 'USD',
+          },
+        ],
+      }),
+    ).toHaveLength(0)
+  })
 })

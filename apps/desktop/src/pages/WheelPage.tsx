@@ -37,11 +37,13 @@ function fromWheelTextScaleUiValue(uiValue: number) {
 }
 
 export function WheelPage() {
+  const [giftBombTestCount, setGiftBombTestCount] = useState(5)
   const {
     wheelSegments,
     wheelSpin,
     wheelTextScale,
     spinWheel,
+    triggerGiftBombTest,
     applyWheelResult,
     addWheelSegment,
     updateWheelSegment,
@@ -198,6 +200,33 @@ export function WheelPage() {
                   </div>
                 )
               })}
+            </div>
+
+            <div className="wheel-test-panel">
+              <div className="wheel-test-panel__copy">
+                <strong>Gift bomb test</strong>
+                <p>Run the same gifted-sub auto-spin path Twitch uses so you can verify thresholds, animation, and the final result before going live.</p>
+              </div>
+              <div className="wheel-test-panel__actions">
+                <label className="rule-field rule-field--inline wheel-test-panel__field">
+                  <span className="rule-field__label">Gifted subs</span>
+                  <input
+                    className="rule-field__input"
+                    type="number"
+                    min={1}
+                    value={giftBombTestCount}
+                    onChange={(event) => setGiftBombTestCount(Math.max(1, Number(event.target.value) || 1))}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => triggerGiftBombTest(giftBombTestCount)}
+                  disabled={wheelSpin.status === 'spinning'}
+                >
+                  Run Gift Bomb Test
+                </button>
+              </div>
             </div>
           </div>
 
