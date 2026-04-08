@@ -129,6 +129,11 @@ export function createWheelSegment(outcomeType: WheelSegment['outcomeType']): Wh
   }
 }
 
+export function getEligibleWheelSegmentsForGiftCount(segments: WheelSegment[], giftCount: number) {
+  const normalizedGiftCount = Math.max(1, Math.floor(giftCount))
+  return segments.filter((segment) => (segment.minSubs ?? 1) <= normalizedGiftCount)
+}
+
 export function pickWheelSegment(segments: WheelSegment[]) {
   const weighted = segments.map((segment) => ({
     segment,

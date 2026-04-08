@@ -67,4 +67,46 @@ describe('useAppStore runtime behavior', () => {
     expect(after.wheelSpin.status).toBe('idle')
     expect(after.timerEvents[0]?.title).toBe('Wheel outcome applied')
   })
+
+  it('auto-spins the wheel for qualifying gift bombs', () => {
+    const initial = useAppStore.getInitialState()
+
+    useAppStore.setState({
+      ...initial,
+      wheelSegments: [
+        {
+          id: 'wheel-gift-bomb',
+          label: 'Gift bomb bonus',
+          chance: '100%',
+          outcome: 'Adds five minutes.',
+          outcomeType: 'time',
+          minSubs: 5,
+          timeDeltaSeconds: 300,
+          moderationRequired: false,
+        },
+      ],
+    })
+
+    useAppStore.getState().processTwitchEvent({
+      id: 'gift-bomb-1',
+      source: 'twitch-eventsub',
+      eventType: 'gift_bomb',
+      occurredAt: new Date().toISOString(),
+      userId: 'gifter-1',
+      userLogin: 'gifter',
+      displayName: 'Gifter',
+      anonymous: false,
+      amount: null,
+      currency: null,
+      tier: '1000',
+      count: 5,
+      command: null,
+      rawPayload: {},
+    })
+
+    const state = useAppStore.getState()
+    expect(state.wheelSpin.status).toBe('spinning')
+    expect(state.wheelSpin.activeSegmentId).toBe('wheel-gift-bomb')
+    expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
+  })
 })

@@ -91,7 +91,7 @@ function normalizeStreamlabsDonation(
 export function normalizeStreamlabsSocketEvent(value: unknown) {
   const payload = asRecord(value) as StreamlabsSocketEnvelope | null
 
-  if (!payload || payload.type !== 'donation') {
+  if (!payload || !['donation', 'donation_test', 'test'].includes(payload.type ?? '')) {
     return [] as NormalizedTimerEvent[]
   }
 

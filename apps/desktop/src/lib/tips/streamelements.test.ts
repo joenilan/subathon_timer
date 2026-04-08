@@ -108,6 +108,35 @@ describe('StreamElements tip helpers', () => {
     expect(normalizeStreamElementsTipMessage(envelope)).toBeNull()
   })
 
+  it('accepts marked test activity payloads when they still represent a tip', () => {
+    const envelope = parseStreamElementsSocketEnvelope(
+      JSON.stringify({
+        id: 'activity-test-tip-1',
+        ts: '2026-04-08T15:07:17Z',
+        type: 'message',
+        topic: 'channel.activities',
+        data: {
+          type: 'test',
+          isTest: true,
+          activityId: 'activity-test-tip-1',
+          createdAt: '2026-04-08T15:07:09.302Z',
+          data: {
+            type: 'tip',
+            username: 'Styler',
+            displayName: 'Styler',
+            amount: '7.00',
+            currency: 'USD',
+          },
+        },
+      }),
+    )
+
+    const event = normalizeStreamElementsTipMessage(envelope)
+
+    expect(event?.eventType).toBe('tip')
+    expect(event?.amount).toBe(7)
+  })
+
   it('formats the tip summary with a currency symbol when possible', () => {
     const summary = summarizeStreamElementsTip({
       id: 'tip-1',

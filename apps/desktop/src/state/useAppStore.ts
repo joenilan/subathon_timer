@@ -23,6 +23,7 @@ import {
   createWheelSegment,
   DEFAULT_WHEEL_TEXT_SCALE,
   defaultWheelSpin,
+  getEligibleWheelSegmentsForGiftCount,
   pickWheelSegment,
 } from '../lib/wheel/outcomes'
 import { getChatters, sendChatMessage, timeoutUser } from '../lib/twitch/helix'
@@ -140,6 +141,41 @@ function clearWheelSpinTimer() {
     window.clearTimeout(wheelSpinTimer)
     wheelSpinTimer = null
   }
+}
+
+function queueWheelSpinSelection(
+  set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState> | AppState), replace?: false) => void,
+  selectedSegmentId: string,
+  requiresModeration: boolean,
+) {
+  clearWheelSpinTimer()
+  set({
+    wheelSpin: {
+      status: 'spinning',
+      activeSegmentId: selectedSegmentId,
+      resultTitle: 'Selecting outcome',
+      resultSummary: 'Wheel animation in progress.',
+      requiresModeration,
+    },
+  })
+
+  wheelSpinTimer = window.setTimeout(() => {
+    const currentSegment = useAppStore.getState().wheelSegments.find((segment) => segment.id === selectedSegmentId)
+    if (!currentSegment) {
+      return
+    }
+
+    set({
+      wheelSpin: {
+        status: 'ready',
+        activeSegmentId: currentSegment.id,
+        resultTitle: currentSegment.label,
+        resultSummary: buildWheelSpinSummary(currentSegment),
+        requiresModeration: currentSegment.moderationRequired,
+      },
+    })
+    wheelSpinTimer = null
+  }, 1800)
 }
 
 const CHAT_TIMER_HELP_MESSAGE =
@@ -400,34 +436,7 @@ export const useAppStore = create<AppState>()(
           return
         }
 
-        clearWheelSpinTimer()
-        set({
-          wheelSpin: {
-            status: 'spinning',
-            activeSegmentId: selectedSegment.id,
-            resultTitle: 'Selecting outcome',
-            resultSummary: 'Wheel animation in progress.',
-            requiresModeration: selectedSegment.moderationRequired,
-          },
-        })
-
-        wheelSpinTimer = window.setTimeout(() => {
-          const currentSegment = useAppStore.getState().wheelSegments.find((segment) => segment.id === selectedSegment.id)
-          if (!currentSegment) {
-            return
-          }
-
-          set({
-            wheelSpin: {
-              status: 'ready',
-              activeSegmentId: currentSegment.id,
-              resultTitle: currentSegment.label,
-              resultSummary: buildWheelSpinSummary(currentSegment),
-              requiresModeration: currentSegment.moderationRequired,
-            },
-          })
-          wheelSpinTimer = null
-        }, 1800)
+        queueWheelSpinSelection(set, selectedSegment.id, selectedSegment.moderationRequired)
       },
       applyWheelResult: async () => {
         const { wheelSpin, wheelSegments } = useAppStore.getState()
@@ -903,6 +912,19 @@ export const useAppStore = create<AppState>()(
           } satisfies NativeTimerEventEntry
           const nextEvents = appendTimerEvent(state.timerEvents, nextEvent)
           const derived = deriveTimerDecorations(state.defaultTimerSeconds, nextEvents, nextRemaining)
+          const shouldAutoSpinGiftWheel =
+            event.eventType === 'gift_bomb'
+            && state.wheelSpin.status === 'idle'
+            && (event.count ?? 0) > 0
+          const eligibleGiftWheelSegments = shouldAutoSpinGiftWheel
+            ? getEligibleWheelSegmentsForGiftCount(state.wheelSegments, event.count ?? 1)
+            : []
+          const selectedGiftWheelSegment =
+            eligibleGiftWheelSegments.length > 0 ? pickWheelSegment(eligibleGiftWheelSegments) : null
+
+          if (selectedGiftWheelSegment) {
+            queueWheelSpinSelection(set, selectedGiftWheelSegment.id, selectedGiftWheelSegment.moderationRequired)
+          }
 
           return {
             processedEventIds,

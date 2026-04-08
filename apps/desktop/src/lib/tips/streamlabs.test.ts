@@ -72,4 +72,25 @@ describe('Streamlabs tip helpers', () => {
 
     expect(summary.detail).toContain('$13.37')
   })
+
+  it('accepts donation test payloads for connection checks', () => {
+    const events = normalizeStreamlabsSocketEvent({
+      type: 'donation_test',
+      for: 'streamlabs',
+      event_id: 'evt-test-1',
+      message: [
+        {
+          donation_id: '96164122',
+          name: 'Test Viewer',
+          amount: '5.00',
+          currency: 'USD',
+          created_at: '2026-04-08T10:00:00Z',
+        },
+      ],
+    })
+
+    expect(events).toHaveLength(1)
+    expect(events[0]?.eventType).toBe('tip')
+    expect(events[0]?.amount).toBe(5)
+  })
 })

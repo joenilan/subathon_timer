@@ -39,6 +39,10 @@ function getNumber(record: Record<string, unknown> | null, key: string) {
   return null
 }
 
+function getBoolean(record: Record<string, unknown> | null, key: string) {
+  return record?.[key] === true
+}
+
 function buildStreamElementsSubscribeMessage(
   connection: StreamElementsTipConnection,
   topic: 'channel.tips' | 'channel.activities',
@@ -105,11 +109,21 @@ function normalizeStreamElementsChannelTip(envelope: StreamElementsSocketEnvelop
 
 function normalizeStreamElementsActivityTip(envelope: StreamElementsSocketEnvelope) {
   const payload = asRecord(envelope.data)
-  if (getString(payload, 'type') !== 'tip') {
+  const activityData = asRecord(payload?.data)
+  const payloadType = getString(payload, 'type')?.toLowerCase()
+  const nestedType =
+    getString(activityData, 'type')?.toLowerCase() ??
+    getString(activityData, 'eventType')?.toLowerCase() ??
+    getString(activityData, 'event')?.toLowerCase()
+  const isMarkedTest =
+    getBoolean(payload, 'test') ||
+    getBoolean(payload, 'isTest') ||
+    getBoolean(activityData, 'test') ||
+    getBoolean(activityData, 'isTest')
+
+  if (payloadType !== 'tip' && nestedType !== 'tip' && !(isMarkedTest && nestedType === 'tip')) {
     return null
   }
-
-  const activityData = asRecord(payload?.data)
   const amount =
     getNumber(activityData, 'amount') ??
     getNumber(activityData, 'tipAmount') ??

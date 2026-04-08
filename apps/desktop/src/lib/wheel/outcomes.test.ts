@@ -3,6 +3,7 @@ import {
   buildWheelSpinSummary,
   clampWheelTextScale,
   createDefaultWheelSegments,
+  getEligibleWheelSegmentsForGiftCount,
   pickWheelSegment,
 } from './outcomes'
 
@@ -31,6 +32,16 @@ describe('pickWheelSegment', () => {
 })
 
 describe('wheel helpers', () => {
+  it('filters wheel segments by minSubs threshold', () => {
+    const segments = [
+      { ...createDefaultWheelSegments()[0], id: 'a', minSubs: 5 },
+      { ...createDefaultWheelSegments()[1], id: 'b', minSubs: 10 },
+    ]
+
+    expect(getEligibleWheelSegmentsForGiftCount(segments, 5).map((segment) => segment.id)).toEqual(['a'])
+    expect(getEligibleWheelSegmentsForGiftCount(segments, 12).map((segment) => segment.id)).toEqual(['a', 'b'])
+  })
+
   it('clamps wheel text scale into the supported range', () => {
     expect(clampWheelTextScale(0.1)).toBe(0.35)
     expect(clampWheelTextScale(2)).toBe(0.75)
