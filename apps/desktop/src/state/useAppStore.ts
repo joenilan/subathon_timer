@@ -138,6 +138,7 @@ export interface AppState {
 const INITIAL_TIMER_SECONDS = 6 * 60 * 60
 const MAX_PROCESSED_IDS = 100
 let wheelSpinTimer: number | null = null
+let wheelAutoApplyTimer: number | null = null
 
 function clearWheelSpinTimer() {
   if (wheelSpinTimer !== null) {
@@ -146,12 +147,21 @@ function clearWheelSpinTimer() {
   }
 }
 
+function clearWheelAutoApplyTimer() {
+  if (wheelAutoApplyTimer !== null) {
+    window.clearTimeout(wheelAutoApplyTimer)
+    wheelAutoApplyTimer = null
+  }
+}
+
 function queueWheelSpinSelection(
   set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState> | AppState), replace?: false) => void,
   selectedSegmentId: string,
   requiresModeration: boolean,
+  autoApply: boolean,
 ) {
   clearWheelSpinTimer()
+  clearWheelAutoApplyTimer()
   set({
     wheelSpin: {
       status: 'spinning',
@@ -159,6 +169,7 @@ function queueWheelSpinSelection(
       resultTitle: 'Selecting outcome',
       resultSummary: 'Wheel animation in progress.',
       requiresModeration,
+      autoApply,
     },
   })
 
@@ -175,9 +186,17 @@ function queueWheelSpinSelection(
         resultTitle: currentSegment.label,
         resultSummary: buildWheelSpinSummary(currentSegment),
         requiresModeration: currentSegment.moderationRequired,
+        autoApply,
       },
     })
     wheelSpinTimer = null
+
+    if (autoApply) {
+      wheelAutoApplyTimer = window.setTimeout(() => {
+        wheelAutoApplyTimer = null
+        void useAppStore.getState().applyWheelResult()
+      }, 1200)
+    }
   }, 1800)
 }
 
@@ -449,7 +468,7 @@ export const useAppStore = create<AppState>()(
           return
         }
 
-        queueWheelSpinSelection(set, selectedSegment.id, selectedSegment.moderationRequired)
+        queueWheelSpinSelection(set, selectedSegment.id, selectedSegment.moderationRequired, false)
       },
       triggerGiftBombTest: (count) => {
         const normalizedCount = Math.max(1, Math.floor(count || 0))
@@ -963,7 +982,7 @@ export const useAppStore = create<AppState>()(
             eligibleGiftWheelSegments.length > 0 ? pickWheelSegment(eligibleGiftWheelSegments) : null
 
           if (selectedGiftWheelSegment) {
-            queueWheelSpinSelection(set, selectedGiftWheelSegment.id, selectedGiftWheelSegment.moderationRequired)
+            queueWheelSpinSelection(set, selectedGiftWheelSegment.id, selectedGiftWheelSegment.moderationRequired, true)
           }
 
           return {

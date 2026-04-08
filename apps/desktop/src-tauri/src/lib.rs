@@ -122,6 +122,7 @@ struct WheelOverlaySpinState {
     result_title: Option<String>,
     result_summary: Option<String>,
     requires_moderation: bool,
+    auto_apply: bool,
 }
 
 impl Default for WheelOverlaySpinState {
@@ -132,6 +133,7 @@ impl Default for WheelOverlaySpinState {
             result_title: None,
             result_summary: None,
             requires_moderation: false,
+            auto_apply: false,
         }
     }
 }
@@ -1923,7 +1925,9 @@ fn wheel_overlay_html() -> &'static str {
           } else {
             eyebrow.textContent = 'Wheel result';
             title.textContent = spin.resultTitle || 'Result ready';
-            summary.textContent = spin.resultSummary || 'Waiting for the operator to apply the result.';
+            summary.textContent = spin.autoApply
+              ? 'Gifted sub wheel results apply automatically after the reveal finishes.'
+              : (spin.resultSummary || 'Waiting for the operator to apply the result.');
             result.textContent = spin.requiresModeration ? 'Reconnect Twitch before applying timeout outcomes.' : '';
           }
 

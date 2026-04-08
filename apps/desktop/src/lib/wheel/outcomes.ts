@@ -10,6 +10,7 @@ export const defaultWheelSpin: WheelSpinState = {
   resultTitle: null,
   resultSummary: null,
   requiresModeration: false,
+  autoApply: false,
 }
 
 export function createDefaultWheelSegments(): WheelSegment[] {

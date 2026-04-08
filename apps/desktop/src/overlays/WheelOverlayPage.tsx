@@ -33,7 +33,9 @@ export function WheelOverlayPage() {
             <p className="wheel-overlay-card__summary">
               {wheelSpin.status === 'spinning'
                 ? 'A gifted sub event triggered the wheel.'
-                : (wheelSpin.resultSummary ?? 'Waiting for the operator to apply the result.')}
+                : wheelSpin.autoApply
+                  ? 'Gifted sub wheel results apply automatically after the reveal finishes.'
+                  : (wheelSpin.resultSummary ?? 'Waiting for the operator to apply the result.')}
             </p>
           </div>
           <WheelDisplay segments={wheelSegments} spin={wheelSpin} textScale={wheelTextScale} />

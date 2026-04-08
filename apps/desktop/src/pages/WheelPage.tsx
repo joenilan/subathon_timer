@@ -89,7 +89,9 @@ export function WheelPage() {
 
   const spinStatusLabel =
     wheelSpin.status === 'ready'
-      ? 'Result ready'
+      ? wheelSpin.autoApply
+        ? 'Applying…'
+        : 'Result ready'
       : wheelSpin.status === 'spinning'
         ? 'Selecting…'
         : 'Idle'
@@ -141,9 +143,9 @@ export function WheelPage() {
               id="btn-apply-result"
               className="btn wheel-cta-btn"
               onClick={() => void applyWheelResult()}
-              disabled={wheelSpin.status !== 'ready'}
+              disabled={wheelSpin.status !== 'ready' || wheelSpin.autoApply}
             >
-              Apply Result
+              {wheelSpin.autoApply ? 'Auto Applying…' : 'Apply Result'}
             </button>
           </div>
         </div>
@@ -167,6 +169,10 @@ export function WheelPage() {
 
             {wheelSpin.status === 'ready' && wheelSpin.resultSummary && (
               <p className="panel-copy">{wheelSpin.resultSummary}</p>
+            )}
+
+            {wheelSpin.status === 'ready' && wheelSpin.autoApply && (
+              <p className="panel-copy">Gifted sub wheel results apply automatically after the reveal finishes.</p>
             )}
 
             {wheelSpin.status === 'idle' && (

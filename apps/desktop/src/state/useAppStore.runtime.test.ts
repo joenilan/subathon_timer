@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from './useAppStore'
 
 describe('useAppStore runtime behavior', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
     useAppStore.setState(useAppStore.getInitialState(), true)
+  })
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
   })
 
   it('applies a normalized Twitch event only once per event id', () => {
@@ -56,6 +62,7 @@ describe('useAppStore runtime behavior', () => {
         resultTitle: '+5 minutes',
         resultSummary: 'Adds five minutes.',
         requiresModeration: false,
+        autoApply: false,
       },
     })
 
@@ -68,7 +75,7 @@ describe('useAppStore runtime behavior', () => {
     expect(after.timerEvents[0]?.title).toBe('Wheel outcome applied')
   })
 
-  it('auto-spins the wheel for qualifying gift bombs', () => {
+  it('auto-spins and auto-applies the wheel for qualifying gift bombs', async () => {
     const initial = useAppStore.getInitialState()
 
     useAppStore.setState({
@@ -108,9 +115,16 @@ describe('useAppStore runtime behavior', () => {
     expect(state.wheelSpin.status).toBe('spinning')
     expect(state.wheelSpin.activeSegmentId).toBe('wheel-gift-bomb')
     expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
+
+    await vi.advanceTimersByTimeAsync(3000)
+
+    const finalState = useAppStore.getState()
+    expect(finalState.timerRemainingSeconds).toBe(initial.timerRemainingSeconds + 300 + 300)
+    expect(finalState.wheelSpin.status).toBe('idle')
+    expect(finalState.timerEvents[0]?.title).toBe('Wheel outcome applied')
   })
 
-  it('runs the gift bomb test through the live wheel auto-spin path', () => {
+  it('runs the gift bomb test through the live wheel auto-spin path', async () => {
     useAppStore.setState({
       timerStatus: 'paused',
       timerRemainingSeconds: 3600,
@@ -140,6 +154,7 @@ describe('useAppStore runtime behavior', () => {
         resultTitle: null,
         resultSummary: null,
         requiresModeration: false,
+        autoApply: false,
       },
     })
 
@@ -149,5 +164,11 @@ describe('useAppStore runtime behavior', () => {
     expect(state.wheelSpin.status).toBe('spinning')
     expect(state.wheelSpin.activeSegmentId).toBe('wheel-test-spin')
     expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
+
+    await vi.advanceTimersByTimeAsync(3000)
+
+    const finalState = useAppStore.getState()
+    expect(finalState.timerRemainingSeconds).toBe(3900)
+    expect(finalState.wheelSpin.status).toBe('idle')
   })
 })
