@@ -42,6 +42,7 @@ import {
   clampOverlayOffset,
   clampOverlayScale,
   defaultOverlayTransforms,
+  normalizeOverlayTransform,
   type OverlayKind,
   type OverlayTransform,
 } from '../lib/platform/overlayTransform'
@@ -71,6 +72,7 @@ export interface AppState {
   wheelTextScale: number
   timerOverlayTransform: OverlayTransform
   reasonOverlayTransform: OverlayTransform
+  wheelOverlayTransform: OverlayTransform
   defaultTimerSeconds: number
   commandPermissions: TimerCommandPermissionConfig
   overlayLanAccessEnabled: boolean
@@ -224,6 +226,7 @@ export const useAppStore = create<AppState>()(
       wheelTextScale: DEFAULT_WHEEL_TEXT_SCALE,
       timerOverlayTransform: defaultOverlayTransforms.timer,
       reasonOverlayTransform: defaultOverlayTransforms.reason,
+      wheelOverlayTransform: defaultOverlayTransforms.wheel,
       defaultTimerSeconds: INITIAL_TIMER_SECONDS,
       commandPermissions: DEFAULT_TIMER_COMMAND_PERMISSIONS,
       overlayLanAccessEnabled: false,
@@ -258,7 +261,12 @@ export const useAppStore = create<AppState>()(
       setWheelTextScale: (wheelTextScale) => set({ wheelTextScale: clampWheelTextScale(wheelTextScale) }),
       setOverlayTransform: (overlay, patch) =>
         set((state) => {
-          const current = overlay === 'timer' ? state.timerOverlayTransform : state.reasonOverlayTransform
+          const current =
+            overlay === 'timer'
+              ? state.timerOverlayTransform
+              : overlay === 'reason'
+                ? state.reasonOverlayTransform
+                : state.wheelOverlayTransform
           const nextTransform = {
             x: clampOverlayOffset(patch.x ?? current.x),
             y: clampOverlayOffset(patch.y ?? current.y),
@@ -267,13 +275,17 @@ export const useAppStore = create<AppState>()(
 
           return overlay === 'timer'
             ? { timerOverlayTransform: nextTransform }
-            : { reasonOverlayTransform: nextTransform }
+            : overlay === 'reason'
+              ? { reasonOverlayTransform: nextTransform }
+              : { wheelOverlayTransform: nextTransform }
         }),
       resetOverlayTransform: (overlay) =>
         set(
           overlay === 'timer'
             ? { timerOverlayTransform: defaultOverlayTransforms.timer }
-            : { reasonOverlayTransform: defaultOverlayTransforms.reason },
+            : overlay === 'reason'
+              ? { reasonOverlayTransform: defaultOverlayTransforms.reason }
+              : { wheelOverlayTransform: defaultOverlayTransforms.wheel },
         ),
       setDefaultTimerSeconds: (defaultTimerSeconds) => set({ defaultTimerSeconds: clampTimer(defaultTimerSeconds) }),
       setCommandPermission: (action, permission) =>
@@ -976,7 +988,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'fdgt.app.state',
-      version: 11,
+      version: 12,
       storage: createJSONStorage(() => window.localStorage),
       migrate: (persistedState, persistedVersion) => {
         const nextState = persistedState as Partial<AppState> | undefined
@@ -998,6 +1010,9 @@ export const useAppStore = create<AppState>()(
           dashMode: nextDashMode,
           timerWidgetTheme: nextState?.timerWidgetTheme === 'original' ? 'app' : (nextState?.timerWidgetTheme ?? 'app'),
           wheelTextScale: clampWheelTextScale(nextState?.wheelTextScale ?? DEFAULT_WHEEL_TEXT_SCALE),
+          timerOverlayTransform: normalizeOverlayTransform(nextState?.timerOverlayTransform, defaultOverlayTransforms.timer),
+          reasonOverlayTransform: normalizeOverlayTransform(nextState?.reasonOverlayTransform, defaultOverlayTransforms.reason),
+          wheelOverlayTransform: normalizeOverlayTransform(nextState?.wheelOverlayTransform, defaultOverlayTransforms.wheel),
           commandPermissions: normalizeTimerCommandPermissionConfig(nextState?.commandPermissions),
           overlayBaseUrl: null,
           overlayPreviewBaseUrl: null,
@@ -1017,6 +1032,7 @@ export const useAppStore = create<AppState>()(
         wheelTextScale: state.wheelTextScale,
         timerOverlayTransform: state.timerOverlayTransform,
         reasonOverlayTransform: state.reasonOverlayTransform,
+        wheelOverlayTransform: state.wheelOverlayTransform,
       }),
     },
   ),

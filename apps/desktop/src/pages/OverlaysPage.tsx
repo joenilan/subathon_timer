@@ -4,8 +4,6 @@ import type { OverlayKind } from '../lib/platform/overlayTransform'
 import { useAppStore } from '../state/useAppStore'
 import { selectOverlaysPageState } from '../state/selectors'
 
-type OverlaySelection = OverlayKind | 'wheel'
-
 function buildPreviewUrl(pathname: string) {
   if (typeof window === 'undefined') {
     return pathname
@@ -35,13 +33,14 @@ export function OverlaysPage() {
     timerWidgetTheme,
     timerOverlayTransform,
     reasonOverlayTransform,
+    wheelOverlayTransform,
     setTimerWidgetTheme,
     setOverlayTransform,
     resetOverlayTransform,
     setOverlayLanAccessEnabled,
   } = useAppStore(useShallow(selectOverlaysPageState))
-  const [selected, setSelected] = useState<OverlaySelection>('timer')
-  const [copied, setCopied] = useState<OverlaySelection | null>(null)
+  const [selected, setSelected] = useState<OverlayKind>('timer')
+  const [copied, setCopied] = useState<OverlayKind | null>(null)
   const isNativeRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
   const runtimeReady = Boolean(overlayPreviewBaseUrl ?? overlayBaseUrl)
 
@@ -103,7 +102,7 @@ export function OverlaysPage() {
       ? timerOverlayTransform
       : selected === 'reason'
         ? reasonOverlayTransform
-        : null
+        : wheelOverlayTransform
   const selectedAnchor = 'Center anchor'
 
   const handleCopy = async (overlay: (typeof overlays)[number]) => {
@@ -119,19 +118,11 @@ export function OverlaysPage() {
   const handleOffsetChange =
     (axis: 'x' | 'y') =>
     (event: ChangeEvent<HTMLInputElement>) => {
-      if (selected === 'wheel') {
-        return
-      }
-
       const nextValue = Number.parseInt(event.target.value, 10) || 0
       setOverlayTransform(selected, axis === 'x' ? { x: nextValue } : { y: nextValue })
     }
 
   const handleScaleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (selected === 'wheel') {
-      return
-    }
-
     setOverlayTransform(selected, { scale: (Number.parseInt(event.target.value, 10) || 100) / 100 })
   }
 
@@ -264,88 +255,70 @@ export function OverlaysPage() {
               ) : null}
             </div>
 
-            {selectedTransform ? (
-              <section className="overlay-adjust-panel">
-                <div className="overlay-adjust-panel__header">
-                  <div>
-                    <span className="panel-subtitle">Placement</span>
-                    <h3 className="panel-title">Live transform</h3>
-                    <p className="panel-copy">
-                      Move and scale the selected overlay in real time. {selectedAnchor} stays as the baseline, the embedded preview mirrors the saved placement, and the live overlay stays inside the visible frame instead of drifting off-screen.
-                    </p>
+            <section className="overlay-adjust-panel">
+              <div className="overlay-adjust-panel__header">
+                <div>
+                  <span className="panel-subtitle">Placement</span>
+                  <h3 className="panel-title">Live transform</h3>
+                  <p className="panel-copy">
+                    Move and scale the selected overlay in real time. {selectedAnchor} stays as the baseline, the embedded preview mirrors the saved placement, and the live overlay stays inside the visible frame instead of drifting off-screen.
+                  </p>
+                </div>
+                <button
+                  className="btn btn--ghost btn--compact"
+                  onClick={() => resetOverlayTransform(selected)}
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div className="overlay-adjust-grid">
+                <label className="overlay-slider-field">
+                  <div className="overlay-slider-field__header">
+                    <span>X offset</span>
+                    <strong>{selectedTransform.x >= 0 ? `+${selectedTransform.x}px` : `${selectedTransform.x}px`}</strong>
                   </div>
-                  <button
-                    className="btn btn--ghost btn--compact"
-                    onClick={() => {
-                      if (selected !== 'wheel') {
-                        resetOverlayTransform(selected)
-                      }
-                    }}
-                  >
-                    Reset
-                  </button>
-                </div>
+                  <input
+                    type="range"
+                    min={-600}
+                    max={600}
+                    step={2}
+                    value={selectedTransform.x}
+                    onChange={handleOffsetChange('x')}
+                  />
+                </label>
 
-                <div className="overlay-adjust-grid">
-                  <label className="overlay-slider-field">
-                    <div className="overlay-slider-field__header">
-                      <span>X offset</span>
-                      <strong>{selectedTransform.x >= 0 ? `+${selectedTransform.x}px` : `${selectedTransform.x}px`}</strong>
-                    </div>
-                    <input
-                      type="range"
-                      min={-600}
-                      max={600}
-                      step={2}
-                      value={selectedTransform.x}
-                      onChange={handleOffsetChange('x')}
-                    />
-                  </label>
-
-                  <label className="overlay-slider-field">
-                    <div className="overlay-slider-field__header">
-                      <span>Y offset</span>
-                      <strong>{selectedTransform.y >= 0 ? `+${selectedTransform.y}px` : `${selectedTransform.y}px`}</strong>
-                    </div>
-                    <input
-                      type="range"
-                      min={-400}
-                      max={400}
-                      step={2}
-                      value={selectedTransform.y}
-                      onChange={handleOffsetChange('y')}
-                    />
-                  </label>
-
-                  <label className="overlay-slider-field">
-                    <div className="overlay-slider-field__header">
-                      <span>Scale</span>
-                      <strong>{Math.round(selectedTransform.scale * 100)}%</strong>
-                    </div>
-                    <input
-                      type="range"
-                      min={50}
-                      max={200}
-                      step={1}
-                      value={Math.round(selectedTransform.scale * 100)}
-                      onChange={handleScaleChange}
-                    />
-                  </label>
-                </div>
-              </section>
-            ) : (
-              <section className="overlay-adjust-panel">
-                <div className="overlay-adjust-panel__header">
-                  <div>
-                    <span className="panel-subtitle">Behavior</span>
-                    <h3 className="panel-title">Wheel trigger</h3>
-                    <p className="panel-copy">
-                      This overlay only appears when the wheel is actively spinning or holding a result after a gifted sub bomb. It stays transparent the rest of the time, so OBS can keep it in the scene full-time.
-                    </p>
+                <label className="overlay-slider-field">
+                  <div className="overlay-slider-field__header">
+                    <span>Y offset</span>
+                    <strong>{selectedTransform.y >= 0 ? `+${selectedTransform.y}px` : `${selectedTransform.y}px`}</strong>
                   </div>
-                </div>
-              </section>
-            )}
+                  <input
+                    type="range"
+                    min={-400}
+                    max={400}
+                    step={2}
+                    value={selectedTransform.y}
+                    onChange={handleOffsetChange('y')}
+                  />
+                </label>
+
+                <label className="overlay-slider-field">
+                  <div className="overlay-slider-field__header">
+                    <span>Scale</span>
+                    <strong>{Math.round(selectedTransform.scale * 100)}%</strong>
+                  </div>
+                  <input
+                    type="range"
+                    min={50}
+                    max={200}
+                    step={1}
+                    value={Math.round(selectedTransform.scale * 100)}
+                    onChange={handleScaleChange}
+                  />
+                </label>
+              </div>
+            </section>
 
             <div className={`overlay-preview-stage overlay-preview-stage--${selected}`}>
               <div className={`overlay-preview-frame${selected === 'reason' ? ' overlay-preview-frame--reason' : ''}`}>

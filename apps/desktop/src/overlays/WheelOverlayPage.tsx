@@ -1,10 +1,17 @@
+import { useLocation } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { WheelDisplay } from '../components/WheelDisplay'
+import { defaultOverlayTransforms } from '../lib/platform/overlayTransform'
+import { useViewportBoundOverlayTransform } from '../lib/platform/useViewportBoundOverlayTransform'
 import { useAppStore } from '../state/useAppStore'
 import { selectWheelOverlayState } from '../state/selectors'
 
 export function WheelOverlayPage() {
-  const { wheelSegments, wheelSpin, wheelTextScale } = useAppStore(useShallow(selectWheelOverlayState))
+  const location = useLocation()
+  const { wheelOverlayTransform, wheelSegments, wheelSpin, wheelTextScale } = useAppStore(useShallow(selectWheelOverlayState))
+  const isStudioPreview = new URLSearchParams(location.search).get('studio') === '1'
+  const activeTransform = isStudioPreview ? defaultOverlayTransforms.wheel : wheelOverlayTransform
+  const { canvasRef, canvasStyle } = useViewportBoundOverlayTransform(activeTransform, 'center')
 
   if (wheelSpin.status === 'idle' || !wheelSpin.activeSegmentId) {
     return <div className="overlay overlay--wheel overlay--wheel-empty" />
@@ -12,7 +19,7 @@ export function WheelOverlayPage() {
 
   return (
     <div className="overlay overlay--wheel">
-      <div className="overlay__canvas overlay__canvas--wheel">
+      <div ref={canvasRef} className="overlay__canvas overlay__canvas--wheel" style={canvasStyle}>
         <div className="wheel-overlay-card">
           <div className="wheel-overlay-card__header">
             <span className="wheel-overlay-card__eyebrow">

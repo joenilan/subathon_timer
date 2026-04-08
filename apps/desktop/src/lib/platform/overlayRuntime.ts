@@ -21,6 +21,7 @@ interface SyncOverlayPayload {
   graphPoints: number[]
   timerOverlayTransform: OverlayTransform
   reasonOverlayTransform: OverlayTransform
+  wheelOverlayTransform: OverlayTransform
   wheelSegments: WheelSegment[]
   wheelSpin: WheelSpinState
   wheelTextScale: number

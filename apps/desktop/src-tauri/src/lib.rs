@@ -145,6 +145,7 @@ struct OverlayState {
     timer_theme: String,
     timer_overlay_transform: OverlayTransform,
     reason_overlay_transform: OverlayTransform,
+    wheel_overlay_transform: OverlayTransform,
     graph_points: Vec<u64>,
     wheel_segments: Vec<WheelOverlaySegment>,
     wheel_spin: WheelOverlaySpinState,
@@ -162,6 +163,7 @@ impl Default for OverlayState {
             timer_theme: "app".into(),
             timer_overlay_transform: OverlayTransform::default(),
             reason_overlay_transform: OverlayTransform::default(),
+            wheel_overlay_transform: OverlayTransform::default(),
             graph_points: vec![6 * 60 * 60],
             wheel_segments: vec![],
             wheel_spin: WheelOverlaySpinState::default(),
@@ -230,6 +232,7 @@ struct OverlaySyncPayload {
     timer_theme: String,
     timer_overlay_transform: OverlayTransform,
     reason_overlay_transform: OverlayTransform,
+    wheel_overlay_transform: OverlayTransform,
     graph_points: Vec<u64>,
     wheel_segments: Vec<WheelOverlaySegment>,
     wheel_spin: WheelOverlaySpinState,
@@ -763,6 +766,7 @@ fn sync_overlay_state(
         timer_theme: payload.timer_theme,
         timer_overlay_transform: payload.timer_overlay_transform,
         reason_overlay_transform: payload.reason_overlay_transform,
+        wheel_overlay_transform: payload.wheel_overlay_transform,
         graph_points: payload.graph_points,
         wheel_segments: payload.wheel_segments,
         wheel_spin: payload.wheel_spin,
@@ -1623,6 +1627,9 @@ fn wheel_overlay_html() -> &'static str {
         --text: #f4f4f5;
         --muted: #cbd5e1;
         --accent: #22d3ee;
+        --offset-x: 0px;
+        --offset-y: 0px;
+        --overlay-scale: 1;
       }
       * { box-sizing: border-box; }
       body {
@@ -1632,6 +1639,11 @@ fn wheel_overlay_html() -> &'static str {
         place-items: center;
         background: transparent;
         color: var(--text);
+      }
+      .canvas {
+        transform: translate(var(--offset-x), var(--offset-y)) scale(var(--overlay-scale));
+        transform-origin: center center;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
       }
       .stage {
         width: min(560px, calc(100vw - 48px));
@@ -1709,21 +1721,23 @@ fn wheel_overlay_html() -> &'static str {
     </style>
   </head>
   <body>
-    <section class="stage" id="stage" aria-live="polite">
-      <div class="copy">
-        <div class="eyebrow" id="eyebrow">Gift bomb wheel</div>
-        <div class="title" id="title">Spinning now</div>
-        <div class="summary" id="summary">A gifted sub event triggered the wheel.</div>
-      </div>
-      <div class="wheel-wrap">
-        <svg viewBox="0 0 100 100" role="img" aria-label="Wheel overlay">
-          <polygon class="pointer" points="50,2 55,12 45,12"></polygon>
-          <g id="rotor" class="rotor"></g>
-          <circle class="hub" cx="50" cy="50" r="8"></circle>
-        </svg>
-      </div>
-      <div class="result" id="result"></div>
-    </section>
+    <div class="canvas">
+      <section class="stage" id="stage" aria-live="polite">
+        <div class="copy">
+          <div class="eyebrow" id="eyebrow">Gift bomb wheel</div>
+          <div class="title" id="title">Spinning now</div>
+          <div class="summary" id="summary">A gifted sub event triggered the wheel.</div>
+        </div>
+        <div class="wheel-wrap">
+          <svg viewBox="0 0 100 100" role="img" aria-label="Wheel overlay">
+            <polygon class="pointer" points="50,2 55,12 45,12"></polygon>
+            <g id="rotor" class="rotor"></g>
+            <circle class="hub" cx="50" cy="50" r="8"></circle>
+          </svg>
+        </div>
+        <div class="result" id="result"></div>
+      </section>
+    </div>
     <script>
       const stage = document.getElementById('stage');
       const rotor = document.getElementById('rotor');
@@ -1734,7 +1748,6 @@ fn wheel_overlay_html() -> &'static str {
       const fallbackPalette = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#db2777', '#65a30d', '#ea580c'];
       let rotation = 0;
       let lastSpinKey = null;
-      let hideResultTimer = null;
 
       function polar(radius, angleDegrees) {
         const radians = ((angleDegrees - 90) * Math.PI) / 180;
@@ -1840,6 +1853,49 @@ fn wheel_overlay_html() -> &'static str {
         stage.classList.toggle('visible', Boolean(active));
       }
 
+      function clamp(value, min, max) {
+        if (min > max) {
+          return Math.round((min + max) / 2);
+        }
+
+        return Math.round(Math.max(min, Math.min(max, value)));
+      }
+
+      function roundScale(value) {
+        return Math.max(0.1, Math.round(value * 100) / 100);
+      }
+
+      function clampCanvasTransform(transform) {
+        const canvas = document.querySelector('.canvas');
+        if (!canvas) {
+          return { x: 0, y: 0, scale: 1 };
+        }
+
+        const width = canvas.offsetWidth || 0;
+        const height = canvas.offsetHeight || 0;
+        const viewportWidth = window.innerWidth || width;
+        const viewportHeight = window.innerHeight || height;
+
+        if (!width || !height || !viewportWidth || !viewportHeight) {
+          return {
+            x: Math.round(transform.x || 0),
+            y: Math.round(transform.y || 0),
+            scale: roundScale(transform.scale || 1),
+          };
+        }
+
+        const requestedScale = Math.max(0.1, transform.scale || 1);
+        const scale = roundScale(Math.min(requestedScale, viewportWidth / width, viewportHeight / height));
+        const maxX = Math.max(0, (viewportWidth - width * scale) / 2);
+        const maxY = Math.max(0, (viewportHeight - height * scale) / 2);
+
+        return {
+          x: clamp(transform.x || 0, -maxX, maxX),
+          y: clamp(transform.y || 0, -maxY, maxY),
+          scale,
+        };
+      }
+
       async function refresh() {
         try {
           const response = await fetch('/api/state', { cache: 'no-store' });
@@ -1847,6 +1903,7 @@ fn wheel_overlay_html() -> &'static str {
           const payload = await response.json();
           const segments = Array.isArray(payload.wheelSegments) ? payload.wheelSegments : [];
           const spin = payload.wheelSpin || { status: 'idle' };
+          const transform = payload.wheelOverlayTransform || { x: 0, y: 0, scale: 1 };
 
           refreshVisibility(spin);
           if (!stage.classList.contains('visible')) {
@@ -1869,6 +1926,11 @@ fn wheel_overlay_html() -> &'static str {
             summary.textContent = spin.resultSummary || 'Waiting for the operator to apply the result.';
             result.textContent = spin.requiresModeration ? 'Reconnect Twitch before applying timeout outcomes.' : '';
           }
+
+          const boundedTransform = clampCanvasTransform(transform);
+          document.documentElement.style.setProperty('--offset-x', `${boundedTransform.x}px`);
+          document.documentElement.style.setProperty('--offset-y', `${boundedTransform.y}px`);
+          document.documentElement.style.setProperty('--overlay-scale', String(boundedTransform.scale));
         } catch (_) {}
       }
 
