@@ -1,5 +1,7 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import appVersionText from '../../VERSION?raw'
+import { useUpdateStore } from '../state/useUpdateStore'
+import { DOWNLOAD_BASE } from '../lib/update/checkForUpdate'
 
 const appVersion = appVersionText.trim()
 
@@ -60,6 +62,8 @@ const credits = [
 ] as const
 
 export function AboutPage() {
+  const { updateInfo, checking, fetchFailed, checkForUpdate } = useUpdateStore()
+
   return (
     <div className="page-container settings-page about-page">
       <section className="page-header rules-header">
@@ -68,6 +72,43 @@ export function AboutPage() {
           <p className="page-desc">Version details, project history, and the source links that matter when you run, share, or build on this app.</p>
         </div>
       </section>
+
+      {updateInfo ? (
+        <section className="panel" style={{ background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.3)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ color: '#fde047', fontWeight: 600, fontSize: '14px', margin: 0 }}>
+                Update available — v{updateInfo.version}
+              </p>
+              <p style={{ color: 'rgba(253,224,71,0.6)', fontSize: '12px', margin: '4px 0 0' }}>
+                {updateInfo.notes}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="about-link-card"
+              style={{ flexShrink: 0, padding: '6px 14px', background: '#facc15', color: '#000', fontWeight: 700, fontSize: '12px', borderRadius: '8px' }}
+              onClick={() => void openExternal(`${DOWNLOAD_BASE}/${updateInfo.files.setup}`)}
+            >
+              Download
+            </button>
+          </div>
+        </section>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted, #6b7280)' }}>
+            {checking ? 'Checking for updates…' : fetchFailed ? 'Could not reach update server.' : 'You\'re on the latest version.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => void checkForUpdate()}
+            disabled={checking}
+            style={{ fontSize: '12px', color: 'var(--color-text-muted, #6b7280)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: checking ? 0.5 : 1 }}
+          >
+            Check for updates
+          </button>
+        </div>
+      )}
 
       <section className="panel about-hero">
         <div className="about-hero__header">
