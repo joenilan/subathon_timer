@@ -1660,12 +1660,30 @@ fn wheel_overlay_html() -> &'static str {
           radial-gradient(circle at top, rgba(34, 211, 238, 0.1), transparent 54%);
         box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
         backdrop-filter: blur(12px);
+        transform-origin: center center;
+        will-change: transform, opacity, filter;
       }
       .stage.visible { display: grid; }
+      .stage.entering {
+        animation: wheelOverlayEnter 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      .stage.phase-visible {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      .stage.exiting {
+        animation: wheelOverlayExit 360ms cubic-bezier(0.4, 0, 1, 1) both;
+      }
       .copy {
         display: grid;
         gap: 6px;
         text-align: center;
+      }
+      .stage.spinning .title {
+        animation: wheelOverlayPulse 1250ms ease-in-out infinite;
+      }
+      .stage.result .copy {
+        animation: wheelOverlayResultReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       .eyebrow {
         font-size: 11px;
@@ -1716,9 +1734,69 @@ fn wheel_overlay_html() -> &'static str {
         pointer-events: none;
       }
       .result {
+        justify-self: center;
+        min-width: 0;
+        max-width: 34ch;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
         font-size: 12px;
         font-weight: 600;
-        color: #e2e8f0;
+        line-height: 1.4;
+        text-align: center;
+        color: rgba(226, 232, 240, 0.86);
+        opacity: 0;
+        transform: translateY(12px) scale(0.96);
+        transition:
+          opacity 220ms ease,
+          transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .result.visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      @keyframes wheelOverlayEnter {
+        from {
+          opacity: 0;
+          transform: translate3d(0, 36px, 0) scale(0.94);
+          filter: blur(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          filter: blur(0);
+        }
+      }
+      @keyframes wheelOverlayExit {
+        from {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+          filter: blur(0);
+        }
+        to {
+          opacity: 0;
+          transform: translate3d(0, -18px, 0) scale(0.97);
+          filter: blur(8px);
+        }
+      }
+      @keyframes wheelOverlayPulse {
+        0%, 100% {
+          text-shadow: 0 0 0 rgba(34, 211, 238, 0);
+        }
+        50% {
+          text-shadow: 0 0 24px rgba(34, 211, 238, 0.18);
+        }
+      }
+      @keyframes wheelOverlayResultReveal {
+        from {
+          opacity: 0;
+          transform: translate3d(0, 14px, 0);
+        }
+        to {
+          opacity: 1;
+          transform: translate3d(0, 0, 0);
+        }
       }
     </style>
   </head>
@@ -1749,8 +1827,13 @@ fn wheel_overlay_html() -> &'static str {
       const summary = document.getElementById('summary');
       const result = document.getElementById('result');
       const fallbackPalette = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#db2777', '#65a30d', '#ea580c'];
+      const OVERLAY_INTRO_MS = 320;
+      const OVERLAY_OUTRO_MS = 360;
       let rotation = 0;
       let lastSpinKey = null;
+      let overlayPhase = isStudioPreview ? 'visible' : 'hidden';
+      let displayedSpin = { status: 'idle' };
+      let phaseTimer = null;
 
       function polar(radius, angleDegrees) {
         const radians = ((angleDegrees - 90) * Math.PI) / 180;
@@ -1851,9 +1934,19 @@ fn wheel_overlay_html() -> &'static str {
         rotor.style.transform = `rotate(${rotation}deg)`;
       }
 
-      function refreshVisibility(spin) {
-        const active = isStudioPreview || (spin && spin.status !== 'idle' && spin.activeSegmentId);
-        stage.classList.toggle('visible', Boolean(active));
+      function clearPhaseTimer() {
+        if (phaseTimer !== null) {
+          window.clearTimeout(phaseTimer);
+          phaseTimer = null;
+        }
+      }
+
+      function applyPhase(nextPhase) {
+        overlayPhase = nextPhase;
+        stage.classList.toggle('visible', nextPhase !== 'hidden');
+        stage.classList.toggle('entering', nextPhase === 'entering');
+        stage.classList.toggle('phase-visible', nextPhase === 'visible');
+        stage.classList.toggle('exiting', nextPhase === 'exiting');
       }
 
       function clamp(value, min, max) {
@@ -1918,28 +2011,61 @@ fn wheel_overlay_html() -> &'static str {
             : liveSpin;
           const transform = payload.wheelOverlayTransform || { x: 0, y: 0, scale: 1 };
 
-          refreshVisibility(spin);
-          if (!stage.classList.contains('visible')) {
+          const hasActiveSpin = isStudioPreview || (spin && spin.status !== 'idle' && spin.activeSegmentId);
+
+          if (hasActiveSpin) {
+            clearPhaseTimer();
+            displayedSpin = spin;
+
+            if (overlayPhase === 'hidden' || overlayPhase === 'exiting') {
+              applyPhase('entering');
+              phaseTimer = window.setTimeout(() => {
+                phaseTimer = null;
+                applyPhase('visible');
+              }, OVERLAY_INTRO_MS);
+            } else if (overlayPhase === 'entering') {
+              // keep the intro animation running
+            } else if (overlayPhase !== 'visible') {
+              applyPhase('visible');
+            }
+          } else if (overlayPhase !== 'hidden' && overlayPhase !== 'exiting') {
+            clearPhaseTimer();
+            applyPhase('exiting');
+            phaseTimer = window.setTimeout(() => {
+              phaseTimer = null;
+              displayedSpin = { status: 'idle' };
+              applyPhase('hidden');
+            }, OVERLAY_OUTRO_MS);
+          }
+
+          if (overlayPhase === 'hidden' || displayedSpin.status === 'idle' || !displayedSpin.activeSegmentId) {
             lastSpinKey = null;
             result.textContent = '';
+            result.classList.remove('visible');
             return;
           }
 
           buildWheel(segments);
-          updateRotation(segments, spin);
+          updateRotation(segments, displayedSpin);
+          stage.classList.toggle('spinning', displayedSpin.status === 'spinning');
+          stage.classList.toggle('result', displayedSpin.status === 'ready');
 
-          if (spin.status === 'spinning') {
+          if (displayedSpin.status === 'spinning') {
             eyebrow.textContent = 'Gift bomb wheel';
             title.textContent = 'Spinning now';
             summary.textContent = 'A gifted sub event triggered the wheel.';
             result.textContent = '';
+            result.classList.remove('visible');
           } else {
             eyebrow.textContent = isStudioPreview ? 'Wheel preview' : 'Wheel result';
-            title.textContent = spin.resultTitle || 'Result ready';
-            summary.textContent = spin.autoApply
+            title.textContent = displayedSpin.resultTitle || 'Result ready';
+            summary.textContent = displayedSpin.autoApply
               ? 'Gifted sub wheel results apply automatically after the reveal finishes.'
-              : (spin.resultSummary || 'Waiting for the operator to apply the result.');
-            result.textContent = spin.requiresModeration ? 'Reconnect Twitch before applying timeout outcomes.' : '';
+              : (displayedSpin.resultSummary || 'Waiting for the operator to apply the result.');
+            result.textContent = displayedSpin.requiresModeration
+              ? 'Reconnect Twitch before timeout outcomes can be applied.'
+              : (displayedSpin.autoApply ? 'Applying automatically after the reveal finishes.' : 'Waiting for the operator to apply the result.');
+            result.classList.add('visible');
           }
 
           const boundedTransform = clampCanvasTransform(transform);
