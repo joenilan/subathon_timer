@@ -10,6 +10,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { AboutPage } from './pages/AboutPage'
 import { TimerOverlayPage } from './overlays/TimerOverlayPage'
 import { ReasonOverlayPage } from './overlays/ReasonOverlayPage'
+import { WheelOverlayPage } from './overlays/WheelOverlayPage'
 
 // Layout wrapper
 const RootLayout = () => {
@@ -36,6 +37,7 @@ const router = createBrowserRouter([
   },
   { path: '/overlay/timer', element: <TimerOverlayPage /> },
   { path: '/overlay/reason', element: <ReasonOverlayPage /> },
+  { path: '/overlay/wheel', element: <WheelOverlayPage /> },
 ])
 
 export function App() {

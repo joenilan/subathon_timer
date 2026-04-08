@@ -5,7 +5,6 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../state/useAppStore'
 import { useUpdateStore } from '../state/useUpdateStore'
 import { DOWNLOAD_BASE } from '../lib/update/checkForUpdate'
-import { WheelSpinOverlay } from './WheelSpinOverlay'
 import { applyWindowSizing } from '../lib/platform/windowSizing'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
 import { useEventSubStore } from '../state/useEventSubStore'
@@ -357,7 +356,6 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                 )}
                 <div className="workspace-content">
                     {children}
-                    <WheelSpinOverlay />
                 </div>
             </main>
         </div>

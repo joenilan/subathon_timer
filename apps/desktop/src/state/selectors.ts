@@ -28,6 +28,9 @@ export const selectOverlayRuntimeState = (state: AppState) => ({
   reasonOverlayTransform: state.reasonOverlayTransform,
   ruleConfig: state.ruleConfig,
   setOverlayBootstrapState: state.setOverlayBootstrapState,
+  wheelSegments: state.wheelSegments,
+  wheelSpin: state.wheelSpin,
+  wheelTextScale: state.wheelTextScale,
   timerOverlayTransform: state.timerOverlayTransform,
   timerRemainingSeconds: state.timerRemainingSeconds,
   timerStatus: state.timerStatus,
@@ -98,6 +101,12 @@ export const selectReasonOverlayState = (state: AppState) => ({
   timerWidgetTheme: state.timerWidgetTheme,
 })
 
+export const selectWheelOverlayState = (state: AppState) => ({
+  wheelSegments: state.wheelSegments,
+  wheelSpin: state.wheelSpin,
+  wheelTextScale: state.wheelTextScale,
+})
+
 export const selectSettingsPageState = (state: AppState) => ({
   applyImportedLegacyConfig: state.applyImportedLegacyConfig,
   commandPermissions: state.commandPermissions,
@@ -116,13 +125,6 @@ export const selectWheelPageState = (state: AppState) => ({
   spinWheel: state.spinWheel,
   triggerGiftBombTest: state.triggerGiftBombTest,
   updateWheelSegment: state.updateWheelSegment,
-  wheelSegments: state.wheelSegments,
-  wheelSpin: state.wheelSpin,
-  wheelTextScale: state.wheelTextScale,
-})
-
-export const selectWheelOverlayState = (state: AppState) => ({
-  applyWheelResult: state.applyWheelResult,
   wheelSegments: state.wheelSegments,
   wheelSpin: state.wheelSpin,
   wheelTextScale: state.wheelTextScale,

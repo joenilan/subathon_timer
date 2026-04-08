@@ -100,6 +100,44 @@ impl Default for OverlayTransform {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct WheelOverlaySegment {
+    id: String,
+    label: String,
+    chance: String,
+    outcome: String,
+    outcome_type: String,
+    color: Option<String>,
+    min_subs: Option<u32>,
+    time_delta_seconds: Option<i64>,
+    timeout_seconds: Option<u32>,
+    timeout_target: Option<String>,
+    moderation_required: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WheelOverlaySpinState {
+    status: String,
+    active_segment_id: Option<String>,
+    result_title: Option<String>,
+    result_summary: Option<String>,
+    requires_moderation: bool,
+}
+
+impl Default for WheelOverlaySpinState {
+    fn default() -> Self {
+        Self {
+            status: "idle".into(),
+            active_segment_id: None,
+            result_title: None,
+            result_summary: None,
+            requires_moderation: false,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct OverlayState {
     timer_seconds: u64,
     uptime_seconds: u64,
@@ -108,6 +146,9 @@ struct OverlayState {
     timer_overlay_transform: OverlayTransform,
     reason_overlay_transform: OverlayTransform,
     graph_points: Vec<u64>,
+    wheel_segments: Vec<WheelOverlaySegment>,
+    wheel_spin: WheelOverlaySpinState,
+    wheel_text_scale: f32,
     incentive_rules: Vec<OverlayRule>,
     overlay_preview: OverlayPreviewState,
 }
@@ -122,6 +163,9 @@ impl Default for OverlayState {
             timer_overlay_transform: OverlayTransform::default(),
             reason_overlay_transform: OverlayTransform::default(),
             graph_points: vec![6 * 60 * 60],
+            wheel_segments: vec![],
+            wheel_spin: WheelOverlaySpinState::default(),
+            wheel_text_scale: 0.55,
             incentive_rules: vec![
                 OverlayRule {
                     label: "T1 Sub".into(),
@@ -187,6 +231,9 @@ struct OverlaySyncPayload {
     timer_overlay_transform: OverlayTransform,
     reason_overlay_transform: OverlayTransform,
     graph_points: Vec<u64>,
+    wheel_segments: Vec<WheelOverlaySegment>,
+    wheel_spin: WheelOverlaySpinState,
+    wheel_text_scale: f32,
     incentive_rules: Vec<OverlayRule>,
     overlay_preview: OverlayPreviewState,
 }
@@ -717,6 +764,9 @@ fn sync_overlay_state(
         timer_overlay_transform: payload.timer_overlay_transform,
         reason_overlay_transform: payload.reason_overlay_transform,
         graph_points: payload.graph_points,
+        wheel_segments: payload.wheel_segments,
+        wheel_spin: payload.wheel_spin,
+        wheel_text_scale: payload.wheel_text_scale,
         incentive_rules: payload.incentive_rules,
         overlay_preview: payload.overlay_preview,
     };
@@ -1559,6 +1609,276 @@ fn reason_overlay_html() -> &'static str {
 </html>"#
 }
 
+fn wheel_overlay_html() -> &'static str {
+    r##"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Subathon Wheel Overlay</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        --text: #f4f4f5;
+        --muted: #cbd5e1;
+        --accent: #22d3ee;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        color: var(--text);
+      }
+      .stage {
+        width: min(560px, calc(100vw - 48px));
+        display: none;
+        gap: 16px;
+        justify-items: center;
+        padding: 20px 22px 18px;
+        border-radius: 20px;
+        border: 1px solid rgba(34, 211, 238, 0.18);
+        background:
+          linear-gradient(180deg, rgba(7, 11, 18, 0.94) 0%, rgba(5, 8, 14, 0.98) 100%),
+          radial-gradient(circle at top, rgba(34, 211, 238, 0.1), transparent 54%);
+        box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
+        backdrop-filter: blur(12px);
+      }
+      .stage.visible { display: grid; }
+      .copy {
+        display: grid;
+        gap: 6px;
+        text-align: center;
+      }
+      .eyebrow {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .title {
+        font-size: clamp(22px, 4vw, 34px);
+        font-weight: 700;
+        line-height: 1.05;
+      }
+      .summary {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      .wheel-wrap {
+        width: min(100%, 420px);
+      }
+      svg {
+        width: 100%;
+        height: auto;
+        display: block;
+        overflow: visible;
+      }
+      .rotor {
+        transform-origin: 50% 50%;
+      }
+      .rotor.spinning {
+        transition: transform 1800ms cubic-bezier(0.12, 0.8, 0.12, 1);
+      }
+      .pointer {
+        fill: #facc15;
+        filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.38));
+      }
+      .hub {
+        fill: rgba(6, 11, 18, 0.96);
+        stroke: rgba(255, 255, 255, 0.08);
+        stroke-width: 1.2;
+      }
+      .label {
+        font-size: 4px;
+        font-weight: 700;
+        text-anchor: middle;
+        dominant-baseline: middle;
+        pointer-events: none;
+      }
+      .result {
+        font-size: 12px;
+        font-weight: 600;
+        color: #e2e8f0;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="stage" id="stage" aria-live="polite">
+      <div class="copy">
+        <div class="eyebrow" id="eyebrow">Gift bomb wheel</div>
+        <div class="title" id="title">Spinning now</div>
+        <div class="summary" id="summary">A gifted sub event triggered the wheel.</div>
+      </div>
+      <div class="wheel-wrap">
+        <svg viewBox="0 0 100 100" role="img" aria-label="Wheel overlay">
+          <polygon class="pointer" points="50,2 55,12 45,12"></polygon>
+          <g id="rotor" class="rotor"></g>
+          <circle class="hub" cx="50" cy="50" r="8"></circle>
+        </svg>
+      </div>
+      <div class="result" id="result"></div>
+    </section>
+    <script>
+      const stage = document.getElementById('stage');
+      const rotor = document.getElementById('rotor');
+      const eyebrow = document.getElementById('eyebrow');
+      const title = document.getElementById('title');
+      const summary = document.getElementById('summary');
+      const result = document.getElementById('result');
+      const fallbackPalette = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#db2777', '#65a30d', '#ea580c'];
+      let rotation = 0;
+      let lastSpinKey = null;
+      let hideResultTimer = null;
+
+      function polar(radius, angleDegrees) {
+        const radians = ((angleDegrees - 90) * Math.PI) / 180;
+        return {
+          x: 50 + radius * Math.cos(radians),
+          y: 50 + radius * Math.sin(radians),
+        };
+      }
+
+      function slicePath(startAngle, endAngle) {
+        const start = polar(46, startAngle);
+        const end = polar(46, endAngle);
+        const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+        return `M 50 50 L ${start.x} ${start.y} A 46 46 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`;
+      }
+
+      function normalizeDegrees(value) {
+        const normalized = value % 360;
+        return normalized < 0 ? normalized + 360 : normalized;
+      }
+
+      function wheelLabel(segment) {
+        if (segment.outcomeType === 'time' && typeof segment.timeDeltaSeconds === 'number') {
+          const amount = Math.round(segment.timeDeltaSeconds);
+          const sign = amount < 0 ? '-' : '+';
+          const abs = Math.abs(amount);
+          if (abs >= 3600 && abs % 3600 === 0) return `${sign}${abs / 3600}h`;
+          if (abs >= 60 && abs % 60 === 0) return `${sign}${abs / 60}m`;
+          return `${sign}${abs}s`;
+        }
+        if (segment.outcomeType === 'timeout') {
+          return segment.timeoutTarget === 'random' ? 'Rand TO' : 'Self TO';
+        }
+        return String(segment.label || 'Result').slice(0, 14);
+      }
+
+      function contrastColor(hex) {
+        const clean = String(hex || '#7c3aed').replace('#', '');
+        const r = parseInt(clean.slice(0, 2), 16) / 255;
+        const g = parseInt(clean.slice(2, 4), 16) / 255;
+        const b = parseInt(clean.slice(4, 6), 16) / 255;
+        const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        return luminance > 0.55 ? '#111114' : '#f4f4f5';
+      }
+
+      function buildWheel(segments) {
+        const sliceAngle = segments.length > 0 ? 360 / segments.length : 360;
+        rotor.innerHTML = '';
+        segments.forEach((segment, index) => {
+          const startAngle = index * sliceAngle;
+          const endAngle = startAngle + sliceAngle;
+          const centerAngle = startAngle + sliceAngle / 2;
+          const fill = segment.color || fallbackPalette[index % fallbackPalette.length];
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', slicePath(startAngle, endAngle));
+          path.setAttribute('fill', fill);
+          path.setAttribute('stroke', 'rgba(0,0,0,0.28)');
+          path.setAttribute('stroke-width', '0.35');
+          rotor.appendChild(path);
+
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('class', 'label');
+          text.setAttribute('fill', contrastColor(fill));
+          const labelPoint = polar(30, centerAngle);
+          text.setAttribute('x', String(labelPoint.x));
+          text.setAttribute('y', String(labelPoint.y));
+          text.textContent = wheelLabel(segment);
+          rotor.appendChild(text);
+        });
+      }
+
+      function updateRotation(segments, spin) {
+        if (!spin || spin.status !== 'spinning' || !spin.activeSegmentId || segments.length === 0) {
+          rotor.classList.remove('spinning');
+          return;
+        }
+
+        const spinKey = `${spin.status}:${spin.activeSegmentId}`;
+        if (lastSpinKey === spinKey) {
+          return;
+        }
+
+        const index = segments.findIndex((segment) => segment.id === spin.activeSegmentId);
+        if (index < 0) {
+          return;
+        }
+
+        lastSpinKey = spinKey;
+        const sliceAngle = 360 / segments.length;
+        const centerAngle = index * sliceAngle + sliceAngle / 2;
+        const currentRotation = normalizeDegrees(rotation);
+        const targetRotation = normalizeDegrees(360 - centerAngle);
+        let delta = targetRotation - currentRotation;
+        while (delta <= 0) delta += 360;
+        rotation += 6 * 360 + delta;
+        rotor.classList.add('spinning');
+        rotor.style.transform = `rotate(${rotation}deg)`;
+      }
+
+      function refreshVisibility(spin) {
+        const active = spin && spin.status !== 'idle' && spin.activeSegmentId;
+        stage.classList.toggle('visible', Boolean(active));
+      }
+
+      async function refresh() {
+        try {
+          const response = await fetch('/api/state', { cache: 'no-store' });
+          if (!response.ok) return;
+          const payload = await response.json();
+          const segments = Array.isArray(payload.wheelSegments) ? payload.wheelSegments : [];
+          const spin = payload.wheelSpin || { status: 'idle' };
+
+          refreshVisibility(spin);
+          if (!stage.classList.contains('visible')) {
+            lastSpinKey = null;
+            result.textContent = '';
+            return;
+          }
+
+          buildWheel(segments);
+          updateRotation(segments, spin);
+
+          if (spin.status === 'spinning') {
+            eyebrow.textContent = 'Gift bomb wheel';
+            title.textContent = 'Spinning now';
+            summary.textContent = 'A gifted sub event triggered the wheel.';
+            result.textContent = '';
+          } else {
+            eyebrow.textContent = 'Wheel result';
+            title.textContent = spin.resultTitle || 'Result ready';
+            summary.textContent = spin.resultSummary || 'Waiting for the operator to apply the result.';
+            result.textContent = spin.requiresModeration ? 'Reconnect Twitch before applying timeout outcomes.' : '';
+          }
+        } catch (_) {}
+      }
+
+      refresh();
+      window.setInterval(refresh, 80);
+    </script>
+  </body>
+</html>"##
+}
+
 fn handle_streamlabs_auth_callback(
     query: &str,
     streamlabs_auth: Arc<Mutex<StreamlabsAuthRuntime>>,
@@ -1691,6 +2011,11 @@ fn try_handle_connection(
             "HTTP/1.1 200 OK",
             "text/html; charset=utf-8",
             reason_overlay_html(),
+        ),
+        "/overlay/wheel" => format_http_response(
+            "HTTP/1.1 200 OK",
+            "text/html; charset=utf-8",
+            wheel_overlay_html(),
         ),
         "/auth/streamlabs/callback" => handle_streamlabs_auth_callback(query, streamlabs_auth),
         _ => format_http_response(

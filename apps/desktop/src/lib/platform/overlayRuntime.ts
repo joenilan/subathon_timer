@@ -4,6 +4,7 @@ import { buildTimerRuleDisplay } from '../timer/ruleDefinitions'
 import type { TimerRuleConfig, TimerWidgetTheme } from '../timer/types'
 import type { TimerActivityEntry, TimerStatus } from '../../state/useAppStore'
 import type { OverlayTransform } from './overlayTransform'
+import type { WheelSegment, WheelSpinState } from '../wheel/types'
 
 interface BootstrapState {
   overlayBaseUrl: string | null
@@ -20,6 +21,9 @@ interface SyncOverlayPayload {
   graphPoints: number[]
   timerOverlayTransform: OverlayTransform
   reasonOverlayTransform: OverlayTransform
+  wheelSegments: WheelSegment[]
+  wheelSpin: WheelSpinState
+  wheelTextScale: number
   incentiveRules: Array<{
     label: string
     value: string
