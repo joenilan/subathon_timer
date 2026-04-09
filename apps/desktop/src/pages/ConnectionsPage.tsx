@@ -529,7 +529,13 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="provider-section">
+              <form
+                className="provider-section"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void handleConnectStreamElements()
+                }}
+              >
                 <div className="panel-subtitle">Paste token</div>
                 <div className="provider-field-grid">
                   <label className="rule-field rule-field--compact">
@@ -547,16 +553,16 @@ export function ConnectionsPage() {
                 </div>
 
                 <div className="action-row">
-                  <button className="btn btn--primary" onClick={() => void handleConnectStreamElements()}>
+                  <button type="submit" className="btn btn--primary">
                     {streamElementsConnectLabel}
                   </button>
                   {streamElementsConnection ? (
-                    <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamelements')}>
+                    <button type="button" className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamelements')}>
                       Disconnect
                     </button>
                   ) : null}
                 </div>
-              </div>
+              </form>
 
               {streamElementsNotifications.length > 0 ? (
                 <div className="provider-section">
@@ -648,7 +654,13 @@ export function ConnectionsPage() {
                 </div>
               </div>
 
-              <div className="provider-section">
+              <form
+                className="provider-section"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void handleConnectStreamlabs()
+                }}
+              >
                 <div className="panel-subtitle">Paste token</div>
                 <div className="provider-field-grid">
                   <label className="rule-field rule-field--compact">
@@ -666,16 +678,16 @@ export function ConnectionsPage() {
                 </div>
 
                 <div className="action-row">
-                  <button className="btn btn--primary" onClick={() => void handleConnectStreamlabs()}>
+                  <button type="submit" className="btn btn--primary">
                     {streamlabsConnectLabel}
                   </button>
                   {streamlabsConnection ? (
-                    <button className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamlabs')}>
+                    <button type="button" className="btn btn--ghost" onClick={() => void disconnectTipProvider('streamlabs')}>
                       Disconnect
                     </button>
                   ) : null}
                 </div>
-              </div>
+              </form>
 
               {streamlabsNotifications.length > 0 ? (
                 <div className="provider-section">

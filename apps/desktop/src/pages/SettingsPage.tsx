@@ -183,7 +183,7 @@ export function SettingsPage() {
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Chat command permissions</h2>
-            <p className="panel-copy">Choose whether each `!timer` command is available to the streamer, moderators, or both.</p>
+            <p className="panel-copy">Choose whether each timer chat command is available to the streamer, moderators, or both.</p>
           </div>
         </div>
 
@@ -194,7 +194,7 @@ export function SettingsPage() {
           </div>
           <div className="settings-mini-note">
             <strong>Lock down</strong>
-            <span>`!timer set` and `!timer reset` start as streamer only</span>
+            <span>!timer set and !timer reset start as streamer only</span>
           </div>
           <div className="settings-mini-note">
             <strong>Applies live</strong>
