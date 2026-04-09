@@ -1934,9 +1934,18 @@ fn wheel_overlay_html() -> &'static str {
         const targetRotation = normalizeDegrees(360 - centerAngle);
         let delta = targetRotation - currentRotation;
         while (delta <= 0) delta += 360;
-        rotation += 6 * 360 + delta;
-        rotor.classList.add('spinning');
-        rotor.style.transform = `rotate(${rotation}deg)`;
+        const previousRotation = rotation;
+        const nextRotation = previousRotation + 6 * 360 + delta;
+        rotation = nextRotation;
+
+        rotor.classList.remove('spinning');
+        rotor.style.transform = `rotate(${previousRotation}deg)`;
+        rotor.getBoundingClientRect();
+
+        window.requestAnimationFrame(() => {
+          rotor.classList.add('spinning');
+          rotor.style.transform = `rotate(${nextRotation}deg)`;
+        });
       }
 
       function clearPhaseTimer() {
