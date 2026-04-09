@@ -139,8 +139,10 @@ export interface AppState {
 
 const INITIAL_TIMER_SECONDS = 6 * 60 * 60
 const MAX_PROCESSED_IDS = 100
+const WHEEL_RESULT_CHAT_DELAY_MS = 250
 let wheelSpinTimer: number | null = null
 let wheelAutoApplyTimer: number | null = null
+let wheelAnnouncementTimer: number | null = null
 
 function clearWheelSpinTimer() {
   if (wheelSpinTimer !== null) {
@@ -156,6 +158,13 @@ function clearWheelAutoApplyTimer() {
   }
 }
 
+function clearWheelAnnouncementTimer() {
+  if (wheelAnnouncementTimer !== null) {
+    window.clearTimeout(wheelAnnouncementTimer)
+    wheelAnnouncementTimer = null
+  }
+}
+
 function queueWheelSpinSelection(
   set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState> | AppState), replace?: false) => void,
   selectedSegmentId: string,
@@ -165,6 +174,7 @@ function queueWheelSpinSelection(
 ) {
   clearWheelSpinTimer()
   clearWheelAutoApplyTimer()
+  clearWheelAnnouncementTimer()
   set({
     wheelSpin: {
       status: 'spinning',
@@ -195,11 +205,14 @@ function queueWheelSpinSelection(
       },
     })
     wheelSpinTimer = null
-    void announceWheelResultInChat({
-      segment: currentSegment,
-      autoApply,
-      isTest,
-    })
+    wheelAnnouncementTimer = window.setTimeout(() => {
+      wheelAnnouncementTimer = null
+      void announceWheelResultInChat({
+        segment: currentSegment,
+        autoApply,
+        isTest,
+      })
+    }, WHEEL_RESULT_CHAT_DELAY_MS)
 
     if (autoApply) {
       wheelAutoApplyTimer = window.setTimeout(() => {
