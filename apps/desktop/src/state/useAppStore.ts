@@ -159,6 +159,7 @@ function queueWheelSpinSelection(
   selectedSegmentId: string,
   requiresModeration: boolean,
   autoApply: boolean,
+  isTest = false,
 ) {
   clearWheelSpinTimer()
   clearWheelAutoApplyTimer()
@@ -170,6 +171,7 @@ function queueWheelSpinSelection(
       resultSummary: 'Wheel animation in progress.',
       requiresModeration,
       autoApply,
+      isTest,
     },
   })
 
@@ -187,6 +189,7 @@ function queueWheelSpinSelection(
         resultSummary: buildWheelSpinSummary(currentSegment),
         requiresModeration: currentSegment.moderationRequired,
         autoApply,
+        isTest,
       },
     })
     wheelSpinTimer = null
@@ -471,35 +474,30 @@ export const useAppStore = create<AppState>()(
         queueWheelSpinSelection(set, selectedSegment.id, selectedSegment.moderationRequired, false)
       },
       triggerGiftBombTest: (count) => {
-        const normalizedCount = Math.max(1, Math.floor(count || 0))
-        const now = new Date().toISOString()
-        const eventId = `gift-bomb-test-${Date.now()}-${normalizedCount}`
+        const state = useAppStore.getState()
+        if (state.wheelSpin.status === 'spinning') {
+          return
+        }
 
-        useAppStore.getState().processTwitchEvent({
-          id: eventId,
-          source: 'twitch-eventsub',
-          eventType: 'gift_bomb',
-          occurredAt: now,
-          userId: 'gift-bomb-test',
-          userLogin: 'giftbombtest',
-          displayName: 'Gift Bomb Test',
-          anonymous: false,
-          amount: null,
-          currency: null,
-          tier: '1000',
-          count: normalizedCount,
-          command: null,
-          rawPayload: {
-            test: true,
-            provider: 'subathon-timer',
-            simulatedEvent: 'gift_bomb',
-            count: normalizedCount,
-          },
-        })
+        const normalizedCount = Math.max(1, Math.floor(count || 0))
+        const eligibleGiftWheelSegments = getEligibleWheelSegmentsForGiftCount(state.wheelSegments, normalizedCount)
+        const selectedGiftWheelSegment =
+          eligibleGiftWheelSegments.length > 0 ? pickWheelSegment(eligibleGiftWheelSegments) : null
+
+        if (!selectedGiftWheelSegment) {
+          return
+        }
+
+        queueWheelSpinSelection(set, selectedGiftWheelSegment.id, selectedGiftWheelSegment.moderationRequired, false, true)
       },
       applyWheelResult: async () => {
         const { wheelSpin, wheelSegments } = useAppStore.getState()
         if (wheelSpin.status !== 'ready' || !wheelSpin.activeSegmentId) {
+          return
+        }
+
+        if (wheelSpin.isTest) {
+          set({ wheelSpin: defaultWheelSpin })
           return
         }
 

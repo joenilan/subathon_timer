@@ -30,6 +30,7 @@ export function WheelOverlayPage() {
             resultSummary: 'Studio preview stays visible so you can place and scale the wheel overlay before the next gifted sub spin.',
             requiresModeration: wheelSegments[0].moderationRequired,
             autoApply: false,
+            isTest: false,
           }
         : wheelSpin,
     [isStudioPreview, wheelSegments, wheelSpin],

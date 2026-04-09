@@ -63,6 +63,7 @@ describe('useAppStore runtime behavior', () => {
         resultSummary: 'Adds five minutes.',
         requiresModeration: false,
         autoApply: false,
+        isTest: false,
       },
     })
 
@@ -155,6 +156,7 @@ describe('useAppStore runtime behavior', () => {
         resultSummary: null,
         requiresModeration: false,
         autoApply: false,
+        isTest: false,
       },
     })
 
@@ -163,12 +165,14 @@ describe('useAppStore runtime behavior', () => {
     const state = useAppStore.getState()
     expect(state.wheelSpin.status).toBe('spinning')
     expect(state.wheelSpin.activeSegmentId).toBe('wheel-test-spin')
-    expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
+    expect(state.wheelSpin.isTest).toBe(true)
+    expect(state.timerEvents).toHaveLength(0)
 
     await vi.advanceTimersByTimeAsync(3000)
 
     const finalState = useAppStore.getState()
-    expect(finalState.timerRemainingSeconds).toBe(3900)
-    expect(finalState.wheelSpin.status).toBe('idle')
+    expect(finalState.timerRemainingSeconds).toBe(3600)
+    expect(finalState.wheelSpin.status).toBe('ready')
+    expect(finalState.wheelSpin.isTest).toBe(true)
   })
 })

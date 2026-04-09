@@ -22,4 +22,5 @@ export interface WheelSpinState {
   resultSummary: string | null
   requiresModeration: boolean
   autoApply: boolean
+  isTest: boolean
 }

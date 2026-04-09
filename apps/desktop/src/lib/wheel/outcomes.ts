@@ -11,6 +11,7 @@ export const defaultWheelSpin: WheelSpinState = {
   resultSummary: null,
   requiresModeration: false,
   autoApply: false,
+  isTest: false,
 }
 
 export function createDefaultWheelSegments(): WheelSegment[] {

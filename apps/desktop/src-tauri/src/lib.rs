@@ -123,6 +123,7 @@ struct WheelOverlaySpinState {
     result_summary: Option<String>,
     requires_moderation: bool,
     auto_apply: bool,
+    is_test: bool,
 }
 
 impl Default for WheelOverlaySpinState {
@@ -134,6 +135,7 @@ impl Default for WheelOverlaySpinState {
             result_summary: None,
             requires_moderation: false,
             auto_apply: false,
+            is_test: false,
         }
     }
 }

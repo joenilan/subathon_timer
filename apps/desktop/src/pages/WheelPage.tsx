@@ -89,9 +89,11 @@ export function WheelPage() {
 
   const spinStatusLabel =
     wheelSpin.status === 'ready'
-      ? wheelSpin.autoApply
-        ? 'Applying…'
-        : 'Result ready'
+      ? wheelSpin.isTest
+        ? 'Test result'
+        : wheelSpin.autoApply
+          ? 'Applying…'
+          : 'Result ready'
       : wheelSpin.status === 'spinning'
         ? 'Selecting…'
         : 'Idle'
@@ -101,8 +103,16 @@ export function WheelPage() {
       ? 'Spin to get a result'
       : wheelSpin.status === 'spinning'
         ? 'Selecting outcome…'
-        : (wheelSpin.resultTitle ?? 'Outcome ready')
+        : wheelSpin.isTest
+          ? (wheelSpin.resultTitle ?? 'Test result ready')
+          : (wheelSpin.resultTitle ?? 'Outcome ready')
   const wheelTextScaleUiValue = toWheelTextScaleUiValue(wheelTextScale)
+  const applyButtonLabel =
+    wheelSpin.isTest
+      ? 'Test Result Only'
+      : wheelSpin.autoApply
+        ? 'Auto Applying…'
+        : 'Apply Result'
 
   return (
     <div className="page-container wheel-page">
@@ -143,9 +153,9 @@ export function WheelPage() {
               id="btn-apply-result"
               className="btn wheel-cta-btn"
               onClick={() => void applyWheelResult()}
-              disabled={wheelSpin.status !== 'ready' || wheelSpin.autoApply}
+              disabled={wheelSpin.status !== 'ready' || wheelSpin.autoApply || wheelSpin.isTest}
             >
-              {wheelSpin.autoApply ? 'Auto Applying…' : 'Apply Result'}
+              {applyButtonLabel}
             </button>
           </div>
         </div>
@@ -169,6 +179,10 @@ export function WheelPage() {
 
             {wheelSpin.status === 'ready' && wheelSpin.resultSummary && (
               <p className="panel-copy">{wheelSpin.resultSummary}</p>
+            )}
+
+            {wheelSpin.status === 'ready' && wheelSpin.isTest && (
+              <p className="panel-copy">This test spin only previews the wheel result. It never applies time or moderation actions.</p>
             )}
 
             {wheelSpin.status === 'ready' && wheelSpin.autoApply && (
@@ -211,7 +225,7 @@ export function WheelPage() {
             <div className="wheel-test-panel">
               <div className="wheel-test-panel__copy">
                 <strong>Gift bomb test</strong>
-                <p>Run the same gifted-sub auto-spin path Twitch uses so you can verify thresholds, animation, and the final result before going live.</p>
+                <p>Run the same gifted-sub wheel thresholds and animation path without applying the final outcome. Use it to verify the spin safely before going live.</p>
               </div>
               <div className="wheel-test-panel__actions">
                 <label className="rule-field rule-field--inline wheel-test-panel__field">
