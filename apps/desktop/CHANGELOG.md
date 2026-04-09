@@ -2,6 +2,12 @@
 
 All notable changes to the desktop app are tracked here.
 
+## 0.9.3
+
+- Reworked the wheel flow to match the original gift-bomb behavior more closely, including automatic gift-bomb spins, delayed result reveal timing, chat announcements, and safe non-applying gift-bomb tests.
+- Added a dedicated wheel overlay source plus an optional in-app wheel animation so both OBS and the streamer can see live spins and winner reveals without watching a separate preview.
+- Polished the wheel result presentation, overlay preview behavior, provider setup forms, update checking, and remaining release-facing UI copy ahead of the public publish.
+
 ## 0.9.2
 
 - Audited the routed desktop pages and rewrote page-level copy so About, Connections, Overlays, Rules, Settings, Wheel, and dashboard empty states read like finished production UI.

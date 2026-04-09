@@ -1,5 +1,11 @@
 # Patch Notes
 
+## 0.9.3
+
+- Gifted-sub wheel spins now follow the live reveal flow more closely, with safer gift-bomb tests that preview the result without applying actions.
+- The wheel can now appear both as an OBS overlay source and as an optional in-app animation for the streamer.
+- Wheel winner screens, overlay previews, updater health, and final setup copy were cleaned up for this release.
+
 ## 0.9.2
 
 - Rewrote the main desktop pages so the app reads like a finished release instead of an internal tool panel.
