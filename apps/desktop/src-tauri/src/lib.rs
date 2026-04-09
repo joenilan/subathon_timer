@@ -1689,11 +1689,13 @@ fn wheel_overlay_html() -> &'static str {
       }
       .stage.result:not(.studio) {
         width: min(860px, calc(100vw - 72px));
+        max-width: 100%;
         min-height: 300px;
         gap: 16px;
         align-content: center;
         justify-items: center;
         padding: 38px 44px 34px;
+        box-sizing: border-box;
         border-radius: 30px;
         background:
           radial-gradient(circle at top, rgba(156, 240, 0, 0.18), transparent 42%),
@@ -1712,17 +1714,23 @@ fn wheel_overlay_html() -> &'static str {
         letter-spacing: 0.18em;
       }
       .stage.result:not(.studio) .title {
-        max-width: 11ch;
+        width: min(100%, 12ch);
+        max-width: 100%;
         font-size: clamp(42px, 8vw, 76px);
         line-height: 0.94;
         letter-spacing: -0.04em;
         text-shadow: 0 0 30px rgba(199, 255, 94, 0.18);
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        text-wrap: balance;
       }
       .stage.result:not(.studio) .summary {
-        max-width: 34ch;
+        width: min(100%, 34ch);
+        max-width: 100%;
         font-size: 18px;
         line-height: 1.55;
         color: rgba(226, 232, 240, 0.92);
+        text-wrap: balance;
       }
       .stage.result:not(.studio) .wheel-wrap {
         display: none;
@@ -1815,6 +1823,7 @@ fn wheel_overlay_html() -> &'static str {
         width: min(440px, 100%);
         max-width: 100%;
         padding: 14px 18px;
+        box-sizing: border-box;
         background: rgba(255, 255, 255, 0.06);
         border-color: rgba(199, 255, 94, 0.18);
         font-size: 14px;
