@@ -1949,6 +1949,8 @@ fn wheel_overlay_html() -> &'static str {
         stage.classList.toggle('exiting', nextPhase === 'exiting');
       }
 
+      applyPhase(overlayPhase);
+
       function clamp(value, min, max) {
         if (min > max) {
           return Math.round((min + max) / 2);
