@@ -63,6 +63,33 @@ const credits = [
 
 export function AboutPage() {
   const { updateInfo, checking, fetchFailed, checkForUpdate } = useUpdateStore()
+  const releaseStatus = updateInfo
+    ? {
+        tone: 'update',
+        kicker: 'Update available',
+        title: `Version ${updateInfo.version} is ready to download`,
+        detail: updateInfo.notes,
+      }
+    : checking
+      ? {
+          tone: 'checking',
+          kicker: 'Release check',
+          title: 'Checking the published updater feed',
+          detail: 'The desktop app is comparing this build with the live release feed from apps.zombie.digital.',
+        }
+      : fetchFailed
+        ? {
+            tone: 'warning',
+            kicker: 'Release check',
+            title: 'The app could not reach the update feed',
+            detail: 'Try again when the published downloads site is reachable. Your current build is still usable.',
+          }
+        : {
+            tone: 'current',
+            kicker: 'Release check',
+            title: 'This build matches the latest published release',
+            detail: 'No newer desktop version is currently listed on the live downloads feed.',
+          }
 
   return (
     <div className="page-container settings-page about-page">
@@ -73,42 +100,31 @@ export function AboutPage() {
         </div>
       </section>
 
-      {updateInfo ? (
-        <section className="panel" style={{ background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ color: '#fde047', fontWeight: 600, fontSize: '14px', margin: 0 }}>
-                Update available — v{updateInfo.version}
-              </p>
-              <p style={{ color: 'rgba(253,224,71,0.6)', fontSize: '12px', margin: '4px 0 0' }}>
-                {updateInfo.notes}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="about-link-card"
-              style={{ flexShrink: 0, padding: '6px 14px', background: '#facc15', color: '#000', fontWeight: 700, fontSize: '12px', borderRadius: '8px' }}
-              onClick={() => void openExternal(`${DOWNLOAD_BASE}/${updateInfo.files.setup}`)}
-            >
-              Download
-            </button>
-          </div>
-        </section>
-      ) : (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-muted, #6b7280)' }}>
-            {checking ? 'Checking for updates…' : fetchFailed ? 'Could not reach update server.' : 'You\'re on the latest version.'}
-          </span>
+      <section className={`panel about-update-strip about-update-strip--${releaseStatus.tone}`}>
+        <div className="about-update-strip__copy">
+          <span className="about-update-strip__kicker">{releaseStatus.kicker}</span>
+          <strong className="about-update-strip__title">{releaseStatus.title}</strong>
+          <p className="about-update-strip__detail">{releaseStatus.detail}</p>
+        </div>
+        {updateInfo ? (
           <button
             type="button"
+            className="btn btn--primary about-update-strip__action"
+            onClick={() => void openExternal(`${DOWNLOAD_BASE}/${updateInfo.files.setup}`)}
+          >
+            Download update
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn--ghost about-update-strip__action"
             onClick={() => void checkForUpdate()}
             disabled={checking}
-            style={{ fontSize: '12px', color: 'var(--color-text-muted, #6b7280)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: checking ? 0.5 : 1 }}
           >
-            Check for updates
+            {checking ? 'Checking…' : 'Check again'}
           </button>
-        </div>
-      )}
+        )}
+      </section>
 
       <section className="panel about-hero">
         <div className="about-hero__header">

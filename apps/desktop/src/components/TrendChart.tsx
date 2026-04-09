@@ -13,8 +13,15 @@ export function TrendChart({
   const areaPath = showArea ? buildAreaPath(points, 520, 120, 10) : ''
   const lastPoint = showGraphIcon ? getLastChartPoint(points, 520, 120, 10) : null
 
-  if (!path) {
-    return <div className="chart-empty">No timer history yet</div>
+  if (points.length < 2 || !path) {
+    return (
+      <div className="chart-empty chart-empty--chart">
+        <strong className="chart-empty__title">Timer history appears here during the run</strong>
+        <span className="chart-empty__detail">
+          New Twitch events, tips, wheel results, and manual adjustments will start drawing the live trend as soon as they land.
+        </span>
+      </div>
+    )
   }
 
   return (
