@@ -142,6 +142,7 @@ export interface AppState {
 const INITIAL_TIMER_SECONDS = 6 * 60 * 60
 const MAX_PROCESSED_IDS = 100
 const WHEEL_RESULT_CHAT_DELAY_MS = 250
+const WHEEL_RESULT_LINGER_MS = 2600
 let wheelSpinTimer: number | null = null
 let wheelAutoApplyTimer: number | null = null
 let wheelAnnouncementTimer: number | null = null
@@ -216,11 +217,16 @@ function queueWheelSpinSelection(
       })
     }, WHEEL_RESULT_CHAT_DELAY_MS)
 
-    if (autoApply) {
+    if (isTest) {
+      wheelAutoApplyTimer = window.setTimeout(() => {
+        wheelAutoApplyTimer = null
+        useAppStore.setState({ wheelSpin: defaultWheelSpin })
+      }, WHEEL_RESULT_LINGER_MS)
+    } else if (autoApply) {
       wheelAutoApplyTimer = window.setTimeout(() => {
         wheelAutoApplyTimer = null
         void useAppStore.getState().applyWheelResult()
-      }, 1200)
+      }, WHEEL_RESULT_LINGER_MS)
     }
   }, 1800)
 }

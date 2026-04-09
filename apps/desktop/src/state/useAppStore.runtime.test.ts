@@ -117,7 +117,7 @@ describe('useAppStore runtime behavior', () => {
     expect(state.wheelSpin.activeSegmentId).toBe('wheel-gift-bomb')
     expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
 
-    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(4600)
 
     const finalState = useAppStore.getState()
     expect(finalState.timerRemainingSeconds).toBe(initial.timerRemainingSeconds + 300 + 300)
@@ -168,11 +168,17 @@ describe('useAppStore runtime behavior', () => {
     expect(state.wheelSpin.isTest).toBe(true)
     expect(state.timerEvents).toHaveLength(0)
 
-    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(2000)
+
+    let midState = useAppStore.getState()
+    expect(midState.timerRemainingSeconds).toBe(3600)
+    expect(midState.wheelSpin.status).toBe('ready')
+    expect(midState.wheelSpin.isTest).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(2600)
 
     const finalState = useAppStore.getState()
     expect(finalState.timerRemainingSeconds).toBe(3600)
-    expect(finalState.wheelSpin.status).toBe('ready')
-    expect(finalState.wheelSpin.isTest).toBe(true)
+    expect(finalState.wheelSpin.status).toBe('idle')
   })
 })
