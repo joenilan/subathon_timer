@@ -4487,8 +4487,13 @@ select.rule-field__input {
 }
 
 .wheel-overlay-card--result:not(.wheel-overlay-card--studio) {
+    width: min(720px, calc(100vw - 72px));
+    min-height: 280px;
     gap: 20px;
-    padding: 26px 26px 24px;
+    align-content: center;
+    justify-items: center;
+    padding: 32px 34px 28px;
+    border-radius: 28px;
 }
 
 .wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__header {
@@ -4506,7 +4511,7 @@ select.rule-field__input {
 }
 
 .wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__summary {
-    max-width: 28ch;
+    max-width: 36ch;
     font-size: 16px;
     line-height: 1.55;
     color: rgba(226, 232, 240, 0.9);
@@ -4574,7 +4579,8 @@ select.rule-field__input {
 }
 
 .wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__result-banner {
-    max-width: 30ch;
+    width: min(420px, 100%);
+    max-width: 100%;
     padding: 13px 18px;
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(199, 255, 94, 0.2);

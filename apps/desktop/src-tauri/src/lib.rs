@@ -1688,8 +1688,13 @@ fn wheel_overlay_html() -> &'static str {
         animation: wheelOverlayResultReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       .stage.result:not(.studio) {
+        width: min(720px, calc(100vw - 72px));
+        min-height: 280px;
         gap: 20px;
-        padding: 26px 26px 24px;
+        align-content: center;
+        justify-items: center;
+        padding: 32px 34px 28px;
+        border-radius: 28px;
         background:
           radial-gradient(circle at top, rgba(156, 240, 0, 0.18), transparent 44%),
           radial-gradient(circle at bottom, rgba(34, 211, 238, 0.12), transparent 52%),
@@ -1709,7 +1714,7 @@ fn wheel_overlay_html() -> &'static str {
         text-shadow: 0 0 28px rgba(199, 255, 94, 0.16);
       }
       .stage.result:not(.studio) .summary {
-        max-width: 28ch;
+        max-width: 36ch;
         font-size: 16px;
         line-height: 1.55;
         color: rgba(226, 232, 240, 0.9);
@@ -1789,7 +1794,8 @@ fn wheel_overlay_html() -> &'static str {
         transform: translateY(0) scale(1);
       }
       .stage.result:not(.studio) .result {
-        max-width: 30ch;
+        width: min(420px, 100%);
+        max-width: 100%;
         padding: 13px 18px;
         background: rgba(255, 255, 255, 0.06);
         border-color: rgba(199, 255, 94, 0.2);
