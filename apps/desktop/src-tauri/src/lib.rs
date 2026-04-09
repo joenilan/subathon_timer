@@ -1688,39 +1688,57 @@ fn wheel_overlay_html() -> &'static str {
         animation: wheelOverlayResultReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       .stage.result:not(.studio) {
-        width: min(720px, calc(100vw - 72px));
-        min-height: 280px;
-        gap: 20px;
+        width: min(860px, calc(100vw - 72px));
+        min-height: 300px;
+        gap: 16px;
         align-content: center;
         justify-items: center;
-        padding: 32px 34px 28px;
-        border-radius: 28px;
+        padding: 38px 44px 34px;
+        border-radius: 30px;
         background:
-          radial-gradient(circle at top, rgba(156, 240, 0, 0.18), transparent 44%),
-          radial-gradient(circle at bottom, rgba(34, 211, 238, 0.12), transparent 52%),
-          linear-gradient(180deg, rgba(9, 13, 20, 0.96) 0%, rgba(5, 8, 14, 0.99) 100%);
-        border-color: rgba(156, 240, 0, 0.24);
-        box-shadow: 0 24px 56px rgba(0, 0, 0, 0.46), 0 0 0 1px rgba(156, 240, 0, 0.08);
+          radial-gradient(circle at top, rgba(156, 240, 0, 0.18), transparent 42%),
+          radial-gradient(circle at 18% 78%, rgba(34, 211, 238, 0.12), transparent 36%),
+          linear-gradient(180deg, rgba(9, 13, 20, 0.97) 0%, rgba(5, 8, 14, 1) 100%);
+        border-color: rgba(156, 240, 0, 0.2);
+        box-shadow: 0 28px 68px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(156, 240, 0, 0.08);
       }
       .stage.result:not(.studio) .copy {
-        gap: 10px;
+        gap: 16px;
       }
       .stage.result:not(.studio) .eyebrow {
         color: #c7ff5e;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
       }
       .stage.result:not(.studio) .title {
-        font-size: clamp(34px, 7vw, 58px);
-        letter-spacing: -0.03em;
-        text-shadow: 0 0 28px rgba(199, 255, 94, 0.16);
+        max-width: 11ch;
+        font-size: clamp(42px, 8vw, 76px);
+        line-height: 0.94;
+        letter-spacing: -0.04em;
+        text-shadow: 0 0 30px rgba(199, 255, 94, 0.18);
       }
       .stage.result:not(.studio) .summary {
-        max-width: 36ch;
-        font-size: 16px;
+        max-width: 34ch;
+        font-size: 18px;
         line-height: 1.55;
-        color: rgba(226, 232, 240, 0.9);
+        color: rgba(226, 232, 240, 0.92);
       }
       .stage.result:not(.studio) .wheel-wrap {
         display: none;
+      }
+      .stage.result:not(.studio).test {
+        border-color: rgba(34, 211, 238, 0.2);
+        background:
+          radial-gradient(circle at top, rgba(34, 211, 238, 0.18), transparent 42%),
+          radial-gradient(circle at 18% 78%, rgba(156, 240, 0, 0.1), transparent 36%),
+          linear-gradient(180deg, rgba(9, 13, 20, 0.97) 0%, rgba(5, 8, 14, 1) 100%);
+      }
+      .stage.result:not(.studio).test .eyebrow {
+        color: var(--accent);
+      }
+      .stage.result:not(.studio).test .title {
+        text-shadow: 0 0 30px rgba(34, 211, 238, 0.2);
       }
       .eyebrow {
         font-size: 11px;
@@ -1794,12 +1812,18 @@ fn wheel_overlay_html() -> &'static str {
         transform: translateY(0) scale(1);
       }
       .stage.result:not(.studio) .result {
-        width: min(420px, 100%);
+        width: min(440px, 100%);
         max-width: 100%;
-        padding: 13px 18px;
+        padding: 14px 18px;
         background: rgba(255, 255, 255, 0.06);
-        border-color: rgba(199, 255, 94, 0.2);
-        font-size: 13px;
+        border-color: rgba(199, 255, 94, 0.18);
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.45;
+        color: rgba(241, 245, 249, 0.94);
+      }
+      .stage.result:not(.studio).test .result {
+        border-color: rgba(34, 211, 238, 0.18);
       }
       @keyframes wheelOverlayEnter {
         from {
@@ -2154,6 +2178,7 @@ fn wheel_overlay_html() -> &'static str {
           updateRotation(segments, displayedSpin);
           stage.classList.toggle('spinning', displayedSpin.status === 'spinning');
           stage.classList.toggle('result', displayedSpin.status === 'ready');
+          stage.classList.toggle('test', Boolean(displayedSpin.isTest));
 
           if (displayedSpin.status === 'spinning') {
             eyebrow.textContent = 'Gift bomb wheel';

@@ -208,27 +208,43 @@ export function WheelOverlayPage() {
       ? 'Applying automatically after the reveal finishes.'
       : 'Announced in chat. Waiting for the operator to apply the result.'
   const showWheelVisual = displaySpin.status === 'spinning' || isStudioPreview
+  const resultScreenClassName = [
+    'wheel-overlay-result-screen',
+    `wheel-overlay-result-screen--${phase}`,
+    displaySpin.isTest ? 'wheel-overlay-result-screen--test' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className="overlay overlay--wheel">
       <div ref={canvasRef} className="overlay__canvas overlay__canvas--wheel" style={canvasStyle}>
-        <div className={cardClassName}>
-          <div className="wheel-overlay-card__header">
-            <span className="wheel-overlay-card__eyebrow">
-              {resultEyebrow}
-            </span>
-            <strong className="wheel-overlay-card__title">
-              {resultTitle}
-            </strong>
-            <p className="wheel-overlay-card__summary">
-              {resultSummary}
-            </p>
+        {showWheelVisual ? (
+          <div className={cardClassName}>
+            <div className="wheel-overlay-card__header">
+              <span className="wheel-overlay-card__eyebrow">
+                {resultEyebrow}
+              </span>
+              <strong className="wheel-overlay-card__title">
+                {resultTitle}
+              </strong>
+              <p className="wheel-overlay-card__summary">
+                {resultSummary}
+              </p>
+            </div>
+            <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} />
+            <div className={`wheel-overlay-card__result-banner${isResultVisible ? ' is-visible' : ''}`}>
+              {resultBannerText}
+            </div>
           </div>
-          {showWheelVisual ? <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} /> : null}
-          <div className={`wheel-overlay-card__result-banner${isResultVisible ? ' is-visible' : ''}`}>
-            {resultBannerText}
-          </div>
-        </div>
+        ) : (
+          <section className={resultScreenClassName}>
+            <span className="wheel-overlay-result-screen__eyebrow">{resultEyebrow}</span>
+            <strong className="wheel-overlay-result-screen__title">{resultTitle}</strong>
+            <p className="wheel-overlay-result-screen__summary">{resultSummary}</p>
+            <div className="wheel-overlay-result-screen__banner">{resultBannerText}</div>
+          </section>
+        )}
       </div>
     </div>
   )
