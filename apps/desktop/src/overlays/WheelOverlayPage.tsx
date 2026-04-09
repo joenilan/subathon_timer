@@ -207,6 +207,7 @@ export function WheelOverlayPage() {
     : displaySpin.autoApply
       ? 'Applying automatically after the reveal finishes.'
       : 'Announced in chat. Waiting for the operator to apply the result.'
+  const showWheelVisual = displaySpin.status === 'spinning' || isStudioPreview
 
   return (
     <div className="overlay overlay--wheel">
@@ -223,7 +224,7 @@ export function WheelOverlayPage() {
               {resultSummary}
             </p>
           </div>
-          <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} />
+          {showWheelVisual ? <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} /> : null}
           <div className={`wheel-overlay-card__result-banner${isResultVisible ? ' is-visible' : ''}`}>
             {resultBannerText}
           </div>

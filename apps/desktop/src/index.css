@@ -4486,6 +4486,32 @@ select.rule-field__input {
     box-shadow: 0 24px 56px rgba(0, 0, 0, 0.46), 0 0 0 1px rgba(156, 240, 0, 0.08);
 }
 
+.wheel-overlay-card--result:not(.wheel-overlay-card--studio) {
+    gap: 20px;
+    padding: 26px 26px 24px;
+}
+
+.wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__header {
+    gap: 10px;
+}
+
+.wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__eyebrow {
+    color: #c7ff5e;
+}
+
+.wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__title {
+    font-size: clamp(34px, 7vw, 58px);
+    letter-spacing: -0.03em;
+    text-shadow: 0 0 28px rgba(199, 255, 94, 0.16);
+}
+
+.wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__summary {
+    max-width: 28ch;
+    font-size: 16px;
+    line-height: 1.55;
+    color: rgba(226, 232, 240, 0.9);
+}
+
 .wheel-overlay-card__header {
     display: grid;
     gap: 8px;
@@ -4545,6 +4571,14 @@ select.rule-field__input {
     transition:
         opacity 220ms ease,
         transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wheel-overlay-card--result:not(.wheel-overlay-card--studio) .wheel-overlay-card__result-banner {
+    max-width: 30ch;
+    padding: 13px 18px;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(199, 255, 94, 0.2);
+    font-size: 13px;
 }
 
 .wheel-overlay-card__result-banner.is-visible {

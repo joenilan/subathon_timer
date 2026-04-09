@@ -1687,6 +1687,36 @@ fn wheel_overlay_html() -> &'static str {
       .stage.result .copy {
         animation: wheelOverlayResultReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
+      .stage.result:not(.studio) {
+        gap: 20px;
+        padding: 26px 26px 24px;
+        background:
+          radial-gradient(circle at top, rgba(156, 240, 0, 0.18), transparent 44%),
+          radial-gradient(circle at bottom, rgba(34, 211, 238, 0.12), transparent 52%),
+          linear-gradient(180deg, rgba(9, 13, 20, 0.96) 0%, rgba(5, 8, 14, 0.99) 100%);
+        border-color: rgba(156, 240, 0, 0.24);
+        box-shadow: 0 24px 56px rgba(0, 0, 0, 0.46), 0 0 0 1px rgba(156, 240, 0, 0.08);
+      }
+      .stage.result:not(.studio) .copy {
+        gap: 10px;
+      }
+      .stage.result:not(.studio) .eyebrow {
+        color: #c7ff5e;
+      }
+      .stage.result:not(.studio) .title {
+        font-size: clamp(34px, 7vw, 58px);
+        letter-spacing: -0.03em;
+        text-shadow: 0 0 28px rgba(199, 255, 94, 0.16);
+      }
+      .stage.result:not(.studio) .summary {
+        max-width: 28ch;
+        font-size: 16px;
+        line-height: 1.55;
+        color: rgba(226, 232, 240, 0.9);
+      }
+      .stage.result:not(.studio) .wheel-wrap {
+        display: none;
+      }
       .eyebrow {
         font-size: 11px;
         font-weight: 700;
@@ -1757,6 +1787,13 @@ fn wheel_overlay_html() -> &'static str {
       .result.visible {
         opacity: 1;
         transform: translateY(0) scale(1);
+      }
+      .stage.result:not(.studio) .result {
+        max-width: 30ch;
+        padding: 13px 18px;
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(199, 255, 94, 0.2);
+        font-size: 13px;
       }
       @keyframes wheelOverlayEnter {
         from {
@@ -1970,6 +2007,7 @@ fn wheel_overlay_html() -> &'static str {
         stage.classList.toggle('entering', nextPhase === 'entering');
         stage.classList.toggle('phase-visible', nextPhase === 'visible');
         stage.classList.toggle('exiting', nextPhase === 'exiting');
+        stage.classList.toggle('studio', isStudioPreview);
       }
 
       applyPhase(overlayPhase);
