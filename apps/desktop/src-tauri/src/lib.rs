@@ -1829,11 +1829,16 @@ fn wheel_overlay_html() -> &'static str {
       const fallbackPalette = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#db2777', '#65a30d', '#ea580c'];
       const OVERLAY_INTRO_MS = 320;
       const OVERLAY_OUTRO_MS = 360;
+      const OVERLAY_SPIN_REVEAL_MS = 1800;
       let rotation = 0;
       let lastSpinKey = null;
       let overlayPhase = isStudioPreview ? 'visible' : 'hidden';
       let displayedSpin = { status: 'idle' };
       let phaseTimer = null;
+      let revealTimer = null;
+      let activeCycleKey = null;
+      let revealUnlocked = false;
+      let latestSourceSpin = { status: 'idle' };
 
       function polar(radius, angleDegrees) {
         const radians = ((angleDegrees - 90) * Math.PI) / 180;
@@ -1941,6 +1946,13 @@ fn wheel_overlay_html() -> &'static str {
         }
       }
 
+      function clearRevealTimer() {
+        if (revealTimer !== null) {
+          window.clearTimeout(revealTimer);
+          revealTimer = null;
+        }
+      }
+
       function applyPhase(nextPhase) {
         overlayPhase = nextPhase;
         stage.classList.toggle('visible', nextPhase !== 'hidden');
@@ -2011,13 +2023,42 @@ fn wheel_overlay_html() -> &'static str {
                 autoApply: false,
               }
             : liveSpin;
+          latestSourceSpin = spin;
           const transform = payload.wheelOverlayTransform || { x: 0, y: 0, scale: 1 };
 
           const hasActiveSpin = isStudioPreview || (spin && spin.status !== 'idle' && spin.activeSegmentId);
 
           if (hasActiveSpin) {
             clearPhaseTimer();
-            displayedSpin = spin;
+            const cycleKey = spin.activeSegmentId || null;
+
+            if (cycleKey && activeCycleKey !== cycleKey) {
+              activeCycleKey = cycleKey;
+              revealUnlocked = false;
+              clearRevealTimer();
+              displayedSpin = {
+                ...spin,
+                status: 'spinning',
+                resultTitle: 'Selecting outcome',
+                resultSummary: 'Wheel animation in progress.',
+              };
+              revealTimer = window.setTimeout(() => {
+                revealTimer = null;
+                revealUnlocked = true;
+                if (latestSourceSpin.status === 'ready' && latestSourceSpin.activeSegmentId === cycleKey) {
+                  displayedSpin = latestSourceSpin;
+                }
+              }, OVERLAY_SPIN_REVEAL_MS);
+            } else if (revealUnlocked && spin.status === 'ready') {
+              displayedSpin = spin;
+            } else if (!revealUnlocked) {
+              displayedSpin = {
+                ...displayedSpin,
+                activeSegmentId: spin.activeSegmentId,
+                requiresModeration: Boolean(spin.requiresModeration),
+                autoApply: Boolean(spin.autoApply),
+              };
+            }
 
             if (overlayPhase === 'hidden' || overlayPhase === 'exiting') {
               applyPhase('entering');
@@ -2032,12 +2073,19 @@ fn wheel_overlay_html() -> &'static str {
             }
           } else if (overlayPhase !== 'hidden' && overlayPhase !== 'exiting') {
             clearPhaseTimer();
+            clearRevealTimer();
+            activeCycleKey = null;
+            revealUnlocked = false;
             applyPhase('exiting');
             phaseTimer = window.setTimeout(() => {
               phaseTimer = null;
               displayedSpin = { status: 'idle' };
               applyPhase('hidden');
             }, OVERLAY_OUTRO_MS);
+          } else if (!hasActiveSpin) {
+            clearRevealTimer();
+            activeCycleKey = null;
+            revealUnlocked = false;
           }
 
           if (overlayPhase === 'hidden' || displayedSpin.status === 'idle' || !displayedSpin.activeSegmentId) {

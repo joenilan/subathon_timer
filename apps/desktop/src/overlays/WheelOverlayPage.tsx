@@ -10,6 +10,7 @@ import { selectWheelOverlayState } from '../state/selectors'
 
 const OVERLAY_INTRO_MS = 320
 const OVERLAY_OUTRO_MS = 360
+const OVERLAY_SPIN_REVEAL_MS = 1800
 type WheelOverlayPhase = 'hidden' | 'entering' | 'visible' | 'exiting'
 
 export function WheelOverlayPage() {
@@ -38,6 +39,14 @@ export function WheelOverlayPage() {
   const [displaySpin, setDisplaySpin] = useState<WheelSpinState>(sourceSpin)
   const [phase, setPhase] = useState<WheelOverlayPhase>(isStudioPreview ? 'visible' : 'hidden')
   const outroTimerRef = useRef<number | null>(null)
+  const revealTimerRef = useRef<number | null>(null)
+  const activeCycleKeyRef = useRef<string | null>(null)
+  const revealUnlockedRef = useRef(false)
+  const latestSourceSpinRef = useRef<WheelSpinState>(sourceSpin)
+
+  useEffect(() => {
+    latestSourceSpinRef.current = sourceSpin
+  }, [sourceSpin])
 
   useEffect(() => {
     if (isStudioPreview) {
@@ -45,6 +54,12 @@ export function WheelOverlayPage() {
         window.clearTimeout(outroTimerRef.current)
         outroTimerRef.current = null
       }
+      if (revealTimerRef.current !== null) {
+        window.clearTimeout(revealTimerRef.current)
+        revealTimerRef.current = null
+      }
+      activeCycleKeyRef.current = null
+      revealUnlockedRef.current = false
 
       setDisplaySpin(previewSpin)
       setPhase('visible')
@@ -53,12 +68,46 @@ export function WheelOverlayPage() {
 
     const hasActiveSpin = sourceSpin.status !== 'idle' && Boolean(sourceSpin.activeSegmentId)
     if (hasActiveSpin) {
+      const cycleKey = sourceSpin.activeSegmentId
+
       if (outroTimerRef.current !== null) {
         window.clearTimeout(outroTimerRef.current)
         outroTimerRef.current = null
       }
 
-      setDisplaySpin(sourceSpin)
+      if (cycleKey && activeCycleKeyRef.current !== cycleKey) {
+        activeCycleKeyRef.current = cycleKey
+        revealUnlockedRef.current = false
+
+        if (revealTimerRef.current !== null) {
+          window.clearTimeout(revealTimerRef.current)
+        }
+
+        setDisplaySpin({
+          ...sourceSpin,
+          status: 'spinning',
+          resultTitle: 'Selecting outcome',
+          resultSummary: 'Wheel animation in progress.',
+        })
+
+        revealTimerRef.current = window.setTimeout(() => {
+          revealTimerRef.current = null
+          revealUnlockedRef.current = true
+          const latestSpin = latestSourceSpinRef.current
+          if (latestSpin.status === 'ready' && latestSpin.activeSegmentId === cycleKey) {
+            setDisplaySpin(latestSpin)
+          }
+        }, OVERLAY_SPIN_REVEAL_MS)
+      } else if (revealUnlockedRef.current && sourceSpin.status === 'ready') {
+        setDisplaySpin(sourceSpin)
+      } else if (!revealUnlockedRef.current) {
+        setDisplaySpin((currentSpin) => ({
+          ...currentSpin,
+          activeSegmentId: sourceSpin.activeSegmentId,
+          requiresModeration: sourceSpin.requiresModeration,
+          autoApply: sourceSpin.autoApply,
+        }))
+      }
 
       if (phase === 'hidden' || phase === 'exiting') {
         setPhase('entering')
@@ -80,7 +129,16 @@ export function WheelOverlayPage() {
     }
 
     if (phase === 'hidden' || phase === 'exiting') {
+      activeCycleKeyRef.current = null
+      revealUnlockedRef.current = false
       return
+    }
+
+    activeCycleKeyRef.current = null
+    revealUnlockedRef.current = false
+    if (revealTimerRef.current !== null) {
+      window.clearTimeout(revealTimerRef.current)
+      revealTimerRef.current = null
     }
 
     setPhase('exiting')
@@ -102,6 +160,9 @@ export function WheelOverlayPage() {
     return () => {
       if (outroTimerRef.current !== null) {
         window.clearTimeout(outroTimerRef.current)
+      }
+      if (revealTimerRef.current !== null) {
+        window.clearTimeout(revealTimerRef.current)
       }
     }
   }, [])
