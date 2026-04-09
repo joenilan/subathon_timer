@@ -95,6 +95,7 @@ export interface AppState {
   wheelSegments: WheelSegment[]
   wheelSpin: WheelSpinState
   lastTwitchActor: LastTwitchActor | null
+  announceWheelResultsInChat: boolean
 
   setSidebarCollapsed: (v: boolean | ((prev: boolean) => boolean)) => void
   setDashMode: (mode: DashMode) => void
@@ -107,6 +108,7 @@ export interface AppState {
   setDefaultTimerSeconds: (value: number) => void
   setCommandPermission: (action: ChatTimerCommandAction, permission: TimerCommandPermission) => void
   setOverlayLanAccessEnabled: (value: boolean) => void
+  setAnnounceWheelResultsInChat: (value: boolean) => void
   setTimerSeconds: (value: number, reason: string, options?: { syncDefault?: boolean }) => void
   setRuleValue: <K extends keyof TimerRuleConfig>(key: K, value: TimerRuleConfig[K]) => void
   setOverlayBootstrapState: (value: {
@@ -235,10 +237,11 @@ async function announceWheelResultInChat(input: {
   isTest: boolean
 }) {
   const twitch = useTwitchSessionStore.getState()
+  const appState = useAppStore.getState()
   const tokens = twitch.tokens
   const session = twitch.session
 
-  if (!tokens || !session || !session.scopes.includes('user:write:chat')) {
+  if (!appState.announceWheelResultsInChat || !tokens || !session || !session.scopes.includes('user:write:chat')) {
     return
   }
 
@@ -306,6 +309,7 @@ export const useAppStore = create<AppState>()(
       defaultTimerSeconds: INITIAL_TIMER_SECONDS,
       commandPermissions: DEFAULT_TIMER_COMMAND_PERMISSIONS,
       overlayLanAccessEnabled: false,
+      announceWheelResultsInChat: true,
 
       timerStatus: 'paused',
       timerRemainingSeconds: INITIAL_TIMER_SECONDS,
@@ -372,6 +376,7 @@ export const useAppStore = create<AppState>()(
           },
         })),
       setOverlayLanAccessEnabled: (overlayLanAccessEnabled) => set({ overlayLanAccessEnabled }),
+      setAnnounceWheelResultsInChat: (announceWheelResultsInChat) => set({ announceWheelResultsInChat }),
       setTimerSeconds: (timerRemainingSeconds, reason, options) =>
         set((state) => {
           const now = Date.now()
@@ -1085,6 +1090,7 @@ export const useAppStore = create<AppState>()(
           reasonOverlayTransform: normalizeOverlayTransform(nextState?.reasonOverlayTransform, defaultOverlayTransforms.reason),
           wheelOverlayTransform: normalizeOverlayTransform(nextState?.wheelOverlayTransform, defaultOverlayTransforms.wheel),
           commandPermissions: normalizeTimerCommandPermissionConfig(nextState?.commandPermissions),
+          announceWheelResultsInChat: nextState?.announceWheelResultsInChat ?? true,
           overlayBaseUrl: null,
           overlayPreviewBaseUrl: null,
           overlayLanBaseUrl: null,
@@ -1101,6 +1107,7 @@ export const useAppStore = create<AppState>()(
         showActivity: state.showActivity,
         timerWidgetTheme: state.timerWidgetTheme,
         wheelTextScale: state.wheelTextScale,
+        announceWheelResultsInChat: state.announceWheelResultsInChat,
         timerOverlayTransform: state.timerOverlayTransform,
         reasonOverlayTransform: state.reasonOverlayTransform,
         wheelOverlayTransform: state.wheelOverlayTransform,

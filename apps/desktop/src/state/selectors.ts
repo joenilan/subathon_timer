@@ -111,9 +111,11 @@ export const selectWheelOverlayState = (state: AppState) => ({
 })
 
 export const selectSettingsPageState = (state: AppState) => ({
+  announceWheelResultsInChat: state.announceWheelResultsInChat,
   applyImportedLegacyConfig: state.applyImportedLegacyConfig,
   commandPermissions: state.commandPermissions,
   defaultTimerSeconds: state.defaultTimerSeconds,
+  setAnnounceWheelResultsInChat: state.setAnnounceWheelResultsInChat,
   setCommandPermission: state.setCommandPermission,
   setDefaultTimerSeconds: state.setDefaultTimerSeconds,
   setTimerWidgetTheme: state.setTimerWidgetTheme,

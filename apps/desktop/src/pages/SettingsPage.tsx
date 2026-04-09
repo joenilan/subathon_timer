@@ -38,6 +38,8 @@ export function SettingsPage() {
     setTimerWidgetTheme,
     defaultTimerSeconds,
     setDefaultTimerSeconds,
+    announceWheelResultsInChat,
+    setAnnounceWheelResultsInChat,
     commandPermissions,
     setCommandPermission,
     applyImportedLegacyConfig,
@@ -146,6 +148,19 @@ export function SettingsPage() {
             </div>
             <span className="rule-field__hint">Reset returns the timer to this value. Editing the live timer on the dashboard does not change the saved default.</span>
           </div>
+
+          <label className="rule-field">
+            <span className="rule-field__label">Wheel result chat message</span>
+            <select
+              className="rule-field__input"
+              value={announceWheelResultsInChat ? 'enabled' : 'disabled'}
+              onChange={(event) => setAnnounceWheelResultsInChat(event.target.value === 'enabled')}
+            >
+              <option value="enabled">Enabled</option>
+              <option value="disabled">Disabled</option>
+            </select>
+            <span className="rule-field__hint">Announces the selected wheel result in Twitch chat when your session has chat write access.</span>
+          </label>
         </div>
       </section>
 
