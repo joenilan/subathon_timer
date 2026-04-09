@@ -47,9 +47,13 @@ export const selectSidebarFrameState = (state: AppState) => ({
   overlayLanBaseUrl: state.overlayLanBaseUrl,
   overlayLanAccessEnabled: state.overlayLanAccessEnabled,
   setSidebarCollapsed: state.setSidebarCollapsed,
+  showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
   showActivity: state.showActivity,
   showTrend: state.showTrend,
   sidebarCollapsed: state.sidebarCollapsed,
+  wheelSegments: state.wheelSegments,
+  wheelSpin: state.wheelSpin,
+  wheelTextScale: state.wheelTextScale,
 })
 
 export const selectDashboardPageState = (state: AppState) => ({
@@ -118,7 +122,9 @@ export const selectSettingsPageState = (state: AppState) => ({
   setAnnounceWheelResultsInChat: state.setAnnounceWheelResultsInChat,
   setCommandPermission: state.setCommandPermission,
   setDefaultTimerSeconds: state.setDefaultTimerSeconds,
+  setShowWheelOverlayInAppShell: state.setShowWheelOverlayInAppShell,
   setTimerWidgetTheme: state.setTimerWidgetTheme,
+  showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
   timerWidgetTheme: state.timerWidgetTheme,
 })
 

@@ -38,6 +38,8 @@ export function SettingsPage() {
     setTimerWidgetTheme,
     defaultTimerSeconds,
     setDefaultTimerSeconds,
+    showWheelOverlayInAppShell,
+    setShowWheelOverlayInAppShell,
     announceWheelResultsInChat,
     setAnnounceWheelResultsInChat,
     commandPermissions,
@@ -148,6 +150,19 @@ export function SettingsPage() {
             </div>
             <span className="rule-field__hint">Reset returns the timer to this value. Editing the live timer on the dashboard does not change the saved default.</span>
           </div>
+
+          <label className="rule-field">
+            <span className="rule-field__label">In-app wheel animation</span>
+            <select
+              className="rule-field__input"
+              value={showWheelOverlayInAppShell ? 'enabled' : 'disabled'}
+              onChange={(event) => setShowWheelOverlayInAppShell(event.target.value === 'enabled')}
+            >
+              <option value="enabled">Enabled</option>
+              <option value="disabled">Disabled</option>
+            </select>
+            <span className="rule-field__hint">Shows the live wheel animation inside the desktop app so the streamer can see spins without watching OBS.</span>
+          </label>
 
           <label className="rule-field">
             <span className="rule-field__label">Wheel result chat message</span>

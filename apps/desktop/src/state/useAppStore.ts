@@ -76,6 +76,7 @@ export interface AppState {
   defaultTimerSeconds: number
   commandPermissions: TimerCommandPermissionConfig
   overlayLanAccessEnabled: boolean
+  showWheelOverlayInAppShell: boolean
 
   timerStatus: TimerStatus
   timerRemainingSeconds: number
@@ -108,6 +109,7 @@ export interface AppState {
   setDefaultTimerSeconds: (value: number) => void
   setCommandPermission: (action: ChatTimerCommandAction, permission: TimerCommandPermission) => void
   setOverlayLanAccessEnabled: (value: boolean) => void
+  setShowWheelOverlayInAppShell: (value: boolean) => void
   setAnnounceWheelResultsInChat: (value: boolean) => void
   setTimerSeconds: (value: number, reason: string, options?: { syncDefault?: boolean }) => void
   setRuleValue: <K extends keyof TimerRuleConfig>(key: K, value: TimerRuleConfig[K]) => void
@@ -353,6 +355,7 @@ export const useAppStore = create<AppState>()(
       defaultTimerSeconds: INITIAL_TIMER_SECONDS,
       commandPermissions: DEFAULT_TIMER_COMMAND_PERMISSIONS,
       overlayLanAccessEnabled: false,
+      showWheelOverlayInAppShell: true,
       announceWheelResultsInChat: true,
 
       timerStatus: 'paused',
@@ -420,6 +423,7 @@ export const useAppStore = create<AppState>()(
           },
         })),
       setOverlayLanAccessEnabled: (overlayLanAccessEnabled) => set({ overlayLanAccessEnabled }),
+      setShowWheelOverlayInAppShell: (showWheelOverlayInAppShell) => set({ showWheelOverlayInAppShell }),
       setAnnounceWheelResultsInChat: (announceWheelResultsInChat) => set({ announceWheelResultsInChat }),
       setTimerSeconds: (timerRemainingSeconds, reason, options) =>
         set((state) => {
@@ -1115,7 +1119,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'fdgt.app.state',
-      version: 12,
+      version: 13,
       storage: createJSONStorage(() => window.localStorage),
       migrate: (persistedState, persistedVersion) => {
         const nextState = persistedState as Partial<AppState> | undefined
@@ -1141,6 +1145,7 @@ export const useAppStore = create<AppState>()(
           reasonOverlayTransform: normalizeOverlayTransform(nextState?.reasonOverlayTransform, defaultOverlayTransforms.reason),
           wheelOverlayTransform: normalizeOverlayTransform(nextState?.wheelOverlayTransform, defaultOverlayTransforms.wheel),
           commandPermissions: normalizeTimerCommandPermissionConfig(nextState?.commandPermissions),
+          showWheelOverlayInAppShell: nextState?.showWheelOverlayInAppShell ?? true,
           announceWheelResultsInChat: nextState?.announceWheelResultsInChat ?? true,
           overlayBaseUrl: null,
           overlayPreviewBaseUrl: null,
@@ -1158,6 +1163,7 @@ export const useAppStore = create<AppState>()(
         showActivity: state.showActivity,
         timerWidgetTheme: state.timerWidgetTheme,
         wheelTextScale: state.wheelTextScale,
+        showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
         announceWheelResultsInChat: state.announceWheelResultsInChat,
         timerOverlayTransform: state.timerOverlayTransform,
         reasonOverlayTransform: state.reasonOverlayTransform,

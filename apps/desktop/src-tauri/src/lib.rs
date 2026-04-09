@@ -1688,13 +1688,13 @@ fn wheel_overlay_html() -> &'static str {
         animation: wheelOverlayResultReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       .stage.result:not(.studio) {
-        width: min(860px, calc(100vw - 72px));
+        width: min(940px, calc(100vw - 72px));
         max-width: 100%;
-        min-height: 300px;
-        gap: 16px;
+        min-height: 280px;
+        gap: 18px;
         align-content: center;
         justify-items: center;
-        padding: 38px 44px 34px;
+        padding: 36px 48px 32px;
         box-sizing: border-box;
         border-radius: 30px;
         background:
@@ -1705,7 +1705,7 @@ fn wheel_overlay_html() -> &'static str {
         box-shadow: 0 28px 68px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(156, 240, 0, 0.08);
       }
       .stage.result:not(.studio) .copy {
-        gap: 16px;
+        gap: 18px;
       }
       .stage.result:not(.studio) .eyebrow {
         color: #c7ff5e;
@@ -1713,22 +1713,26 @@ fn wheel_overlay_html() -> &'static str {
         font-weight: 800;
         letter-spacing: 0.18em;
       }
+      .stage.result:not(.studio) .winner {
+        display: grid;
+        gap: 14px;
+        justify-items: center;
+        width: min(100%, 720px);
+      }
       .stage.result:not(.studio) .title {
-        width: min(100%, 12ch);
         max-width: 100%;
-        font-size: clamp(42px, 8vw, 76px);
-        line-height: 0.94;
+        font-size: clamp(48px, 8vw, 88px);
+        line-height: 0.96;
         letter-spacing: -0.04em;
         text-shadow: 0 0 30px rgba(199, 255, 94, 0.18);
         overflow-wrap: anywhere;
-        word-break: break-word;
         text-wrap: balance;
       }
       .stage.result:not(.studio) .summary {
-        width: min(100%, 34ch);
+        width: min(100%, 40ch);
         max-width: 100%;
-        font-size: 18px;
-        line-height: 1.55;
+        font-size: 19px;
+        line-height: 1.5;
         color: rgba(226, 232, 240, 0.92);
         text-wrap: balance;
       }
@@ -1820,7 +1824,7 @@ fn wheel_overlay_html() -> &'static str {
         transform: translateY(0) scale(1);
       }
       .stage.result:not(.studio) .result {
-        width: min(440px, 100%);
+        width: min(520px, 100%);
         max-width: 100%;
         padding: 14px 18px;
         box-sizing: border-box;
@@ -1883,8 +1887,10 @@ fn wheel_overlay_html() -> &'static str {
       <section class="stage" id="stage" aria-live="polite">
         <div class="copy">
           <div class="eyebrow" id="eyebrow">Gift bomb wheel</div>
-          <div class="title" id="title">Spinning now</div>
-          <div class="summary" id="summary">A gifted sub event triggered the wheel.</div>
+          <div class="winner">
+            <div class="title" id="title">Spinning now</div>
+            <div class="summary" id="summary">The wheel is choosing the next outcome live on stream.</div>
+          </div>
         </div>
         <div class="wheel-wrap">
           <svg viewBox="0 0 100 100" role="img" aria-label="Wheel overlay">
@@ -2106,7 +2112,7 @@ fn wheel_overlay_html() -> &'static str {
                 status: 'ready',
                 activeSegmentId: segments[0].id,
                 resultTitle: segments[0].label,
-                resultSummary: 'Studio preview stays visible so you can place and scale the wheel overlay before the next gifted sub spin.',
+                resultSummary: 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.',
                 requiresModeration: Boolean(segments[0].moderationRequired),
                 autoApply: false,
               }
@@ -2192,7 +2198,9 @@ fn wheel_overlay_html() -> &'static str {
           if (displayedSpin.status === 'spinning') {
             eyebrow.textContent = 'Gift bomb wheel';
             title.textContent = 'Spinning now';
-            summary.textContent = 'A gifted sub event triggered the wheel.';
+            summary.textContent = isStudioPreview
+              ? 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.'
+              : 'The wheel is choosing the next outcome live on stream.';
             result.textContent = '';
             result.classList.remove('visible');
           } else {
@@ -2201,15 +2209,15 @@ fn wheel_overlay_html() -> &'static str {
               : (displayedSpin.isTest ? 'Test result' : 'Wheel picked');
             title.textContent = displayedSpin.resultTitle || 'Result ready';
             summary.textContent = displayedSpin.isTest
-              ? 'Preview only. This test spin announced the pick in chat and stopped before applying anything.'
+              ? 'This test spin announced the winner in chat and stopped before applying anything.'
               : displayedSpin.autoApply
-                ? 'The wheel picked a live outcome and announced it in chat.'
-                : 'The wheel has landed. Review the result and apply it when you are ready.';
+                ? 'Gifted subs triggered this result live and the outcome is moving through its apply flow now.'
+                : 'The wheel landed on this outcome and is waiting for the streamer to apply it from the Wheel page.';
             result.textContent = displayedSpin.requiresModeration
-              ? 'Reconnect Twitch before timeout outcomes can be applied.'
+              ? 'Reconnect Twitch before timeout outcomes can run.'
               : displayedSpin.isTest
-                ? 'Chat announcement sent. No action was applied.'
-                : (displayedSpin.autoApply ? 'Applying automatically after the reveal finishes.' : 'Announced in chat. Waiting for the operator to apply the result.');
+                ? 'Preview only. No action was applied.'
+                : (displayedSpin.autoApply ? 'Chat announcement sent. Applying after the reveal.' : 'Chat announcement sent. Waiting for manual apply.');
             result.classList.add('visible');
           }
 

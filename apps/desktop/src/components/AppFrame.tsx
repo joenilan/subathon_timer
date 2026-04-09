@@ -9,6 +9,7 @@ import { applyWindowSizing } from '../lib/platform/windowSizing'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
 import { useEventSubStore } from '../state/useEventSubStore'
 import { TWITCH_SCOPES } from '../lib/twitch/constants'
+import { WheelLiveSurface } from './WheelLiveSurface'
 import { selectSidebarFrameState, selectTwitchSidebarState } from '../state/selectors'
 
 const icons = {
@@ -50,10 +51,14 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         dashMode,
         showTrend,
         showActivity,
+        showWheelOverlayInAppShell,
         overlayBaseUrl,
         overlayPreviewBaseUrl,
         overlayLanBaseUrl,
         overlayLanAccessEnabled,
+        wheelSegments,
+        wheelSpin,
+        wheelTextScale,
     } = useAppStore(useShallow(selectSidebarFrameState))
     const {
         twitchStatus,
@@ -357,6 +362,16 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                 <div className="workspace-content">
                     {children}
                 </div>
+                {showWheelOverlayInAppShell ? (
+                    <div className="app-wheel-overlay" aria-hidden="true">
+                        <WheelLiveSurface
+                            variant="shell"
+                            wheelSegments={wheelSegments}
+                            wheelSpin={wheelSpin}
+                            wheelTextScale={wheelTextScale}
+                        />
+                    </div>
+                ) : null}
             </main>
         </div>
     )
