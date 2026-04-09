@@ -276,6 +276,37 @@ async function announceWheelResultInChat(input: {
   }
 }
 
+async function announceWheelAppliedTimeoutInChat(input: {
+  targetMention: string
+  durationSeconds: number
+}) {
+  const twitch = useTwitchSessionStore.getState()
+  const appState = useAppStore.getState()
+  const tokens = twitch.tokens
+  const session = twitch.session
+
+  if (!appState.announceWheelResultsInChat || !tokens || !session || !session.scopes.includes('user:write:chat')) {
+    return
+  }
+
+  try {
+    await sendChatMessage({
+      clientId: TWITCH_CLIENT_ID,
+      accessToken: tokens.accessToken,
+      broadcasterId: session.userId,
+      senderId: session.userId,
+      message: `Wheel timeout applied: ${input.targetMention} for ${input.durationSeconds}s.`,
+    })
+  } catch (error) {
+    useTwitchSessionStore.setState({
+      lastError:
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : 'Unable to send the applied wheel timeout message to Twitch chat.',
+    })
+  }
+}
+
 async function sendTimerHelpReply(input: {
   accessToken: string
   broadcasterId: string
@@ -715,6 +746,7 @@ export const useAppStore = create<AppState>()(
         try {
           let targetUserId: string | null = null
           let targetLabel = 'selected target'
+          let targetMention = '@target'
 
           if (selectedSegment.timeoutTarget === 'self') {
             const actor = useAppStore.getState().lastTwitchActor
@@ -725,6 +757,7 @@ export const useAppStore = create<AppState>()(
 
             targetUserId = actor.userId
             targetLabel = actor.displayName ?? actor.userLogin ?? 'recent Twitch actor'
+            targetMention = actor.userLogin ? `@${actor.userLogin}` : targetLabel
           } else {
             if (!session.scopes.includes('moderator:read:chatters')) {
               throw new Error('Reconnect Twitch to grant moderator:read:chatters before using random timeout outcomes.')
@@ -746,6 +779,7 @@ export const useAppStore = create<AppState>()(
             const selectedChatter = candidates[Math.floor(Math.random() * candidates.length)]
             targetUserId = selectedChatter.userId
             targetLabel = selectedChatter.userName
+            targetMention = `@${selectedChatter.userLogin}`
           }
 
           await timeoutUser({
@@ -756,6 +790,10 @@ export const useAppStore = create<AppState>()(
             userId: targetUserId,
             durationSeconds: selectedSegment.timeoutSeconds ?? 300,
             reason: `Wheel outcome: ${selectedSegment.label}`,
+          })
+          void announceWheelAppliedTimeoutInChat({
+            targetMention,
+            durationSeconds: selectedSegment.timeoutSeconds ?? 300,
           })
 
           set((state) => {
