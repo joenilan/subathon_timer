@@ -183,11 +183,30 @@ export function WheelOverlayPage() {
     .join(' ')
 
   const isResultVisible = displaySpin.status === 'ready'
+  const resultEyebrow = displaySpin.status === 'spinning'
+    ? 'Gift bomb wheel'
+    : isStudioPreview
+      ? 'Wheel preview'
+      : displaySpin.isTest
+        ? 'Test result'
+        : 'Wheel picked'
+  const resultTitle = displaySpin.status === 'spinning'
+    ? 'Spinning now'
+    : (displaySpin.resultTitle ?? 'Result ready')
+  const resultSummary = displaySpin.status === 'spinning'
+    ? 'A gifted sub event triggered the wheel.'
+    : displaySpin.isTest
+      ? 'Preview only. This test spin announced the pick in chat and stopped before applying anything.'
+      : displaySpin.autoApply
+        ? 'The wheel picked a live outcome and announced it in chat.'
+        : 'The wheel has landed. Review the result and apply it when you are ready.'
   const resultBannerText = displaySpin.requiresModeration
     ? 'Reconnect Twitch before timeout outcomes can be applied.'
+    : displaySpin.isTest
+      ? 'Chat announcement sent. No action was applied.'
     : displaySpin.autoApply
       ? 'Applying automatically after the reveal finishes.'
-      : 'Waiting for the operator to apply the result.'
+      : 'Announced in chat. Waiting for the operator to apply the result.'
 
   return (
     <div className="overlay overlay--wheel">
@@ -195,19 +214,13 @@ export function WheelOverlayPage() {
         <div className={cardClassName}>
           <div className="wheel-overlay-card__header">
             <span className="wheel-overlay-card__eyebrow">
-              {displaySpin.status === 'spinning' ? 'Gift bomb wheel' : isStudioPreview ? 'Wheel preview' : 'Wheel result'}
+              {resultEyebrow}
             </span>
             <strong className="wheel-overlay-card__title">
-              {displaySpin.status === 'spinning'
-                ? 'Spinning now'
-                : (displaySpin.resultTitle ?? 'Result ready')}
+              {resultTitle}
             </strong>
             <p className="wheel-overlay-card__summary">
-              {displaySpin.status === 'spinning'
-                ? 'A gifted sub event triggered the wheel.'
-                : displaySpin.autoApply
-                  ? 'Gifted sub wheel results apply automatically after the reveal finishes.'
-                  : (displaySpin.resultSummary ?? 'Waiting for the operator to apply the result.')}
+              {resultSummary}
             </p>
           </div>
           <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} />

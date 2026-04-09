@@ -2118,14 +2118,20 @@ fn wheel_overlay_html() -> &'static str {
             result.textContent = '';
             result.classList.remove('visible');
           } else {
-            eyebrow.textContent = isStudioPreview ? 'Wheel preview' : 'Wheel result';
+            eyebrow.textContent = isStudioPreview
+              ? 'Wheel preview'
+              : (displayedSpin.isTest ? 'Test result' : 'Wheel picked');
             title.textContent = displayedSpin.resultTitle || 'Result ready';
-            summary.textContent = displayedSpin.autoApply
-              ? 'Gifted sub wheel results apply automatically after the reveal finishes.'
-              : (displayedSpin.resultSummary || 'Waiting for the operator to apply the result.');
+            summary.textContent = displayedSpin.isTest
+              ? 'Preview only. This test spin announced the pick in chat and stopped before applying anything.'
+              : displayedSpin.autoApply
+                ? 'The wheel picked a live outcome and announced it in chat.'
+                : 'The wheel has landed. Review the result and apply it when you are ready.';
             result.textContent = displayedSpin.requiresModeration
               ? 'Reconnect Twitch before timeout outcomes can be applied.'
-              : (displayedSpin.autoApply ? 'Applying automatically after the reveal finishes.' : 'Waiting for the operator to apply the result.');
+              : displayedSpin.isTest
+                ? 'Chat announcement sent. No action was applied.'
+                : (displayedSpin.autoApply ? 'Applying automatically after the reveal finishes.' : 'Announced in chat. Waiting for the operator to apply the result.');
             result.classList.add('visible');
           }
 

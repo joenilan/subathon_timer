@@ -193,6 +193,11 @@ function queueWheelSpinSelection(
       },
     })
     wheelSpinTimer = null
+    void announceWheelResultInChat({
+      segment: currentSegment,
+      autoApply,
+      isTest,
+    })
 
     if (autoApply) {
       wheelAutoApplyTimer = window.setTimeout(() => {
@@ -205,6 +210,55 @@ function queueWheelSpinSelection(
 
 const CHAT_TIMER_HELP_MESSAGE =
   'Timer commands: !timer add <seconds|mm:ss|hh:mm:ss>, !timer remove <seconds|mm:ss|hh:mm:ss>, !timer set <time>, !timer pause, !timer resume, !timer start, !timer reset, !timer help'
+
+function buildWheelAnnouncementMessage(input: {
+  segment: WheelSegment
+  autoApply: boolean
+  isTest: boolean
+}) {
+  const label = input.segment.label.trim().length > 0 ? input.segment.label.trim() : 'Unknown result'
+
+  if (input.isTest) {
+    return `Wheel test result: ${label}. Preview only, no action was applied.`
+  }
+
+  if (input.autoApply) {
+    return `Wheel picked: ${label}.`
+  }
+
+  return `Wheel result ready: ${label}.`
+}
+
+async function announceWheelResultInChat(input: {
+  segment: WheelSegment
+  autoApply: boolean
+  isTest: boolean
+}) {
+  const twitch = useTwitchSessionStore.getState()
+  const tokens = twitch.tokens
+  const session = twitch.session
+
+  if (!tokens || !session || !session.scopes.includes('user:write:chat')) {
+    return
+  }
+
+  try {
+    await sendChatMessage({
+      clientId: TWITCH_CLIENT_ID,
+      accessToken: tokens.accessToken,
+      broadcasterId: session.userId,
+      senderId: session.userId,
+      message: buildWheelAnnouncementMessage(input),
+    })
+  } catch (error) {
+    useTwitchSessionStore.setState({
+      lastError:
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : 'Unable to send the wheel result message to Twitch chat.',
+    })
+  }
+}
 
 async function sendTimerHelpReply(input: {
   accessToken: string
