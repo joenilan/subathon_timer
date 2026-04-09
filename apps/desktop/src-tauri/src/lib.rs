@@ -2107,16 +2107,17 @@ fn wheel_overlay_html() -> &'static str {
           const payload = await response.json();
           const segments = Array.isArray(payload.wheelSegments) ? payload.wheelSegments : [];
           const liveSpin = payload.wheelSpin || { status: 'idle' };
-          const spin = isStudioPreview && segments[0]
+          const spin = isStudioPreview && liveSpin.status === 'idle' && segments[0]
             ? {
-                status: 'ready',
+                status: 'spinning',
                 activeSegmentId: segments[0].id,
-                resultTitle: segments[0].label,
+                resultTitle: 'Overlay placement',
                 resultSummary: 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.',
                 requiresModeration: Boolean(segments[0].moderationRequired),
                 autoApply: false,
               }
             : liveSpin;
+          const isPlacementPreview = isStudioPreview && liveSpin.status === 'idle';
           latestSourceSpin = spin;
           const transform = payload.wheelOverlayTransform || { x: 0, y: 0, scale: 1 };
 
@@ -2198,13 +2199,13 @@ fn wheel_overlay_html() -> &'static str {
           if (displayedSpin.status === 'spinning') {
             eyebrow.textContent = 'Gift bomb wheel';
             title.textContent = 'Spinning now';
-            summary.textContent = isStudioPreview
+            summary.textContent = isPlacementPreview
               ? 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.'
               : 'The wheel is choosing the next outcome live on stream.';
             result.textContent = '';
             result.classList.remove('visible');
           } else {
-            eyebrow.textContent = isStudioPreview
+            eyebrow.textContent = isPlacementPreview
               ? 'Wheel preview'
               : (displayedSpin.isTest ? 'Test result' : 'Wheel picked');
             title.textContent = displayedSpin.resultTitle || 'Result ready';

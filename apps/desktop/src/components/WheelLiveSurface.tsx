@@ -18,12 +18,12 @@ interface WheelLiveSurfaceProps {
 
 function getResultCopy(input: {
   autoApply: boolean
-  isStudioPreview: boolean
+  isPlacementPreview: boolean
   isTest: boolean
   requiresModeration: boolean
   status: WheelSpinState['status']
 }) {
-  if (input.isStudioPreview) {
+  if (input.isPlacementPreview) {
     return {
       eyebrow: 'Wheel preview',
       title: 'Overlay placement',
@@ -84,10 +84,10 @@ export function WheelLiveSurface({
     () =>
       isStudioPreview && wheelSegments[0]
         ? {
-            status: 'ready',
+            status: 'spinning',
             activeSegmentId: wheelSegments[0].id,
-            resultTitle: wheelSegments[0].label,
-            resultSummary: 'Studio preview stays visible so you can place and scale the wheel overlay before the next gifted sub spin.',
+            resultTitle: 'Overlay placement',
+            resultSummary: 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.',
             requiresModeration: wheelSegments[0].moderationRequired,
             autoApply: false,
             isTest: false,
@@ -96,9 +96,10 @@ export function WheelLiveSurface({
     [isStudioPreview, wheelSegments, wheelSpin],
   )
 
-  const sourceSpin = isStudioPreview ? previewSpin : wheelSpin
+  const sourceSpin = isStudioPreview && wheelSpin.status === 'idle' ? previewSpin : wheelSpin
+  const isPlacementPreview = isStudioPreview && wheelSpin.status === 'idle'
   const [displaySpin, setDisplaySpin] = useState<WheelSpinState>(sourceSpin)
-  const [phase, setPhase] = useState<WheelOverlayPhase>(isStudioPreview ? 'visible' : 'hidden')
+  const [phase, setPhase] = useState<WheelOverlayPhase>(isPlacementPreview ? 'visible' : 'hidden')
   const outroTimerRef = useRef<number | null>(null)
   const revealTimerRef = useRef<number | null>(null)
   const activeCycleKeyRef = useRef<string | null>(null)
@@ -110,7 +111,7 @@ export function WheelLiveSurface({
   }, [sourceSpin])
 
   useEffect(() => {
-    if (isStudioPreview) {
+    if (isPlacementPreview) {
       if (outroTimerRef.current !== null) {
         window.clearTimeout(outroTimerRef.current)
         outroTimerRef.current = null
@@ -215,7 +216,7 @@ export function WheelLiveSurface({
         outroTimerRef.current = null
       }
     }
-  }, [isStudioPreview, phase, previewSpin, sourceSpin])
+  }, [isPlacementPreview, phase, previewSpin, sourceSpin])
 
   useEffect(() => {
     return () => {
@@ -234,7 +235,7 @@ export function WheelLiveSurface({
 
   const copy = getResultCopy({
     autoApply: displaySpin.autoApply,
-    isStudioPreview,
+    isPlacementPreview,
     isTest: displaySpin.isTest,
     requiresModeration: displaySpin.requiresModeration,
     status: displaySpin.status,
@@ -243,14 +244,14 @@ export function WheelLiveSurface({
   const resultTitle = displaySpin.status === 'spinning'
     ? copy.title
     : (displaySpin.resultTitle ?? 'Result ready')
-  const showWheelVisual = displaySpin.status === 'spinning' || isStudioPreview
-  const isResultVisible = displaySpin.status === 'ready' || isStudioPreview
+  const showWheelVisual = displaySpin.status === 'spinning' || isPlacementPreview
+  const isResultVisible = displaySpin.status === 'ready' || isPlacementPreview
   const cardClassName = [
     'wheel-overlay-card',
     `wheel-overlay-card--${phase}`,
     displaySpin.status === 'spinning' ? 'wheel-overlay-card--spinning' : 'wheel-overlay-card--result',
     displaySpin.autoApply ? 'wheel-overlay-card--auto-apply' : '',
-    isStudioPreview ? 'wheel-overlay-card--studio' : '',
+    isPlacementPreview ? 'wheel-overlay-card--studio' : '',
     variant === 'shell' ? 'wheel-overlay-card--shell' : '',
   ]
     .filter(Boolean)

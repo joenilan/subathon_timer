@@ -182,6 +182,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                     : twitchStatus === 'error'
                         ? 'Session check failed'
                         : null
+    const shouldShowShellWheelOverlay = showWheelOverlayInAppShell && location.pathname !== '/wheel'
 
     return (
         <div ref={shellRef} className={`shell${sidebarCollapsed ? ' shell--collapsed' : ''}`}>
@@ -362,7 +363,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                 <div className="workspace-content">
                     {children}
                 </div>
-                {showWheelOverlayInAppShell ? (
+                {shouldShowShellWheelOverlay ? (
                     <div className="app-wheel-overlay" aria-hidden="true">
                         <WheelLiveSurface
                             variant="shell"
