@@ -23,7 +23,7 @@ This section is the implementation status source of truth for shared-subathon wo
 | 0 | Decision And Contract | Completed | Server-authoritative shared mode accepted and documented on the planning branch. |
 | 1 | Shared Session Skeleton | Completed | In-memory service scaffold, create/join flow, presence socket, desktop page, and up-to-6 participant structure are in place on the planning branch. |
 | 2 | Shared Timer Snapshot Sync | Completed | Shared-session service owns the timer snapshot, host-only timer actions route through the service, and connected desktops render the same shared timer state. |
-| 3 | Shared Twitch Event Ingestion | Planned | Host/guest Twitch events feed one timer through the shared service. |
+| 3 | Shared Twitch Event Ingestion | Completed | Participant desktops now submit normalized Twitch events to the service, the service dedupes/applies them once, and the shared activity feed labels which creator triggered each event. |
 | 4 | Shared Tip Ingestion | Planned | Host/guest tips feed one timer, tip providers stay tip-only. |
 | 5 | Shared Wheel | Planned | Shared wheel trigger, sync, reveal, and single outcome application. |
 | 6 | Hardening | Planned | Reconnect, replay, audit, and recovery coverage. |
@@ -695,7 +695,7 @@ Completion notes:
 
 ### Phase 3: Shared Twitch Event Ingestion
 
-Status: `Planned`
+Status: `Completed`
 
 Deliverables:
 
@@ -704,6 +704,14 @@ Deliverables:
 - merged shared activity feed
 
 Only after this phase should the shared timer feel real.
+
+Completion notes:
+
+- connected desktop clients now submit normalized Twitch EventSub payloads to the shared-session service instead of applying them locally
+- the shared-session service dedupes Twitch events per participant and applies qualifying timer deltas once
+- the shared timer snapshot and shared activity feed now update together for every connected participant
+- the shared activity feed labels which creator triggered the applied Twitch event
+- tip providers remain blocked from shared-mode timer application until Phase 4
 
 ### Phase 4: Shared Tip Ingestion
 

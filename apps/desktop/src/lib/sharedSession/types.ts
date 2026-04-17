@@ -1,3 +1,5 @@
+import type { NormalizedTwitchEvent, TimerRuleConfig } from '../timer/types'
+
 export type SharedSessionConnectionStatus = 'connected' | 'disconnected'
 export type SharedSessionRole = 'host' | 'guest'
 export type SharedSessionStatus = 'waiting_for_collaborators' | 'active' | 'ended'
@@ -38,6 +40,19 @@ export interface SharedTimerState {
   timerSessionRunningSince: number | null
 }
 
+export interface SharedSessionActivityEntry {
+  id: string
+  sourceParticipantId: string
+  sourceParticipantLabel: string
+  provider: 'twitch'
+  eventType: NormalizedTwitchEvent['eventType']
+  title: string
+  summary: string
+  deltaSeconds: number
+  occurredAt: string
+  remainingSeconds: number
+}
+
 export interface SharedSessionSnapshot {
   id: string
   title: string
@@ -46,6 +61,7 @@ export interface SharedSessionSnapshot {
   hostParticipantId: string
   participants: SharedSessionParticipant[]
   timerState: SharedTimerState
+  recentActivity: SharedSessionActivityEntry[]
   createdAt: string
   updatedAt: string
 }
@@ -54,6 +70,7 @@ export interface SharedSessionCreateInput {
   title?: string
   displayName: string
   twitchIdentity: SharedSessionTwitchIdentity | null
+  ruleConfig: TimerRuleConfig
 }
 
 export interface SharedSessionJoinInput {
@@ -90,6 +107,11 @@ export interface SharedSessionTimerActionMessage {
     | { action: 'set'; timerSeconds: number; reason: string }
 }
 
+export interface SharedSessionTwitchEventMessage {
+  type: 'twitch.event'
+  payload: NormalizedTwitchEvent
+}
+
 export interface SharedSessionHelloMessage {
   type: 'hello'
 }
@@ -98,6 +120,7 @@ export type SharedSessionSocketClientMessage =
   | SharedSessionHelloMessage
   | SharedSessionParticipantStatusMessage
   | SharedSessionTimerActionMessage
+  | SharedSessionTwitchEventMessage
 
 export interface SharedSessionSnapshotMessage {
   type: 'session.snapshot'

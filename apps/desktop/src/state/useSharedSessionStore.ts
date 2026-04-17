@@ -13,8 +13,11 @@ import type {
   SharedSessionRole,
   SharedSessionServiceHealth,
   SharedSessionSnapshot,
+  SharedSessionSocketClientMessage,
   SharedSessionSocketServerMessage,
+  SharedSessionTwitchEventMessage,
 } from '../lib/sharedSession/types'
+import type { NormalizedTwitchEvent } from '../lib/timer/types'
 
 let activeSharedSessionSocket: WebSocket | null = null
 
@@ -47,6 +50,7 @@ export interface SharedSessionState {
   leaveSession: () => void
   clearError: () => void
   syncParticipantStatus: (payload: SharedParticipantRuntimeState) => void
+  submitSharedTwitchEvent: (event: NormalizedTwitchEvent) => boolean
   startSharedTimer: () => void
   pauseSharedTimer: () => void
   resetSharedTimer: () => void
@@ -55,7 +59,7 @@ export interface SharedSessionState {
 }
 
 export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
-  const sendSocketMessage = (message: unknown) => {
+  const sendSocketMessage = (message: SharedSessionSocketClientMessage) => {
     if (!activeSharedSessionSocket || activeSharedSessionSocket.readyState !== WebSocket.OPEN) {
       set({
         status: 'error',
@@ -211,6 +215,12 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
         payload,
       })
     },
+
+    submitSharedTwitchEvent: (event) =>
+      sendSocketMessage({
+        type: 'twitch.event',
+        payload: event,
+      } satisfies SharedSessionTwitchEventMessage),
 
     startSharedTimer: () => {
       sendSocketMessage({

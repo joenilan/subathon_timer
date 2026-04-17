@@ -7,7 +7,9 @@ import { selectSharedSessionPageState } from '../state/selectors'
 import { useSharedSessionStore } from '../state/useSharedSessionStore'
 import { useTipSessionStore } from '../state/useTipSessionStore'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
+import { useAppStore } from '../state/useAppStore'
 import type {
+  SharedSessionActivityEntry,
   SharedParticipantRuntimeState,
   SharedSessionParticipant,
   SharedSessionServiceHealth,
@@ -46,6 +48,24 @@ function getParticipantTone(participant: SharedSessionParticipant) {
   return participant.connectionStatus === 'connected' ? 'connected' : 'critical'
 }
 
+function formatActivityTime(occurredAt: string) {
+  const date = new Date(occurredAt)
+  return Number.isNaN(date.valueOf())
+    ? 'Just now'
+    : new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(date)
+}
+
+function getActivityDeltaLabel(entry: SharedSessionActivityEntry) {
+  if (entry.deltaSeconds === 0) {
+    return 'No timer change'
+  }
+
+  return `${entry.deltaSeconds > 0 ? '+' : '-'}${formatDurationClock(Math.abs(entry.deltaSeconds))}`
+}
+
 export function SharedSessionPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
@@ -79,6 +99,7 @@ export function SharedSessionPage() {
   const twitchSession = useTwitchSessionStore((state) => state.session)
   const streamElementsStatus = useTipSessionStore((state) => state.streamelementsStatus)
   const streamlabsStatus = useTipSessionStore((state) => state.streamlabsStatus)
+  const localRuleConfig = useAppStore((state) => state.ruleConfig)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -145,6 +166,7 @@ export function SharedSessionPage() {
       title: sessionTitle.trim(),
       displayName: displayName.trim() || twitchSession?.login || 'Host',
       twitchIdentity: localIdentity,
+      ruleConfig: localRuleConfig,
     })
     setCreateOpen(false)
     setDisplayName('')
@@ -455,6 +477,44 @@ export function SharedSessionPage() {
                 </article>
               ))}
             </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Shared Activity</h2>
+                <p className="panel-copy">
+                  Shared Twitch events are applied once on the service, then labeled here with the creator who triggered them so both desktops can audit the same runtime history.
+                </p>
+              </div>
+            </div>
+
+            {session.recentActivity.length > 0 ? (
+              <div className="shared-session-activity-list">
+                {session.recentActivity.map((entry) => (
+                  <article key={entry.id} className="shared-session-activity-card">
+                    <div className="shared-session-activity-card__header">
+                      <div className="shared-session-activity-card__title-group">
+                        <span className="shared-session-activity-card__kicker">
+                          {entry.sourceParticipantLabel} · {entry.provider === 'twitch' ? 'Twitch' : entry.provider}
+                        </span>
+                        <strong>{entry.title}</strong>
+                      </div>
+                      <div className="shared-session-activity-card__meta">
+                        <span className="mini-chip">{getActivityDeltaLabel(entry)}</span>
+                        <span className="shared-session-activity-card__time">{formatActivityTime(entry.occurredAt)}</span>
+                      </div>
+                    </div>
+                    <p>{entry.summary}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="shared-session-empty-state">
+                <strong>No shared Twitch events yet</strong>
+                <p>When one of the linked creators receives a qualifying Twitch event, the shared timer and this activity timeline will update for everyone in the room.</p>
+              </div>
+            )}
           </section>
         </>
       )}

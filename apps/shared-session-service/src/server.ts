@@ -1,3 +1,10 @@
+import {
+  getDefaultTimerRuleConfig,
+  normalizeTimerRuleConfig,
+  resolveTimerAdjustment,
+} from '../../desktop/src/lib/timer/engine'
+import type { NormalizedTwitchEvent, TimerRuleConfig } from '../../desktop/src/lib/timer/types'
+
 type SessionStatus = 'waiting_for_collaborators' | 'active' | 'ended'
 type ParticipantRole = 'host' | 'guest'
 type ConnectionStatus = 'connected' | 'disconnected'
@@ -38,6 +45,9 @@ interface SessionRecord {
   hostParticipantId: string
   participants: ParticipantRecord[]
   timerState: SharedTimerState
+  ruleConfig: TimerRuleConfig
+  recentActivity: SharedActivityEntry[]
+  appliedEventKeys: string[]
   createdAt: string
   updatedAt: string
 }
@@ -47,6 +57,19 @@ interface SharedTimerState {
   timerSessionBaseRemainingSeconds: number
   timerSessionBaseUptimeSeconds: number
   timerSessionRunningSince: number | null
+}
+
+interface SharedActivityEntry {
+  id: string
+  sourceParticipantId: string
+  sourceParticipantLabel: string
+  provider: 'twitch'
+  eventType: NormalizedTwitchEvent['eventType']
+  title: string
+  summary: string
+  deltaSeconds: number
+  occurredAt: string
+  remainingSeconds: number
 }
 
 interface JoinTokenRecord {
@@ -89,6 +112,7 @@ function sessionSnapshot(session: SessionRecord) {
     hostParticipantId: session.hostParticipantId,
     participants: session.participants,
     timerState: session.timerState,
+    recentActivity: session.recentActivity,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
   }
@@ -98,6 +122,10 @@ function clampTimerSeconds(value: number) {
   return Math.max(0, Math.floor(Number.isFinite(value) ? value : 0))
 }
 
+function buildEventDedupeKey(participantId: string, event: NormalizedTwitchEvent) {
+  return `${participantId}:${event.source}:${event.id}`
+}
+
 function createDefaultTimerState(): SharedTimerState {
   return {
     timerStatus: 'paused',
@@ -105,6 +133,10 @@ function createDefaultTimerState(): SharedTimerState {
     timerSessionBaseUptimeSeconds: 0,
     timerSessionRunningSince: null,
   }
+}
+
+function prependSharedActivityEntry(entries: SharedActivityEntry[], nextEntry: SharedActivityEntry) {
+  return [nextEntry, ...entries].slice(0, 20)
 }
 
 function resolveTimerRuntime(timerState: SharedTimerState, now = Date.now()) {
@@ -221,6 +253,54 @@ function applyTimerAction(timerState: SharedTimerState, action: TimerAction): Sh
   }
 }
 
+function applySharedTwitchEvent(session: SessionRecord, participant: ParticipantRecord, event: NormalizedTwitchEvent) {
+  if (event.source !== 'twitch-eventsub') {
+    return false
+  }
+
+  if (event.eventType === 'chat_command') {
+    return false
+  }
+
+  const dedupeKey = buildEventDedupeKey(participant.id, event)
+  if (session.appliedEventKeys.includes(dedupeKey)) {
+    return false
+  }
+
+  const result = resolveTimerAdjustment(event, session.ruleConfig)
+  if (!result) {
+    return false
+  }
+
+  const runtime = resolveTimerRuntime(session.timerState)
+  const nextRemaining = clampTimerSeconds(runtime.timerRemainingSeconds + result.deltaSeconds)
+  const nextStatus: SharedTimerStatus = nextRemaining <= 0 ? 'finished' : runtime.timerStatus === 'running' ? 'running' : 'paused'
+  const now = Date.now()
+
+  session.timerState = {
+    timerStatus: nextStatus,
+    timerSessionBaseRemainingSeconds: nextRemaining,
+    timerSessionBaseUptimeSeconds: runtime.uptimeSeconds,
+    timerSessionRunningSince: nextStatus === 'running' ? now : null,
+  }
+
+  session.recentActivity = prependSharedActivityEntry(session.recentActivity, {
+    id: `${event.id}:${participant.id}`,
+    sourceParticipantId: participant.id,
+    sourceParticipantLabel: participant.displayName,
+    provider: 'twitch',
+    eventType: event.eventType,
+    title: result.title,
+    summary: result.summary,
+    deltaSeconds: result.deltaSeconds,
+    occurredAt: nowIso(),
+    remainingSeconds: nextRemaining,
+  })
+  session.appliedEventKeys = [dedupeKey, ...session.appliedEventKeys].slice(0, 200)
+
+  return true
+}
+
 function generateInviteCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let code = ''
@@ -328,6 +408,7 @@ const server = Bun.serve<SharedSessionSocketData>({
           title?: string
           displayName?: string
           twitchIdentity?: TwitchIdentity | null
+          ruleConfig?: Partial<TimerRuleConfig> | null
         } | null
 
         const displayName = payload?.displayName?.trim()
@@ -361,6 +442,9 @@ const server = Bun.serve<SharedSessionSocketData>({
           hostParticipantId: participantId,
           participants: [participant],
           timerState: createDefaultTimerState(),
+          ruleConfig: normalizeTimerRuleConfig(payload?.ruleConfig ?? getDefaultTimerRuleConfig()),
+          recentActivity: [],
+          appliedEventKeys: [],
           createdAt,
           updatedAt: createdAt,
         }
@@ -502,6 +586,7 @@ const server = Bun.serve<SharedSessionSocketData>({
         | { type: 'hello' }
         | { type: 'participant.status'; payload: ParticipantRuntimeState }
         | { type: 'timer.action'; payload: TimerAction }
+        | { type: 'twitch.event'; payload: NormalizedTwitchEvent }
 
       try {
         message = JSON.parse(String(rawMessage)) as typeof message
@@ -536,6 +621,10 @@ const server = Bun.serve<SharedSessionSocketData>({
         }
 
         session.timerState = applyTimerAction(session.timerState, message.payload)
+      }
+
+      if (message.type === 'twitch.event') {
+        applySharedTwitchEvent(session, participant, message.payload)
       }
 
       updateSessionStatus(session)
