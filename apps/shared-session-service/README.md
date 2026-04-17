@@ -8,6 +8,7 @@ Current scope:
 - join a shared room by invite code
 - keep participant presence live over WebSocket
 - broadcast room snapshots back to both desktop apps
+- structurally support up to 6 creators in one room
 
 This is intentionally Phase 1 only. It does not own timer mutation yet.
 
@@ -34,3 +35,4 @@ Default bind:
 - state is in-memory only in this scaffold
 - invite codes and join tokens are ephemeral
 - restarting the service clears active rooms
+- `SHARED_SESSION_MAX_PARTICIPANTS` defaults to `6`

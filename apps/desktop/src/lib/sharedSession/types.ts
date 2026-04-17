@@ -1,6 +1,6 @@
 export type SharedSessionConnectionStatus = 'connected' | 'disconnected'
 export type SharedSessionRole = 'host' | 'guest'
-export type SharedSessionStatus = 'waiting_for_guest' | 'active' | 'ended'
+export type SharedSessionStatus = 'waiting_for_collaborators' | 'active' | 'ended'
 export type SharedSessionServiceHealth = 'unknown' | 'checking' | 'online' | 'offline'
 
 export type SharedSessionTwitchHealth = 'connected' | 'needs-attention' | 'not-linked'

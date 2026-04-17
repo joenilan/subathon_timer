@@ -2,12 +2,12 @@
 
 ## Summary
 
-This document defines the production design for a shared subathon mode where two streamers run the desktop app on separate PCs, connect their own Twitch accounts, and contribute events into one shared timer.
+This document defines the production design for a shared subathon mode where up to six creators run the desktop app on separate PCs, connect their own Twitch accounts, and contribute events into one shared timer.
 
 The core requirement is not "sync a countdown." The real requirement is:
 
 - one shared timer session
-- two independent broadcaster accounts
+- multiple independent broadcaster accounts
 - one merged event stream
 - no duplicate rule application
 - no ambiguous ownership for wheel, moderation, pause/resume, or manual edits
@@ -21,7 +21,7 @@ This section is the implementation status source of truth for shared-subathon wo
 | Phase | Name | Status | Notes |
 | --- | --- | --- | --- |
 | 0 | Decision And Contract | Completed | Server-authoritative shared mode accepted and documented on the planning branch. |
-| 1 | Shared Session Skeleton | Completed | In-memory service scaffold, create/join flow, presence socket, and desktop page are in place on the planning branch. |
+| 1 | Shared Session Skeleton | Completed | In-memory service scaffold, create/join flow, presence socket, desktop page, and up-to-6 participant structure are in place on the planning branch. |
 | 2 | Shared Timer Snapshot Sync | Planned | Server-owned timer snapshot and host-owned manual controls. |
 | 3 | Shared Twitch Event Ingestion | Planned | Host/guest Twitch events feed one timer through the shared service. |
 | 4 | Shared Tip Ingestion | Planned | Host/guest tips feed one timer, tip providers stay tip-only. |
@@ -41,7 +41,7 @@ Phase update rule:
 
 ## Product Goals
 
-- Let two streamers join the same shared subathon session from separate PCs.
+- Let up to six creators join the same shared subathon session from separate PCs.
 - Let each streamer connect their own Twitch account and their own tip providers.
 - Merge both accounts' qualifying events into one shared timer.
 - Keep the timer, activity feed, overlays, and wheel state consistent across both apps.
@@ -50,7 +50,7 @@ Phase update rule:
 
 ## Non-Goals
 
-- More than two streamers in the first version.
+- More than six creators in the first version.
 - General team/collab support with arbitrary membership.
 - Cross-provider follow/sub normalization in the first release beyond the specific duplicate protections defined here.
 - Local peer-to-peer sync between the two PCs.
@@ -79,8 +79,7 @@ The shared mode therefore needs a server-authoritative session model.
 
 ### Roles
 
-- Desktop client A: streamer A's app
-- Desktop client B: streamer B's app
+- Desktop clients: one per participating creator
 - Shared session service: authoritative session state and event ledger
 - Shared session database: durable state and event history
 
@@ -102,9 +101,9 @@ The desktop clients remain authoritative only for:
 - UI preferences that are not part of the shared runtime
 - local overlay presentation settings unless explicitly shared later
 
-## How The Two Accounts Link
+## How Participants Link
 
-The cleanest first-release model is a host/guest session with an invite code.
+The cleanest first-release model is a host-led session with an invite code.
 
 ### Host Flow
 
@@ -117,13 +116,13 @@ The cleanest first-release model is a host/guest session with an invite code.
    - host join token
 5. Streamer A keeps the session open and copies the invite code.
 
-### Guest Flow
+### Joiner Flow
 
-1. Streamer B opens the same `Shared subathon` page.
-2. Streamer B clicks `Join shared session`.
-3. Streamer B enters the invite code.
+1. Any additional creator opens the same `Shared subathon` page.
+2. They click `Join shared session`.
+3. They enter the invite code.
 4. The desktop app exchanges the invite code for a guest join token.
-5. Streamer B joins the live shared session.
+5. They join the live shared session.
 
 ### Identity Binding
 
@@ -141,7 +140,7 @@ Recommended binding:
 
 This means:
 
-- host and guest are linked by invite code
+- the host and every joining creator are linked by one invite code
 - each side still uses their own Twitch auth locally
 - the shared service knows exactly which broadcaster account belongs to which participant
 
@@ -295,7 +294,7 @@ Every event must have a stable dedupe key before it can affect the shared timer.
 
 ### What Dedupe Is Actually For
 
-In shared mode, dedupe is mainly for transport and retry safety, not because one viewer action should count for both streamers.
+In shared mode, dedupe is mainly for transport and retry safety, not because one viewer action should count for multiple creators.
 
 Examples of the real duplication risks:
 
@@ -307,7 +306,7 @@ Examples of the real duplication risks:
 Examples that are not the main problem:
 
 - one viewer follows streamer A and somehow that same follow should count for streamer B
-- one viewer's Twitch gift bomb naturally appearing on both streamers' Twitch EventSub sockets
+- one viewer's Twitch gift bomb naturally appearing on multiple creators' Twitch EventSub sockets
 
 Those should not happen if each client only listens to its own broadcaster account.
 
@@ -356,7 +355,7 @@ That page should cover:
 - shared mode explanation
 - current session state
 - host controls
-- guest join flow
+- creator join flow
 - participant presence
 - linked broadcaster accounts
 - shared event health
@@ -372,7 +371,7 @@ Show two clear actions:
 
 Support copy should explain one thing plainly:
 
-- each streamer connects their own Twitch account on their own PC
+- each creator connects their own Twitch account on their own PC
 - both sets of events feed one timer once joined
 
 #### Creating Session
@@ -391,7 +390,7 @@ Use a modal for:
 - entering invite code
 - validating code
 - showing which host/session is being joined
-- confirming the guest broadcaster account before final join
+- confirming the joining broadcaster account before final join
 
 #### Connected Session
 
@@ -399,7 +398,7 @@ Show a finished shared-session control surface with:
 
 - session title / session code
 - host vs guest badge
-- participant cards for both streamers
+- participant cards for the full roster
 - connected/disconnected presence state
 - Twitch linked account summary for each participant
 - tip-provider readiness summary for each participant
@@ -474,7 +473,7 @@ The shared-session page should match the desktop app's production look:
 The user-facing product language should stay operational and simple:
 
 - connected
-- waiting for guest
+- waiting for collaborators
 - reconnect required
 - shared timer active
 - host controls only
@@ -486,7 +485,7 @@ In shared mode, the rules and wheel config need one owner to avoid silent confli
 ### Recommended First Release
 
 - Host owns shared rules, wheel config, and manual timer controls.
-- Guest can contribute provider events but cannot edit shared runtime config.
+- Guests can contribute provider events but cannot edit shared runtime config.
 
 Optional later expansion:
 
@@ -607,6 +606,7 @@ The shared service should never require raw Twitch or tip-provider secrets for t
   - small service for shared sessions
   - websocket + REST endpoints
   - session database
+  - supports up to 6 participants structurally in the scaffold
 - desktop shared-session client layer under:
   - `apps/desktop/src/lib/sharedSession/`
 - desktop shared-session store:
@@ -672,6 +672,7 @@ Completion notes:
 - desktop create/join flow is exposed on a dedicated `Shared Session` page
 - participant presence is broadcast over a shared-session WebSocket
 - local Twitch/tip readiness is surfaced into the participant cards for setup visibility
+- the scaffold is already structured for up to 6 participants instead of being hard-wired to 2
 
 ### Phase 2: Shared Timer Snapshot Sync
 
@@ -764,17 +765,17 @@ Deliverables:
 
 ### Manual
 
-- host and guest connect from separate machines
-- each streamer triggers a qualifying Twitch event
+- host and guests connect from separate machines
+- each creator triggers a qualifying Twitch event
 - both apps show the same timer and activity result
-- guest disconnects and reconnects during live session
+- one guest disconnects and reconnects during live session
 - host disconnects and reconnects during live session
 - gift bomb triggers exactly one wheel spin and one outcome application
 - tip providers only affect tips and do not duplicate Twitch follows/subs/gifts
 
 ## Open Questions
 
-- Should the guest be able to trigger manual timer actions later, or stay read-only forever?
+- Should guests be able to trigger manual timer actions later, or stay read-only forever?
 - Should the shared activity feed mark which streamer contributed each event visibly in the UI?
 - Should chat announcements come from host only, or from both broadcasters independently?
 - Should each streamer keep their own wheel overlay placement while sharing the runtime state?

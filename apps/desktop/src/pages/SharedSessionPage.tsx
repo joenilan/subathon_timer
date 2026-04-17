@@ -146,7 +146,7 @@ export function SharedSessionPage() {
         <div>
           <h1 className="page-title">Shared Session</h1>
           <p className="page-desc">
-            Link two streamers into one shared subathon room, confirm both broadcaster accounts are present, and keep the shared runtime healthy before shared timer sync goes live.
+            Link up to six creators into one shared subathon room, confirm each broadcaster account is present, and keep the shared runtime healthy before shared timer sync goes live.
           </p>
         </div>
       </section>
@@ -191,19 +191,19 @@ export function SharedSessionPage() {
               <span className="mini-chip">Phase 1</span>
               <h2 className="panel-title">Create the shared room first, then link the shared timer in the next phase</h2>
               <p className="panel-copy">
-                This first shared-session build focuses on room creation, invite flow, broadcaster presence, and provider health. It gives both streamers one place to confirm they are linked before shared timer controls are turned on.
+                This first shared-session build focuses on room creation, invite flow, broadcaster presence, and provider health. It gives every collaborator one place to confirm they are linked before shared timer controls are turned on.
               </p>
             </div>
             <div className="shared-session-hero__grid">
               <div className="shared-session-callout">
                 <strong>Host streamer</strong>
-                <p>Create the room, share the invite code, and stay responsible for the future shared runtime controls.</p>
+                <p>Create the room, share the invite code, and stay responsible for the future shared runtime controls for the whole collaboration.</p>
                 <button type="button" className="btn btn--primary" onClick={() => setCreateOpen(true)}>
                   Create shared session
                 </button>
               </div>
               <div className="shared-session-callout">
-                <strong>Guest streamer</strong>
+                <strong>Joining creator</strong>
                 <p>Join the host’s room with the invite code from their app and confirm your own Twitch account is the one attached to this PC.</p>
                 <button type="button" className="btn btn--accent" onClick={() => setJoinOpen(true)}>
                   Join shared session
@@ -243,14 +243,15 @@ export function SharedSessionPage() {
               <div>
                 <div className="shared-session-session-card__badges">
                   <span className="mini-chip">Invite code {session.inviteCode}</span>
+                  <span className="mini-chip">{session.participants.length} / 6 creators joined</span>
                   <span className={`status-chip ${session.status === 'active' ? 'status-chip--connected' : 'status-chip--pending'}`}>
-                    {session.status === 'active' ? 'Both streamers linked' : 'Waiting for guest'}
+                    {session.status === 'active' ? 'Shared room active' : 'Waiting for collaborators'}
                   </span>
                   {localRole ? <span className="mini-chip">{localRole === 'host' ? 'Host controls only' : 'Guest view'}</span> : null}
                 </div>
                 <h2 className="panel-title">{session.title}</h2>
                 <p className="panel-copy">
-                  This room is live. Both apps should stay on this page long enough to confirm presence, linked Twitch accounts, and provider health before shared timer sync is enabled in the next phase.
+                  This room is live. Each app should stay on this page long enough to confirm presence, linked Twitch accounts, and provider health before shared timer sync is enabled in the next phase.
                 </p>
               </div>
               <div className="shared-session-session-card__actions">
@@ -294,7 +295,7 @@ export function SharedSessionPage() {
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">Participants</h2>
-                <p className="panel-copy">Each participant card must clearly show who is in the room, which broadcaster account is linked, and whether that PC is still online.</p>
+                <p className="panel-copy">Each participant card shows who is in the room, which broadcaster account is linked, and whether that PC is still online. The scaffold is already structured for up to six creators.</p>
               </div>
             </div>
 
@@ -360,7 +361,7 @@ export function SharedSessionPage() {
             <div className="settings-grid settings-grid--single">
               <label className="rule-field">
                 <span className="rule-field__label">Session title</span>
-                <span className="rule-field__hint">Use a short label both streamers will recognize during setup.</span>
+                <span className="rule-field__hint">Use a short label the whole collaboration will recognize during setup.</span>
                 <input className="rule-field__input" value={sessionTitle} onChange={(event) => setSessionTitle(event.target.value)} placeholder="Shared Subathon" />
               </label>
               <label className="rule-field">

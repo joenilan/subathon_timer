@@ -1,4 +1,4 @@
-type SessionStatus = 'waiting_for_guest' | 'active' | 'ended'
+type SessionStatus = 'waiting_for_collaborators' | 'active' | 'ended'
 type ParticipantRole = 'host' | 'guest'
 type ConnectionStatus = 'connected' | 'disconnected'
 type TwitchHealth = 'connected' | 'needs-attention' | 'not-linked'
@@ -52,6 +52,7 @@ interface SharedSessionSocketData {
 
 const HOST = process.env.SHARED_SESSION_HOST ?? '127.0.0.1'
 const PORT = Number.parseInt(process.env.SHARED_SESSION_PORT ?? '31947', 10)
+const MAX_PARTICIPANTS = Number.parseInt(process.env.SHARED_SESSION_MAX_PARTICIPANTS ?? '6', 10)
 
 const sessions = new Map<string, SessionRecord>()
 const inviteCodeIndex = new Map<string, string>()
@@ -111,7 +112,7 @@ function getSessionByInviteCode(inviteCode: string) {
 
 function updateSessionStatus(session: SessionRecord) {
   const connectedCount = session.participants.filter((participant) => participant.connectionStatus === 'connected').length
-  session.status = session.participants.length > 1 || connectedCount > 1 ? 'active' : 'waiting_for_guest'
+  session.status = session.participants.length > 1 || connectedCount > 1 ? 'active' : 'waiting_for_collaborators'
   session.updatedAt = nowIso()
 }
 
@@ -218,7 +219,7 @@ const server = Bun.serve<SharedSessionSocketData>({
           id: sessionId,
           title,
           inviteCode,
-          status: 'waiting_for_guest',
+          status: 'waiting_for_collaborators',
           hostParticipantId: participantId,
           participants: [participant],
           createdAt,
@@ -260,8 +261,8 @@ const server = Bun.serve<SharedSessionSocketData>({
           return errorResponse('That invite code does not match an active shared session.', 404)
         }
 
-        if (session.participants.length >= 2) {
-          return errorResponse('This shared session already has both streamer slots filled.', 409)
+        if (session.participants.length >= MAX_PARTICIPANTS) {
+          return errorResponse(`This shared session already has all ${MAX_PARTICIPANTS} creator slots filled.`, 409)
         }
 
         const participantId = crypto.randomUUID()
