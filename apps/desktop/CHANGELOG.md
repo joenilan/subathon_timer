@@ -2,6 +2,12 @@
 
 All notable changes to the desktop app are tracked here.
 
+## 0.9.4
+
+- Added a new wheel reveal timing control so streamers can decide how long the winner stays on screen before tests clear or automatic wheel actions finish.
+- Reworked the wheel winner presentation so the wheel stays visible behind a smaller centered result card that reads better on stream.
+- Kept the React overlay, in-app wheel popup, and native OBS loopback overlay aligned for the new reveal timing and layout behavior.
+
 ## 0.9.3
 
 - Reworked the wheel flow to match the original gift-bomb behavior more closely, including automatic gift-bomb spins, delayed result reveal timing, chat announcements, and safe non-applying gift-bomb tests.

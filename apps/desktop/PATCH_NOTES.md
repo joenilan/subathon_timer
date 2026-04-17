@@ -1,5 +1,11 @@
 # Patch Notes
 
+## 0.9.4
+
+- Added a setting for how long wheel results stay visible after a spin.
+- The wheel now stays on screen during the winner reveal with a smaller centered result card.
+- React, in-app, and OBS wheel surfaces now follow the same reveal timing and presentation.
+
 ## 0.9.3
 
 - Gifted-sub wheel spins now follow the live reveal flow more closely, with safer gift-bomb tests that preview the result without applying actions.
