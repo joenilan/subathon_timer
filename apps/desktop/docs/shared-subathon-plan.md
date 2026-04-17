@@ -211,6 +211,55 @@ The shared service:
 - appends the event to the shared activity ledger
 - broadcasts the updated state to both clients
 
+## Event Source Boundaries
+
+The shared mode should be explicit about which providers are allowed to drive which event types.
+
+### Twitch Is Authoritative For
+
+- follows
+- subs and resubs
+- cheers/bits
+- gift bombs
+- wheel triggers
+- moderation-related outcomes
+
+Reason:
+
+- each streamer's desktop app is already connected to that streamer's own broadcaster account
+- Twitch EventSub is the cleanest source for these channel-native events
+- a follow or gift bomb on streamer A's channel should only come from streamer A's Twitch connection, not streamer B's
+
+### StreamElements And Streamlabs Are Authoritative Only For
+
+- tips
+- donations
+
+Reason:
+
+- those providers are already being kept tip-only in the desktop app
+- allowing them to contribute follows/subs/gifts would overlap with Twitch and create unnecessary duplicate-risk
+
+### Practical Consequence
+
+The shared service should accept:
+
+- Twitch events from host
+- Twitch events from guest
+- tip events from host
+- tip events from guest
+
+But it should reject or ignore:
+
+- follow/sub/gift style activity coming from StreamElements or Streamlabs
+- wheel-trigger attempts from tip providers
+
+This keeps the event model simple:
+
+- Twitch drives Twitch-style channel events
+- tip providers drive money/tip events only
+- both participants contribute to one timer
+
 ## Dedupe Strategy
 
 This is the highest-risk part of the feature and must be designed before implementation.
@@ -218,6 +267,24 @@ This is the highest-risk part of the feature and must be designed before impleme
 ### Hard Rule
 
 Every event must have a stable dedupe key before it can affect the shared timer.
+
+### What Dedupe Is Actually For
+
+In shared mode, dedupe is mainly for transport and retry safety, not because one viewer action should count for both streamers.
+
+Examples of the real duplication risks:
+
+- a client reconnects and resubmits a previously seen event
+- the shared service receives the same normalized event twice
+- a provider replay/test surface emits the same tip more than once
+- a moderation apply path retries after partial failure
+
+Examples that are not the main problem:
+
+- one viewer follows streamer A and somehow that same follow should count for streamer B
+- one viewer's Twitch gift bomb naturally appearing on both streamers' Twitch EventSub sockets
+
+Those should not happen if each client only listens to its own broadcaster account.
 
 ### Twitch Events
 
@@ -250,6 +317,142 @@ The first shared-mode release should not try to infer "this StreamElements tip a
 ### Replay/Test Events
 
 Provider-side test events should be allowed only when marked as tests and only if the session is explicitly in a testing mode. They must never be eligible for permanent timer changes in a live shared session unless the product explicitly adds a shared testing workflow.
+
+## Shared-Session UI And UX
+
+This feature needs finished product UX, not a debug console or raw transport panel.
+
+### Main Entry Point
+
+Add a dedicated `Shared Session` page in the desktop app.
+
+That page should cover:
+
+- shared mode explanation
+- current session state
+- host controls
+- guest join flow
+- participant presence
+- linked broadcaster accounts
+- shared event health
+
+### Primary States
+
+#### Not In Shared Session
+
+Show two clear actions:
+
+- `Create Shared Session`
+- `Join Shared Session`
+
+Support copy should explain one thing plainly:
+
+- each streamer connects their own Twitch account on their own PC
+- both sets of events feed one timer once joined
+
+#### Creating Session
+
+Use a modal or focused setup card for:
+
+- session name or title if we want it
+- invite code generation
+- copy/share invite button
+- host account verification summary
+
+#### Joining Session
+
+Use a modal for:
+
+- entering invite code
+- validating code
+- showing which host/session is being joined
+- confirming the guest broadcaster account before final join
+
+#### Connected Session
+
+Show a finished shared-session control surface with:
+
+- session title / session code
+- host vs guest badge
+- participant cards for both streamers
+- connected/disconnected presence state
+- Twitch linked account summary for each participant
+- tip-provider readiness summary for each participant
+- shared timer status summary
+
+### Recommended Layout
+
+For the first production pass, keep the page structured as:
+
+1. shared-session header
+2. participant status row
+3. shared runtime control panel
+4. event-source health panel
+5. recent shared activity panel
+
+Do not bury shared status inside the existing `Connections` page only. It deserves its own surface.
+
+### Modal Use
+
+Modals are appropriate for:
+
+- create-session confirmation
+- join-session code entry
+- leave-session confirmation
+- end-session confirmation
+- reconnect/reclaim-session flow
+
+Do not use a modal for the entire day-to-day shared-session experience. The ongoing state should live on a full page.
+
+### UX Rules
+
+- Host and guest status must be visually obvious.
+- Each participant card must show exactly which Twitch account is linked.
+- Shared-mode errors must say which side is unhealthy:
+  - host Twitch disconnected
+  - guest Twitch disconnected
+  - host tips disconnected
+  - guest tips disconnected
+- If one side disconnects, the UI should say the session is still running, not imply total failure.
+- If guest permissions are limited, say that directly in the UI instead of hiding controls without explanation.
+
+### Shared Activity Feed
+
+The shared activity feed should visibly tag which participant produced the event.
+
+Examples:
+
+- `Host · Follow · viewername`
+- `Guest · Tier 1 sub · viewername`
+- `Host · Streamlabs tip · $5.00`
+
+Without that, the shared timer will feel opaque and debugging live issues will be harder than it needs to be.
+
+### Shared Testing UX
+
+If we add shared test flows later, keep them obviously separate from live actions.
+
+Recommended rules:
+
+- shared test actions must be labeled `Test`
+- test events must be visually distinct in the shared activity feed
+- test events must never silently apply a live moderation outcome
+
+### Visual Standard
+
+The shared-session page should match the desktop app's production look:
+
+- no debug tables as the primary UI
+- no raw JSON in the user-facing surface
+- no developer terms like `session token`, `transport ack`, or `event ledger` exposed unless behind an advanced diagnostics area
+
+The user-facing product language should stay operational and simple:
+
+- connected
+- waiting for guest
+- reconnect required
+- shared timer active
+- host controls only
 
 ## Shared Rules And Config Ownership
 
@@ -423,6 +626,7 @@ Deliverables:
 - session create/join flow
 - participant presence
 - desktop shared-session page
+- polished host/guest UI states for create, join, connected, and reconnect-required
 
 No timer mutation yet.
 
