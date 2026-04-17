@@ -5,6 +5,7 @@ import {
   createSharedSession,
   DEFAULT_SHARED_SESSION_HTTP_BASE,
   joinSharedSession,
+  rejoinSharedSession,
 } from '../lib/sharedSession/client'
 import type {
   SharedParticipantRuntimeState,
@@ -21,9 +22,23 @@ import type {
 } from '../lib/sharedSession/types'
 import type { NormalizedTwitchEvent } from '../lib/timer/types'
 
+const RECONNECT_MAX_ATTEMPTS = 3
+const RECONNECT_DELAY_MS = [1000, 3000, 9000] as const
+
 let activeSharedSessionSocket: WebSocket | null = null
+let reconnectAttempt = 0
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearReconnectTimer() {
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+}
 
 function closeSharedSessionSocket() {
+  clearReconnectTimer()
+
   if (!activeSharedSessionSocket) {
     return
   }
@@ -40,15 +55,18 @@ export interface SharedSessionState {
   serviceUrl: string
   serviceHealth: SharedSessionServiceHealth
   serviceMessage: string | null
-  status: 'idle' | 'creating' | 'joining' | 'connecting' | 'connected' | 'error'
+  status: 'idle' | 'creating' | 'joining' | 'connecting' | 'connected' | 'reconnecting' | 'error'
   session: SharedSessionSnapshot | null
   localParticipantId: string | null
+  localSessionId: string | null
   localRole: SharedSessionRole | null
+  joinToken: string | null
   lastError: string | null
 
   checkHealth: () => Promise<void>
   createSession: (input: SharedSessionCreateInput) => Promise<void>
   joinSession: (input: SharedSessionJoinInput) => Promise<void>
+  rejoinSession: () => Promise<void>
   leaveSession: () => void
   clearError: () => void
   syncParticipantStatus: (payload: SharedParticipantRuntimeState) => void
@@ -67,6 +85,7 @@ export interface SharedSessionState {
   resetSharedTimer: () => void
   adjustSharedTimer: (deltaSeconds: number, reason: string) => void
   setSharedTimer: (timerSeconds: number, reason: string) => void
+  endSharedSession: () => void
 }
 
 export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
@@ -83,20 +102,23 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
     return true
   }
 
-  const connectRealtime = (joinToken: string, participantId: string, role: SharedSessionRole) => {
+  const connectRealtime = (joinToken: string, participantId: string, role: SharedSessionRole, sessionId: string) => {
     closeSharedSessionSocket()
 
     set({
       status: 'connecting',
       lastError: null,
       localParticipantId: participantId,
+      localSessionId: sessionId,
       localRole: role,
+      joinToken,
     })
 
     const socket = new WebSocket(buildSharedSessionSocketUrl(get().serviceUrl, joinToken))
     activeSharedSessionSocket = socket
 
     socket.onopen = () => {
+      reconnectAttempt = 0
       socket.send(JSON.stringify({ type: 'hello' }))
     }
 
@@ -110,6 +132,20 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
           serviceHealth: 'online',
           serviceMessage: 'Shared session service reachable.',
           lastError: null,
+        })
+        return
+      }
+
+      if (message.type === 'session.ended') {
+        closeSharedSessionSocket()
+        set({
+          status: 'idle',
+          session: null,
+          localParticipantId: null,
+          localSessionId: null,
+          localRole: null,
+          joinToken: null,
+          lastError: 'The host ended the shared session.',
         })
         return
       }
@@ -132,11 +168,52 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
     socket.onclose = () => {
       activeSharedSessionSocket = null
 
-      set((state) => ({
-        ...state,
-        status: state.session ? 'error' : 'idle',
-        lastError: state.session ? 'The shared session connection closed.' : null,
-      }))
+      const state = get()
+
+      // No session means this was a clean leave — do not reconnect.
+      if (!state.session) {
+        set((s) => ({ ...s, status: s.status === 'connecting' ? 'error' : 'idle' }))
+        return
+      }
+
+      // session.ended message already handled — if we're already idle, don't clobber that state.
+      if (state.status === 'idle') {
+        return
+      }
+
+      // Attempt auto-reconnect if we have the stored token and have not exhausted retries.
+      const storedToken = state.joinToken
+      if (storedToken && reconnectAttempt < RECONNECT_MAX_ATTEMPTS) {
+        const delay = RECONNECT_DELAY_MS[reconnectAttempt] ?? 9000
+        reconnectAttempt += 1
+
+        set({ status: 'reconnecting', lastError: null })
+
+        clearReconnectTimer()
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null
+          const current = get()
+
+          // If the user manually left during the backoff window, abort.
+          if (!current.session || !current.localParticipantId || !current.localSessionId || !current.localRole) {
+            return
+          }
+
+          connectRealtime(
+            storedToken,
+            current.localParticipantId,
+            current.localRole,
+            current.localSessionId,
+          )
+        }, delay)
+
+        return
+      }
+
+      set({
+        status: 'error',
+        lastError: 'The shared session connection closed. You may need to rejoin.',
+      })
     }
   }
 
@@ -147,7 +224,9 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
     status: 'idle',
     session: null,
     localParticipantId: null,
+    localSessionId: null,
     localRole: null,
+    joinToken: null,
     lastError: null,
 
     checkHealth: async () => {
@@ -178,7 +257,12 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
 
       try {
         const response = await createSharedSession(get().serviceUrl, input)
-        connectRealtime(response.joinToken, response.participantId, 'host')
+        connectRealtime(
+          response.joinToken,
+          response.participantId,
+          'host',
+          response.session.id,
+        )
       } catch (error) {
         set({
           status: 'error',
@@ -195,7 +279,12 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
 
       try {
         const response = await joinSharedSession(get().serviceUrl, input)
-        connectRealtime(response.joinToken, response.participantId, 'guest')
+        connectRealtime(
+          response.joinToken,
+          response.participantId,
+          'guest',
+          response.session.id,
+        )
       } catch (error) {
         set({
           status: 'error',
@@ -207,13 +296,44 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
       }
     },
 
+    rejoinSession: async () => {
+      const { localSessionId, localParticipantId, localRole, serviceUrl } = get()
+
+      if (!localSessionId || !localParticipantId || !localRole) {
+        set({
+          status: 'error',
+          lastError: 'No session to rejoin. Use an invite code instead.',
+        })
+        return
+      }
+
+      set({ status: 'connecting', lastError: null })
+      reconnectAttempt = 0
+
+      try {
+        const response = await rejoinSharedSession(serviceUrl, localSessionId, localParticipantId)
+        connectRealtime(response.joinToken, localParticipantId, localRole, localSessionId)
+      } catch (error) {
+        set({
+          status: 'error',
+          lastError:
+            error instanceof Error && error.message.trim().length > 0
+              ? error.message
+              : 'Unable to rejoin the shared session. It may have ended.',
+        })
+      }
+    },
+
     leaveSession: () => {
+      reconnectAttempt = 0
       closeSharedSessionSocket()
       set({
         status: 'idle',
         session: null,
         localParticipantId: null,
+        localSessionId: null,
         localRole: null,
+        joinToken: null,
         lastError: null,
       })
     },
@@ -298,6 +418,10 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
           reason,
         },
       })
+    },
+
+    endSharedSession: () => {
+      sendSocketMessage({ type: 'session.end' } as SharedSessionSocketClientMessage)
     },
   }
 })

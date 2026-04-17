@@ -27,7 +27,7 @@
 - `apps/desktop/docs/persistence-roadmap.md` is the source of truth for the persistence migration phases. Update it whenever a persistence-related phase lands or changes scope.
 - `apps/desktop/docs/shared-subathon-plan.md` is the source of truth for the shared-session / linked-streamer design. Update it whenever shared-session scope, ownership rules, or rollout phases change.
 - `apps/desktop/docs/shared-subathon-plan.md` also contains the shared-session phase tracker. If a shared-session phase starts, is blocked, changes scope, or is completed, update that tracker in the same pass.
-- `apps/shared-session-service/` is the shared-session backend entrypoint. It now covers the Phase 1 create/join/presence scaffold, the Phase 2 server-owned shared timer snapshot, the Phase 3 shared Twitch event ingestion path, the Phase 4 tip-only provider ingestion path, and the Phase 5 shared wheel runtime. Keep new shared-mode authority there instead of improvising ad hoc endpoints elsewhere.
+- `apps/shared-session-service/` is the shared-session backend entrypoint. It now covers the Phase 1 create/join/presence scaffold, the Phase 2 server-owned shared timer snapshot, the Phase 3 shared Twitch event ingestion path, the Phase 4 tip-only provider ingestion path, the Phase 5 shared wheel runtime, and the Phase 6 hardening (reconnect, rejoin endpoint, session end, and integration tests). Keep new shared-mode authority there instead of improvising ad hoc endpoints elsewhere.
 - Root `src/` and `public/` are the legacy Node/overlay app. Treat them as behavior reference unless a task explicitly targets the old stack.
 
 ## Build, Test, and Development Commands

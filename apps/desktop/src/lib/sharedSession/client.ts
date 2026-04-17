@@ -60,6 +60,22 @@ export async function joinSharedSession(baseUrl: string, input: SharedSessionJoi
   return readJson<SharedSessionJoinResponse>(response)
 }
 
+export async function rejoinSharedSession(
+  baseUrl: string,
+  sessionId: string,
+  participantId: string,
+) {
+  const response = await fetch(joinUrl(baseUrl, `/sessions/${sessionId}/rejoin`), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ participantId }),
+  })
+
+  return readJson<SharedSessionJoinResponse>(response)
+}
+
 export function buildSharedSessionSocketUrl(baseUrl: string, joinToken: string) {
   const socketBase = baseUrl.replace(/^http/i, 'ws').replace(/\/+$/, '')
   return `${socketBase}/ws?token=${encodeURIComponent(joinToken)}`

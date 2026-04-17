@@ -102,10 +102,12 @@ export function SharedSessionPage() {
     lastError,
     checkHealth,
     createSession,
+    endSharedSession,
     failSharedWheelTimeout,
     joinSession,
     leaveSession,
     pauseSharedTimer,
+    rejoinSession,
     resetSharedTimer,
     setSharedTimer,
     startSharedTimer,
@@ -322,7 +324,31 @@ export function SharedSessionPage() {
         </button>
       </section>
 
-      {lastError ? (
+      {status === 'reconnecting' ? (
+        <section className="panel shared-session-alert shared-session-alert--warning">
+          <div>
+            <strong>Reconnecting</strong>
+            <p>Lost contact with the shared session service. Attempting to reconnect automatically.</p>
+          </div>
+        </section>
+      ) : null}
+
+      {lastError && status === 'error' && session ? (
+        <section className="panel shared-session-alert shared-session-alert--critical">
+          <div>
+            <strong>Connection lost</strong>
+            <p>{lastError}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn--primary" onClick={() => void rejoinSession()}>
+              Reconnect
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={leaveSession}>
+              Leave session
+            </button>
+          </div>
+        </section>
+      ) : lastError ? (
         <section className="panel shared-session-alert shared-session-alert--critical">
           <div>
             <strong>Shared session error</strong>
@@ -412,9 +438,15 @@ export function SharedSessionPage() {
                 >
                   Copy invite code
                 </button>
-                <button type="button" className="btn btn--danger" onClick={leaveSession}>
-                  Leave session
-                </button>
+                {isHost ? (
+                  <button type="button" className="btn btn--danger" onClick={endSharedSession}>
+                    End session
+                  </button>
+                ) : (
+                  <button type="button" className="btn btn--danger" onClick={leaveSession}>
+                    Leave session
+                  </button>
+                )}
               </div>
             </div>
           </section>

@@ -26,7 +26,7 @@ This section is the implementation status source of truth for shared-subathon wo
 | 3 | Shared Twitch Event Ingestion | Completed | Participant desktops now submit normalized Twitch events to the service, the service dedupes/applies them once, and the shared activity feed labels which creator triggered each event. |
 | 4 | Shared Tip Ingestion | Completed | Participant-local StreamElements and Streamlabs tips now submit to the service, the service applies them once, and non-tip provider activity is ignored. |
 | 5 | Shared Wheel | Completed | Shared gift bombs now trigger one server-owned wheel spin, connected desktops receive the same spin/result state, and timeout outcomes are finalized by the participant whose broadcaster session triggered the wheel. |
-| 6 | Hardening | Planned | Reconnect, replay, audit, and recovery coverage. |
+| 6 | Hardening | Completed | Auto-reconnect with backoff, rejoin endpoint, host-driven session end, and 21 integration tests covering dedupe, timer authority, wheel ownership, reconnect, and session lifecycle. |
 
 Status values:
 
@@ -753,7 +753,7 @@ Completion notes:
 
 ### Phase 6: Hardening
 
-Status: `Planned`
+Status: `Completed`
 
 Deliverables:
 
@@ -761,6 +761,16 @@ Deliverables:
 - event ledger audit tools
 - session close/recover flows
 - test harnesses for duplicate prevention
+
+Completion notes:
+
+- the desktop store now stores the join token across the session lifetime and auto-reconnects on socket drop with exponential backoff (1s/3s/9s, max 3 attempts)
+- a `POST /sessions/:id/rejoin` endpoint issues a fresh join token to an existing participant, covering the app-restart-while-service-alive scenario
+- the desktop store exposes `rejoinSession()` which calls the rejoin endpoint and re-opens the socket; the shared-session page surfaces a reconnect button when the connection is lost
+- host-driven session end is handled via a `session.end` socket message; the service marks the session `ended`, broadcasts `session.ended` to all connected participants, and rejects any subsequent join or rejoin attempts with 410
+- the shared-session page shows an "End session" button for the host and a "Reconnect" button when the store status is `error` with a live session reference
+- the `apps/shared-session-service/src/createServer.ts` factory function wraps all server state in a closure, enabling isolated test instances per test run
+- 21 integration tests in `apps/shared-session-service/src/server.test.ts` cover: session create/join, capacity enforcement, WebSocket connect, reconnect with same token, rejoin with participantId, Twitch event dedupe, non-tip provider rejection, host timer authority, guest timer rejection, session end from host, session end rejection from guest, and 410 guard on ended sessions
 
 ## Risks
 

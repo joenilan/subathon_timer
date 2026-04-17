@@ -20,8 +20,11 @@ Current scope:
 - broadcast a shared activity feed with creator labels
 - broadcast room snapshots back to both desktop apps
 - structurally support up to 6 creators in one room
+- issue fresh join tokens to existing participants via rejoin endpoint
+- enforce host-only session end via socket message
+- reject join and rejoin on ended sessions with 410
 
-This scaffold now covers Phase 5 of the shared-subathon plan. It is still intentionally in-memory only, and reconnect/replay hardening is still deferred to the next phase.
+This scaffold now covers Phase 6 of the shared-subathon plan. State is still intentionally in-memory only; a durable database layer is a future concern.
 
 ## Run
 
@@ -39,7 +42,15 @@ Default bind:
 - `GET /health`
 - `POST /sessions`
 - `POST /sessions/join`
+- `POST /sessions/:id/rejoin` — issue a fresh join token to an existing participant
 - `GET /ws?token=<joinToken>` (WebSocket upgrade)
+
+## Tests
+
+```bash
+cd apps/shared-session-service
+bun run test
+```
 
 ## Notes
 

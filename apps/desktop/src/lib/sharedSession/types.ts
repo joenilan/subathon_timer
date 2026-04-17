@@ -151,6 +151,10 @@ export interface SharedSessionHelloMessage {
   type: 'hello'
 }
 
+export interface SharedSessionEndSessionMessage {
+  type: 'session.end'
+}
+
 export type SharedSessionSocketClientMessage =
   | SharedSessionHelloMessage
   | SharedSessionParticipantStatusMessage
@@ -158,6 +162,7 @@ export type SharedSessionSocketClientMessage =
   | SharedSessionTwitchEventMessage
   | SharedSessionTipEventMessage
   | SharedSessionWheelActionMessage
+  | SharedSessionEndSessionMessage
 
 export interface SharedSessionSnapshotMessage {
   type: 'session.snapshot'
@@ -171,6 +176,14 @@ export interface SharedSessionErrorMessage {
   }
 }
 
+export interface SharedSessionEndedMessage {
+  type: 'session.ended'
+  payload: {
+    sessionId: string
+  }
+}
+
 export type SharedSessionSocketServerMessage =
   | SharedSessionSnapshotMessage
   | SharedSessionErrorMessage
+  | SharedSessionEndedMessage
