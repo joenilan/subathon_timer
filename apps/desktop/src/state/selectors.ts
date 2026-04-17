@@ -221,6 +221,7 @@ export const selectRulesTipState = (state: TipSessionState) => ({
 })
 
 export const selectSharedSessionPageState = (state: SharedSessionState) => ({
+  adjustSharedTimer: state.adjustSharedTimer,
   checkHealth: state.checkHealth,
   clearError: state.clearError,
   createSession: state.createSession,
@@ -229,10 +230,14 @@ export const selectSharedSessionPageState = (state: SharedSessionState) => ({
   leaveSession: state.leaveSession,
   localParticipantId: state.localParticipantId,
   localRole: state.localRole,
+  pauseSharedTimer: state.pauseSharedTimer,
+  resetSharedTimer: state.resetSharedTimer,
   serviceHealth: state.serviceHealth,
   serviceMessage: state.serviceMessage,
   serviceUrl: state.serviceUrl,
   session: state.session,
+  setSharedTimer: state.setSharedTimer,
+  startSharedTimer: state.startSharedTimer,
   status: state.status,
   syncParticipantStatus: state.syncParticipantStatus,
 })

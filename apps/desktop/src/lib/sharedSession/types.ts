@@ -2,6 +2,7 @@ export type SharedSessionConnectionStatus = 'connected' | 'disconnected'
 export type SharedSessionRole = 'host' | 'guest'
 export type SharedSessionStatus = 'waiting_for_collaborators' | 'active' | 'ended'
 export type SharedSessionServiceHealth = 'unknown' | 'checking' | 'online' | 'offline'
+export type SharedTimerStatus = 'idle' | 'running' | 'paused' | 'finished'
 
 export type SharedSessionTwitchHealth = 'connected' | 'needs-attention' | 'not-linked'
 export type SharedSessionTipHealth = 'connected' | 'connecting' | 'error' | 'idle'
@@ -30,6 +31,13 @@ export interface SharedSessionParticipant {
   runtimeState: SharedParticipantRuntimeState
 }
 
+export interface SharedTimerState {
+  timerStatus: SharedTimerStatus
+  timerSessionBaseRemainingSeconds: number
+  timerSessionBaseUptimeSeconds: number
+  timerSessionRunningSince: number | null
+}
+
 export interface SharedSessionSnapshot {
   id: string
   title: string
@@ -37,6 +45,7 @@ export interface SharedSessionSnapshot {
   status: SharedSessionStatus
   hostParticipantId: string
   participants: SharedSessionParticipant[]
+  timerState: SharedTimerState
   createdAt: string
   updatedAt: string
 }
@@ -71,6 +80,16 @@ export interface SharedSessionParticipantStatusMessage {
   payload: SharedParticipantRuntimeState
 }
 
+export interface SharedSessionTimerActionMessage {
+  type: 'timer.action'
+  payload:
+    | { action: 'start' }
+    | { action: 'pause' }
+    | { action: 'reset' }
+    | { action: 'adjust'; deltaSeconds: number; reason: string }
+    | { action: 'set'; timerSeconds: number; reason: string }
+}
+
 export interface SharedSessionHelloMessage {
   type: 'hello'
 }
@@ -78,6 +97,7 @@ export interface SharedSessionHelloMessage {
 export type SharedSessionSocketClientMessage =
   | SharedSessionHelloMessage
   | SharedSessionParticipantStatusMessage
+  | SharedSessionTimerActionMessage
 
 export interface SharedSessionSnapshotMessage {
   type: 'session.snapshot'

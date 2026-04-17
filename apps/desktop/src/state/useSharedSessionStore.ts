@@ -47,9 +47,27 @@ export interface SharedSessionState {
   leaveSession: () => void
   clearError: () => void
   syncParticipantStatus: (payload: SharedParticipantRuntimeState) => void
+  startSharedTimer: () => void
+  pauseSharedTimer: () => void
+  resetSharedTimer: () => void
+  adjustSharedTimer: (deltaSeconds: number, reason: string) => void
+  setSharedTimer: (timerSeconds: number, reason: string) => void
 }
 
 export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
+  const sendSocketMessage = (message: unknown) => {
+    if (!activeSharedSessionSocket || activeSharedSessionSocket.readyState !== WebSocket.OPEN) {
+      set({
+        status: 'error',
+        lastError: 'The shared session connection is not open.',
+      })
+      return false
+    }
+
+    activeSharedSessionSocket.send(JSON.stringify(message))
+    return true
+  }
+
   const connectRealtime = (joinToken: string, participantId: string, role: SharedSessionRole) => {
     closeSharedSessionSocket()
 
@@ -188,16 +206,60 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
     clearError: () => set({ lastError: null }),
 
     syncParticipantStatus: (payload) => {
-      if (!activeSharedSessionSocket || activeSharedSessionSocket.readyState !== WebSocket.OPEN) {
-        return
-      }
+      sendSocketMessage({
+        type: 'participant.status',
+        payload,
+      })
+    },
 
-      activeSharedSessionSocket.send(
-        JSON.stringify({
-          type: 'participant.status',
-          payload,
-        }),
-      )
+    startSharedTimer: () => {
+      sendSocketMessage({
+        type: 'timer.action',
+        payload: { action: 'start' satisfies SharedTimerActionPayload['action'] },
+      })
+    },
+
+    pauseSharedTimer: () => {
+      sendSocketMessage({
+        type: 'timer.action',
+        payload: { action: 'pause' satisfies SharedTimerActionPayload['action'] },
+      })
+    },
+
+    resetSharedTimer: () => {
+      sendSocketMessage({
+        type: 'timer.action',
+        payload: { action: 'reset' satisfies SharedTimerActionPayload['action'] },
+      })
+    },
+
+    adjustSharedTimer: (deltaSeconds, reason) => {
+      sendSocketMessage({
+        type: 'timer.action',
+        payload: {
+          action: 'adjust',
+          deltaSeconds: Math.round(deltaSeconds),
+          reason,
+        },
+      })
+    },
+
+    setSharedTimer: (timerSeconds, reason) => {
+      sendSocketMessage({
+        type: 'timer.action',
+        payload: {
+          action: 'set',
+          timerSeconds: Math.max(0, Math.round(timerSeconds)),
+          reason,
+        },
+      })
     },
   }
 })
+
+type SharedTimerActionPayload =
+  | { action: 'start' }
+  | { action: 'pause' }
+  | { action: 'reset' }
+  | { action: 'adjust'; deltaSeconds: number; reason: string }
+  | { action: 'set'; timerSeconds: number; reason: string }

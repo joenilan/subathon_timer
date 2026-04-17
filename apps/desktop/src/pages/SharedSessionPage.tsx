@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { TimerWidget } from '../components/TimerWidget'
+import { formatDurationClock } from '../lib/timer/engine'
+import { resolveRuntimeFromSession } from '../lib/timer/runtime'
+import { selectSharedSessionPageState } from '../state/selectors'
 import { useSharedSessionStore } from '../state/useSharedSessionStore'
 import { useTipSessionStore } from '../state/useTipSessionStore'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
@@ -48,7 +52,10 @@ export function SharedSessionPage() {
   const [sessionTitle, setSessionTitle] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [joinCode, setJoinCode] = useState('')
+  const [setTimerDraft, setSetTimerDraft] = useState('06:00:00')
+  const [now, setNow] = useState(() => Date.now())
   const {
+    adjustSharedTimer,
     serviceUrl,
     serviceHealth,
     serviceMessage,
@@ -61,30 +68,22 @@ export function SharedSessionPage() {
     createSession,
     joinSession,
     leaveSession,
+    pauseSharedTimer,
+    resetSharedTimer,
+    setSharedTimer,
+    startSharedTimer,
     clearError,
     syncParticipantStatus,
-  } = useSharedSessionStore(
-    useShallow((state) => ({
-      serviceUrl: state.serviceUrl,
-      serviceHealth: state.serviceHealth,
-      serviceMessage: state.serviceMessage,
-      status: state.status,
-      session: state.session,
-      localParticipantId: state.localParticipantId,
-      localRole: state.localRole,
-      lastError: state.lastError,
-      checkHealth: state.checkHealth,
-      createSession: state.createSession,
-      joinSession: state.joinSession,
-      leaveSession: state.leaveSession,
-      clearError: state.clearError,
-      syncParticipantStatus: state.syncParticipantStatus,
-    })),
-  )
+  } = useSharedSessionStore(useShallow(selectSharedSessionPageState))
   const twitchStatus = useTwitchSessionStore((state) => state.status)
   const twitchSession = useTwitchSessionStore((state) => state.session)
   const streamElementsStatus = useTipSessionStore((state) => state.streamelementsStatus)
   const streamlabsStatus = useTipSessionStore((state) => state.streamlabsStatus)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     void checkHealth()
@@ -117,6 +116,29 @@ export function SharedSessionPage() {
   )
   const participantCards = session?.participants ?? []
   const localParticipant = participantCards.find((participant) => participant.id === localParticipantId) ?? null
+  const sharedTimer = useMemo(() => {
+    if (!session) {
+      return null
+    }
+
+    return resolveRuntimeFromSession(
+      {
+        timerStatus: session.timerState.timerStatus,
+        timerSessionBaseRemainingSeconds: session.timerState.timerSessionBaseRemainingSeconds,
+        timerSessionBaseUptimeSeconds: session.timerState.timerSessionBaseUptimeSeconds,
+        timerSessionRunningSince: session.timerState.timerSessionRunningSince,
+      },
+      now,
+    )
+  }, [now, session])
+  const isHost = localRole === 'host'
+  const runButtonLabel =
+    sharedTimer?.timerStatus === 'running'
+      ? 'Pause'
+      : sharedTimer?.timerStatus === 'paused' && sharedTimer.timerRemainingSeconds > 0
+        ? 'Resume'
+        : 'Start'
+  const runButtonAction = sharedTimer?.timerStatus === 'running' ? pauseSharedTimer : startSharedTimer
 
   const handleCreate = async () => {
     await createSession({
@@ -140,13 +162,19 @@ export function SharedSessionPage() {
     setJoinCode('')
   }
 
+  const applyExactTimer = () => {
+    const nextSeconds = parseDurationDraft(setTimerDraft)
+    setSharedTimer(nextSeconds, 'Shared session host set timer')
+    setSetTimerDraft(formatDurationDraft(nextSeconds))
+  }
+
   return (
     <div className="page-container settings-page shared-session-page">
       <section className="page-header rules-header">
         <div>
           <h1 className="page-title">Shared Session</h1>
           <p className="page-desc">
-            Link up to six creators into one shared subathon room, confirm each broadcaster account is present, and keep the shared runtime healthy before shared timer sync goes live.
+            Link up to six creators into one shared subathon room, verify each broadcaster account is attached to the right PC, and keep one shared timer snapshot in sync across every desktop client.
           </p>
         </div>
       </section>
@@ -188,10 +216,10 @@ export function SharedSessionPage() {
         <>
           <section className="panel shared-session-hero">
             <div className="shared-session-hero__copy">
-              <span className="mini-chip">Phase 1</span>
-              <h2 className="panel-title">Create the shared room first, then link the shared timer in the next phase</h2>
+              <span className="mini-chip">Phase 2</span>
+              <h2 className="panel-title">Create the room, link the creators, and let the host drive one shared timer</h2>
               <p className="panel-copy">
-                This first shared-session build focuses on room creation, invite flow, broadcaster presence, and provider health. It gives every collaborator one place to confirm they are linked before shared timer controls are turned on.
+                The shared-session flow now covers room creation, invite flow, creator presence, broadcaster identity, provider health, and one server-owned timer snapshot. The host can drive the shared timer while every guest sees the same live value.
               </p>
             </div>
             <div className="shared-session-hero__grid">
@@ -251,7 +279,7 @@ export function SharedSessionPage() {
                 </div>
                 <h2 className="panel-title">{session.title}</h2>
                 <p className="panel-copy">
-                  This room is live. Each app should stay on this page long enough to confirm presence, linked Twitch accounts, and provider health before shared timer sync is enabled in the next phase.
+                  This room is live. Use this page to confirm creator presence, linked Twitch accounts, provider health, and the shared timer snapshot before Twitch and tip ingestion are added in later phases.
                 </p>
               </div>
               <div className="shared-session-session-card__actions">
@@ -267,6 +295,92 @@ export function SharedSessionPage() {
                 </button>
               </div>
             </div>
+          </section>
+
+          <section className="panel shared-session-timer-panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Shared Timer</h2>
+                <p className="panel-copy">
+                  This timer snapshot now comes from the shared-session service. Only the host can start, pause, reset, add time, remove time, or set the exact shared timer value in this phase.
+                </p>
+              </div>
+              <div className="shared-session-session-card__badges">
+                <span className={`status-chip ${sharedTimer?.timerStatus === 'running' ? 'status-chip--connected' : 'status-chip--idle'}`}>
+                  {sharedTimer?.timerStatus ?? 'idle'}
+                </span>
+                <span className="mini-chip">{sharedTimer ? formatDurationClock(sharedTimer.uptimeSeconds) : '00:00:00'} uptime</span>
+              </div>
+            </div>
+
+            {sharedTimer ? (
+              <div className="shared-session-timer-grid">
+                <div className="shared-session-timer-stage">
+                  <TimerWidget
+                    theme="app"
+                    surface="dashboard"
+                    timerSeconds={sharedTimer.timerRemainingSeconds}
+                    uptimeSeconds={sharedTimer.uptimeSeconds}
+                    timerStatus={sharedTimer.timerStatus}
+                    trendPoints={[session.timerState.timerSessionBaseRemainingSeconds, sharedTimer.timerRemainingSeconds]}
+                    rules={[]}
+                    showTrend={false}
+                  />
+                </div>
+
+                <div className="shared-session-timer-controls">
+                  <div className="shared-session-callout">
+                    <strong>Host controls</strong>
+                    <p>
+                      {isHost
+                        ? 'These controls write to the shared-session service and every connected desktop app will receive the same timer snapshot.'
+                        : 'Only the host can change the shared timer right now. Guest desktops stay read-only until later permission work lands.'}
+                    </p>
+                    <div className="shared-session-control-row">
+                      <button type="button" className="btn btn--primary" onClick={runButtonAction} disabled={!isHost}>
+                        {runButtonLabel}
+                      </button>
+                      <button type="button" className="btn btn--ghost" onClick={resetSharedTimer} disabled={!isHost}>
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="shared-session-callout">
+                    <strong>Quick adjust</strong>
+                    <p>Use the same operator shortcuts here before shared Twitch and tip events are wired in.</p>
+                    <div className="shared-session-control-row">
+                      <button type="button" className="btn btn--accent" onClick={() => adjustSharedTimer(300, 'Shared session host add 5 min')} disabled={!isHost}>
+                        +5 min
+                      </button>
+                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(60, 'Shared session host add 1 min')} disabled={!isHost}>
+                        +1 min
+                      </button>
+                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(-120, 'Shared session host remove 2 min')} disabled={!isHost}>
+                        -2 min
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="shared-session-callout">
+                    <strong>Set exact timer</strong>
+                    <p>Use `HH:MM:SS` to set the shared timer directly when you need to recover or start from a specific value.</p>
+                    <div className="shared-session-set-row">
+                      <input
+                        className="rule-field__input"
+                        value={setTimerDraft}
+                        onChange={(event) => setSetTimerDraft(normalizeDurationDraft(event.target.value))}
+                        placeholder="06:00:00"
+                        disabled={!isHost}
+                      />
+                      <button type="button" className="btn btn--accent" onClick={applyExactTimer} disabled={!isHost}>
+                        Set timer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="shared-session-summary-grid">
@@ -422,4 +536,41 @@ export function SharedSessionPage() {
       ) : null}
     </div>
   )
+}
+
+function normalizeDurationDraft(value: string) {
+  return value.replace(/[^\d:]/g, '').slice(0, 8)
+}
+
+function parseDurationDraft(value: string) {
+  const parts = value
+    .split(':')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => Math.max(0, Number.parseInt(part, 10) || 0))
+
+  if (parts.length === 0) {
+    return 0
+  }
+
+  if (parts.length === 1) {
+    return parts[0] * 60
+  }
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts
+    return minutes * 60 + Math.min(seconds, 59)
+  }
+
+  const [hours, minutes, seconds] = parts.slice(-3)
+  return hours * 3600 + Math.min(minutes, 59) * 60 + Math.min(seconds, 59)
+}
+
+function formatDurationDraft(totalSeconds: number) {
+  const safeTotal = Math.max(0, Math.floor(totalSeconds))
+  const hours = Math.floor(safeTotal / 3600)
+  const minutes = Math.floor((safeTotal % 3600) / 60)
+  const seconds = safeTotal % 60
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }

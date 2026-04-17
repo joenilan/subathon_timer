@@ -22,7 +22,7 @@ This section is the implementation status source of truth for shared-subathon wo
 | --- | --- | --- | --- |
 | 0 | Decision And Contract | Completed | Server-authoritative shared mode accepted and documented on the planning branch. |
 | 1 | Shared Session Skeleton | Completed | In-memory service scaffold, create/join flow, presence socket, desktop page, and up-to-6 participant structure are in place on the planning branch. |
-| 2 | Shared Timer Snapshot Sync | Planned | Server-owned timer snapshot and host-owned manual controls. |
+| 2 | Shared Timer Snapshot Sync | Completed | Shared-session service owns the timer snapshot, host-only timer actions route through the service, and connected desktops render the same shared timer state. |
 | 3 | Shared Twitch Event Ingestion | Planned | Host/guest Twitch events feed one timer through the shared service. |
 | 4 | Shared Tip Ingestion | Planned | Host/guest tips feed one timer, tip providers stay tip-only. |
 | 5 | Shared Wheel | Planned | Shared wheel trigger, sync, reveal, and single outcome application. |
@@ -676,7 +676,7 @@ Completion notes:
 
 ### Phase 2: Shared Timer Snapshot Sync
 
-Status: `Planned`
+Status: `Completed`
 
 Deliverables:
 
@@ -685,6 +685,13 @@ Deliverables:
 - both clients render the same timer snapshot
 
 Still no provider ingestion.
+
+Completion notes:
+
+- the shared-session service now owns `timerState` for every room
+- host-only timer actions (`start`, `pause`, `reset`, `adjust`, `set`) are enforced on the shared-session socket
+- the desktop `Shared Session` page renders the authoritative shared timer snapshot and exposes host-only controls
+- host and guest clients now receive the same updated timer snapshot from the service after host actions
 
 ### Phase 3: Shared Twitch Event Ingestion
 

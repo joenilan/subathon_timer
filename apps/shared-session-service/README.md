@@ -7,10 +7,12 @@ Current scope:
 - create a shared room
 - join a shared room by invite code
 - keep participant presence live over WebSocket
+- own the shared timer snapshot for the room
+- accept host-only timer actions over WebSocket
 - broadcast room snapshots back to both desktop apps
 - structurally support up to 6 creators in one room
 
-This is intentionally Phase 1 only. It does not own timer mutation yet.
+This scaffold now covers Phase 2 of the shared-subathon plan. It is still intentionally in-memory only and does not ingest Twitch or tip-provider events yet.
 
 ## Run
 

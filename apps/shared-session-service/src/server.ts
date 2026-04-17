@@ -3,6 +3,7 @@ type ParticipantRole = 'host' | 'guest'
 type ConnectionStatus = 'connected' | 'disconnected'
 type TwitchHealth = 'connected' | 'needs-attention' | 'not-linked'
 type TipHealth = 'connected' | 'connecting' | 'error' | 'idle'
+type SharedTimerStatus = 'idle' | 'running' | 'paused' | 'finished'
 
 interface TwitchIdentity {
   userId: string
@@ -36,8 +37,16 @@ interface SessionRecord {
   status: SessionStatus
   hostParticipantId: string
   participants: ParticipantRecord[]
+  timerState: SharedTimerState
   createdAt: string
   updatedAt: string
+}
+
+interface SharedTimerState {
+  timerStatus: SharedTimerStatus
+  timerSessionBaseRemainingSeconds: number
+  timerSessionBaseUptimeSeconds: number
+  timerSessionRunningSince: number | null
 }
 
 interface JoinTokenRecord {
@@ -53,6 +62,7 @@ interface SharedSessionSocketData {
 const HOST = process.env.SHARED_SESSION_HOST ?? '127.0.0.1'
 const PORT = Number.parseInt(process.env.SHARED_SESSION_PORT ?? '31947', 10)
 const MAX_PARTICIPANTS = Number.parseInt(process.env.SHARED_SESSION_MAX_PARTICIPANTS ?? '6', 10)
+const DEFAULT_TIMER_SECONDS = Number.parseInt(process.env.SHARED_SESSION_DEFAULT_TIMER_SECONDS ?? '21600', 10)
 
 const sessions = new Map<string, SessionRecord>()
 const inviteCodeIndex = new Map<string, string>()
@@ -78,8 +88,136 @@ function sessionSnapshot(session: SessionRecord) {
     status: session.status,
     hostParticipantId: session.hostParticipantId,
     participants: session.participants,
+    timerState: session.timerState,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
+  }
+}
+
+function clampTimerSeconds(value: number) {
+  return Math.max(0, Math.floor(Number.isFinite(value) ? value : 0))
+}
+
+function createDefaultTimerState(): SharedTimerState {
+  return {
+    timerStatus: 'paused',
+    timerSessionBaseRemainingSeconds: clampTimerSeconds(DEFAULT_TIMER_SECONDS),
+    timerSessionBaseUptimeSeconds: 0,
+    timerSessionRunningSince: null,
+  }
+}
+
+function resolveTimerRuntime(timerState: SharedTimerState, now = Date.now()) {
+  if (timerState.timerStatus !== 'running' || !timerState.timerSessionRunningSince) {
+    return {
+      timerStatus:
+        timerState.timerSessionBaseRemainingSeconds <= 0 && timerState.timerStatus !== 'idle' ? 'finished' : timerState.timerStatus,
+      timerRemainingSeconds: clampTimerSeconds(timerState.timerSessionBaseRemainingSeconds),
+      uptimeSeconds: clampTimerSeconds(timerState.timerSessionBaseUptimeSeconds),
+    }
+  }
+
+  const elapsedSeconds = clampTimerSeconds((now - timerState.timerSessionRunningSince) / 1000)
+  const timerRemainingSeconds = clampTimerSeconds(timerState.timerSessionBaseRemainingSeconds - elapsedSeconds)
+  const uptimeSeconds = clampTimerSeconds(timerState.timerSessionBaseUptimeSeconds + elapsedSeconds)
+
+  return {
+    timerStatus: timerRemainingSeconds <= 0 ? 'finished' : 'running',
+    timerRemainingSeconds,
+    uptimeSeconds,
+  }
+}
+
+function collapseTimerState(timerState: SharedTimerState, nextStatus: SharedTimerStatus): SharedTimerState {
+  const runtime = resolveTimerRuntime(timerState)
+
+  return {
+    timerStatus: runtime.timerRemainingSeconds <= 0 ? 'finished' : nextStatus,
+    timerSessionBaseRemainingSeconds: runtime.timerRemainingSeconds,
+    timerSessionBaseUptimeSeconds: runtime.uptimeSeconds,
+    timerSessionRunningSince: null,
+  }
+}
+
+type TimerAction =
+  | { action: 'start' }
+  | { action: 'pause' }
+  | { action: 'reset' }
+  | { action: 'adjust'; deltaSeconds: number; reason: string }
+  | { action: 'set'; timerSeconds: number; reason: string }
+
+function applyTimerAction(timerState: SharedTimerState, action: TimerAction): SharedTimerState {
+  const runtime = resolveTimerRuntime(timerState)
+  const wasRunning = runtime.timerStatus === 'running'
+  const collapsed = {
+    timerStatus: runtime.timerRemainingSeconds <= 0 ? 'finished' : wasRunning ? 'paused' : runtime.timerStatus,
+    timerSessionBaseRemainingSeconds: runtime.timerRemainingSeconds,
+    timerSessionBaseUptimeSeconds: runtime.uptimeSeconds,
+    timerSessionRunningSince: null,
+  } satisfies SharedTimerState
+
+  switch (action.action) {
+    case 'start':
+      if (collapsed.timerSessionBaseRemainingSeconds <= 0) {
+        return {
+          ...collapsed,
+          timerStatus: 'finished',
+        }
+      }
+
+      return {
+        timerStatus: 'running',
+        timerSessionBaseRemainingSeconds: collapsed.timerSessionBaseRemainingSeconds,
+        timerSessionBaseUptimeSeconds: collapsed.timerSessionBaseUptimeSeconds,
+        timerSessionRunningSince: Date.now(),
+      }
+
+    case 'pause':
+      return {
+        ...collapsed,
+        timerStatus: collapsed.timerSessionBaseRemainingSeconds <= 0 ? 'finished' : 'paused',
+      }
+
+    case 'reset':
+      return createDefaultTimerState()
+
+    case 'adjust': {
+      const nextRemaining = clampTimerSeconds(collapsed.timerSessionBaseRemainingSeconds + action.deltaSeconds)
+      if (wasRunning && nextRemaining > 0) {
+        return {
+          timerStatus: 'running',
+          timerSessionBaseRemainingSeconds: nextRemaining,
+          timerSessionBaseUptimeSeconds: collapsed.timerSessionBaseUptimeSeconds,
+          timerSessionRunningSince: Date.now(),
+        }
+      }
+
+      return {
+        timerStatus: nextRemaining <= 0 ? 'finished' : collapsed.timerStatus,
+        timerSessionBaseRemainingSeconds: nextRemaining,
+        timerSessionBaseUptimeSeconds: collapsed.timerSessionBaseUptimeSeconds,
+        timerSessionRunningSince: null,
+      }
+    }
+
+    case 'set': {
+      const nextRemaining = clampTimerSeconds(action.timerSeconds)
+      if (wasRunning && nextRemaining > 0) {
+        return {
+          timerStatus: 'running',
+          timerSessionBaseRemainingSeconds: nextRemaining,
+          timerSessionBaseUptimeSeconds: collapsed.timerSessionBaseUptimeSeconds,
+          timerSessionRunningSince: Date.now(),
+        }
+      }
+
+      return {
+        timerStatus: nextRemaining <= 0 ? 'finished' : collapsed.timerStatus === 'idle' ? 'paused' : collapsed.timerStatus,
+        timerSessionBaseRemainingSeconds: nextRemaining,
+        timerSessionBaseUptimeSeconds: collapsed.timerSessionBaseUptimeSeconds,
+        timerSessionRunningSince: null,
+      }
+    }
   }
 }
 
@@ -222,6 +360,7 @@ const server = Bun.serve<SharedSessionSocketData>({
           status: 'waiting_for_collaborators',
           hostParticipantId: participantId,
           participants: [participant],
+          timerState: createDefaultTimerState(),
           createdAt,
           updatedAt: createdAt,
         }
@@ -359,9 +498,17 @@ const server = Bun.serve<SharedSessionSocketData>({
         return
       }
 
-      const message = JSON.parse(String(rawMessage)) as
+      let message:
         | { type: 'hello' }
         | { type: 'participant.status'; payload: ParticipantRuntimeState }
+        | { type: 'timer.action'; payload: TimerAction }
+
+      try {
+        message = JSON.parse(String(rawMessage)) as typeof message
+      } catch {
+        socket.send(JSON.stringify({ type: 'session.error', payload: { message: 'Shared session message was not valid JSON.' } }))
+        return
+      }
 
       participant.lastSeenAt = nowIso()
 
@@ -380,6 +527,15 @@ const server = Bun.serve<SharedSessionSocketData>({
             displayName: participant.twitchIdentity?.displayName ?? message.payload.twitchLogin,
           }
         }
+      }
+
+      if (message.type === 'timer.action') {
+        if (participant.id !== session.hostParticipantId) {
+          socket.send(JSON.stringify({ type: 'session.error', payload: { message: 'Only the host can change the shared timer right now.' } }))
+          return
+        }
+
+        session.timerState = applyTimerAction(session.timerState, message.payload)
       }
 
       updateSessionStatus(session)
