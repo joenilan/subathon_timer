@@ -17,6 +17,11 @@ The legacy root `src/` and `public/` app is kept as behavior reference only. New
 - `apps/desktop/src-tauri/`: native Tauri shell and loopback overlay server
 - `apps/desktop/docs/`: desktop-specific implementation notes and roadmap docs
 
+Important planning docs:
+
+- [apps/desktop/docs/persistence-roadmap.md](/E:/git/subathon_timer/apps/desktop/docs/persistence-roadmap.md)
+- [apps/desktop/docs/shared-subathon-plan.md](/E:/git/subathon_timer/apps/desktop/docs/shared-subathon-plan.md)
+
 ## Quick Start
 
 ### Prerequisites

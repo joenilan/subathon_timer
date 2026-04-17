@@ -25,6 +25,7 @@
 - `apps/desktop/src/pages/SettingsPage.tsx` owns the remaining desktop-level appearance settings and legacy config import flow.
 - `apps/desktop/src/lib/config/legacyConfig.ts` parses the old `config.json` shape into the current desktop rules and wheel config.
 - `apps/desktop/docs/persistence-roadmap.md` is the source of truth for the persistence migration phases. Update it whenever a persistence-related phase lands or changes scope.
+- `apps/desktop/docs/shared-subathon-plan.md` is the source of truth for the shared-session / linked-streamer design. Update it whenever shared-session scope, ownership rules, or rollout phases change.
 - Root `src/` and `public/` are the legacy Node/overlay app. Treat them as behavior reference unless a task explicitly targets the old stack.
 
 ## Build, Test, and Development Commands
@@ -91,3 +92,4 @@
 - Standard app pages like `Connections`, `Rules`, and `Settings` should prefer page-level scrolling. Do not trap normal content inside fixed-height or flex-compressed inner panes just to avoid page scroll.
 - Reserve pane-local scrolling for clearly dedicated surfaces only, such as the dashboard activity rail, overlay studio panes, or the wheel segment list/editor where an isolated scroll region is part of the actual interaction model.
 - For persistence work, follow `apps/desktop/docs/persistence-roadmap.md` in order and keep that file updated as part of the same pass. Do not let persistence phases live only in chat context.
+- For shared-subathon work, follow `apps/desktop/docs/shared-subathon-plan.md` in order and keep that file updated as part of the same pass. Do not improvise a peer-to-peer sync model or let shared-session authority rules live only in chat context.
