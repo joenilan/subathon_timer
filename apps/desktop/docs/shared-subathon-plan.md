@@ -14,6 +14,31 @@ The core requirement is not "sync a countdown." The real requirement is:
 
 This plan assumes the current desktop app remains the operator-facing client. The new work adds a small shared-session service and a shared-session mode in the desktop app. The local single-streamer flow must continue to work without the service.
 
+## Phase Tracker
+
+This section is the implementation status source of truth for shared-subathon work. Update it in the same pass as any shared-session implementation change.
+
+| Phase | Name | Status | Notes |
+| --- | --- | --- | --- |
+| 0 | Decision And Contract | Planned | Design approved only when server-authoritative shared mode is accepted. |
+| 1 | Shared Session Skeleton | Planned | Create/join flow, presence, and initial page shell. |
+| 2 | Shared Timer Snapshot Sync | Planned | Server-owned timer snapshot and host-owned manual controls. |
+| 3 | Shared Twitch Event Ingestion | Planned | Host/guest Twitch events feed one timer through the shared service. |
+| 4 | Shared Tip Ingestion | Planned | Host/guest tips feed one timer, tip providers stay tip-only. |
+| 5 | Shared Wheel | Planned | Shared wheel trigger, sync, reveal, and single outcome application. |
+| 6 | Hardening | Planned | Reconnect, replay, audit, and recovery coverage. |
+
+Status values:
+
+- `Planned`
+- `In progress`
+- `Blocked`
+- `Completed`
+
+Phase update rule:
+
+- whenever a shared-session phase starts, changes scope, is blocked, or is completed, update this table and the matching phase section below in the same commit
+
 ## Product Goals
 
 - Let two streamers join the same shared subathon session from separate PCs.
@@ -607,6 +632,8 @@ The shared service should never require raw Twitch or tip-provider secrets for t
 
 ### Phase 0: Decision And Contract
 
+Status: `Planned`
+
 Deliverables:
 
 - this design doc
@@ -620,6 +647,8 @@ Stop/go decision:
 
 ### Phase 1: Shared Session Skeleton
 
+Status: `Planned`
+
 Deliverables:
 
 - shared-session service scaffold
@@ -632,6 +661,8 @@ No timer mutation yet.
 
 ### Phase 2: Shared Timer Snapshot Sync
 
+Status: `Planned`
+
 Deliverables:
 
 - shared timer state on the server
@@ -641,6 +672,8 @@ Deliverables:
 Still no provider ingestion.
 
 ### Phase 3: Shared Twitch Event Ingestion
+
+Status: `Planned`
 
 Deliverables:
 
@@ -652,6 +685,8 @@ Only after this phase should the shared timer feel real.
 
 ### Phase 4: Shared Tip Ingestion
 
+Status: `Planned`
+
 Deliverables:
 
 - participant-local StreamElements/Streamlabs tip events submitted to server
@@ -662,6 +697,8 @@ Keep providers tip-only.
 
 ### Phase 5: Shared Wheel
 
+Status: `Planned`
+
 Deliverables:
 
 - server-owned wheel trigger and selection
@@ -670,6 +707,8 @@ Deliverables:
 - single application path for wheel results
 
 ### Phase 6: Hardening
+
+Status: `Planned`
 
 Deliverables:
 

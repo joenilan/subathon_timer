@@ -26,6 +26,7 @@
 - `apps/desktop/src/lib/config/legacyConfig.ts` parses the old `config.json` shape into the current desktop rules and wheel config.
 - `apps/desktop/docs/persistence-roadmap.md` is the source of truth for the persistence migration phases. Update it whenever a persistence-related phase lands or changes scope.
 - `apps/desktop/docs/shared-subathon-plan.md` is the source of truth for the shared-session / linked-streamer design. Update it whenever shared-session scope, ownership rules, or rollout phases change.
+- `apps/desktop/docs/shared-subathon-plan.md` also contains the shared-session phase tracker. If a shared-session phase starts, is blocked, changes scope, or is completed, update that tracker in the same pass.
 - Root `src/` and `public/` are the legacy Node/overlay app. Treat them as behavior reference unless a task explicitly targets the old stack.
 
 ## Build, Test, and Development Commands
@@ -93,3 +94,4 @@
 - Reserve pane-local scrolling for clearly dedicated surfaces only, such as the dashboard activity rail, overlay studio panes, or the wheel segment list/editor where an isolated scroll region is part of the actual interaction model.
 - For persistence work, follow `apps/desktop/docs/persistence-roadmap.md` in order and keep that file updated as part of the same pass. Do not let persistence phases live only in chat context.
 - For shared-subathon work, follow `apps/desktop/docs/shared-subathon-plan.md` in order and keep that file updated as part of the same pass. Do not improvise a peer-to-peer sync model or let shared-session authority rules live only in chat context.
+- For shared-subathon work, do not mark a phase as effectively done only in chat. Update the phase tracker table and the relevant phase section status inside `apps/desktop/docs/shared-subathon-plan.md` in the same commit.

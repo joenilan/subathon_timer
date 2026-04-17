@@ -22,6 +22,8 @@ Important planning docs:
 - [apps/desktop/docs/persistence-roadmap.md](/E:/git/subathon_timer/apps/desktop/docs/persistence-roadmap.md)
 - [apps/desktop/docs/shared-subathon-plan.md](/E:/git/subathon_timer/apps/desktop/docs/shared-subathon-plan.md)
 
+Shared-subathon phase status is tracked directly inside [apps/desktop/docs/shared-subathon-plan.md](/E:/git/subathon_timer/apps/desktop/docs/shared-subathon-plan.md). Keep that document updated as phases start, change scope, or complete.
+
 ## Quick Start
 
 ### Prerequisites
