@@ -27,6 +27,7 @@
 - `apps/desktop/docs/persistence-roadmap.md` is the source of truth for the persistence migration phases. Update it whenever a persistence-related phase lands or changes scope.
 - `apps/desktop/docs/shared-subathon-plan.md` is the source of truth for the shared-session / linked-streamer design. Update it whenever shared-session scope, ownership rules, or rollout phases change.
 - `apps/desktop/docs/shared-subathon-plan.md` also contains the shared-session phase tracker. If a shared-session phase starts, is blocked, changes scope, or is completed, update that tracker in the same pass.
+- `apps/shared-session-service/` is the Phase 1 scaffold for shared-session create/join/presence work. Treat it as the shared-mode backend entrypoint instead of improvising ad hoc endpoints elsewhere.
 - Root `src/` and `public/` are the legacy Node/overlay app. Treat them as behavior reference unless a task explicitly targets the old stack.
 
 ## Build, Test, and Development Commands
@@ -44,6 +45,7 @@
 - `cd apps/desktop && bun run tauri:clean` removes the full Rust/Tauri build cache when disk usage gets out of hand.
 - `cd apps/desktop && bun run tauri:build:clean` creates a release build, then removes the release-side Rust artifacts while keeping dev caches.
 - `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` validates the native layer without producing a release build.
+- `cd apps/shared-session-service && bun run start` runs the shared-session scaffold service on `127.0.0.1:31947`.
 - Root `bun run start` is only for the legacy app.
 
 ## Coding Style & Naming Conventions

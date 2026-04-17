@@ -45,7 +45,7 @@ export async function applyWindowSizing(
         height = 860
         minWidth = MIN_CONTENT_W + sidebarWidth
         minHeight = 700
-    } else if (pathname === '/connections' || pathname === '/overlays' || pathname === '/rules') {
+    } else if (pathname === '/connections' || pathname === '/overlays' || pathname === '/rules' || pathname === '/shared-session') {
         width = 900 + sidebarWidth
         height = 680
         minWidth = MIN_CONTENT_W + sidebarWidth

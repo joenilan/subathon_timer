@@ -20,8 +20,8 @@ This section is the implementation status source of truth for shared-subathon wo
 
 | Phase | Name | Status | Notes |
 | --- | --- | --- | --- |
-| 0 | Decision And Contract | Planned | Design approved only when server-authoritative shared mode is accepted. |
-| 1 | Shared Session Skeleton | Planned | Create/join flow, presence, and initial page shell. |
+| 0 | Decision And Contract | Completed | Server-authoritative shared mode accepted and documented on the planning branch. |
+| 1 | Shared Session Skeleton | Completed | In-memory service scaffold, create/join flow, presence socket, and desktop page are in place on the planning branch. |
 | 2 | Shared Timer Snapshot Sync | Planned | Server-owned timer snapshot and host-owned manual controls. |
 | 3 | Shared Twitch Event Ingestion | Planned | Host/guest Twitch events feed one timer through the shared service. |
 | 4 | Shared Tip Ingestion | Planned | Host/guest tips feed one timer, tip providers stay tip-only. |
@@ -632,7 +632,7 @@ The shared service should never require raw Twitch or tip-provider secrets for t
 
 ### Phase 0: Decision And Contract
 
-Status: `Planned`
+Status: `Completed`
 
 Deliverables:
 
@@ -645,9 +645,16 @@ Stop/go decision:
 
 - only proceed if "server-authoritative shared mode" is acceptable
 
+Completion notes:
+
+- shared mode is explicitly server-authoritative
+- event-source boundaries are defined
+- host/guest ownership is defined for the first release
+- the planning branch is the living contract until implementation moves to `main`
+
 ### Phase 1: Shared Session Skeleton
 
-Status: `Planned`
+Status: `Completed`
 
 Deliverables:
 
@@ -658,6 +665,13 @@ Deliverables:
 - polished host/guest UI states for create, join, connected, and reconnect-required
 
 No timer mutation yet.
+
+Completion notes:
+
+- `apps/shared-session-service/` now exists as a Bun scaffold with in-memory sessions
+- desktop create/join flow is exposed on a dedicated `Shared Session` page
+- participant presence is broadcast over a shared-session WebSocket
+- local Twitch/tip readiness is surfaced into the participant cards for setup visibility
 
 ### Phase 2: Shared Timer Snapshot Sync
 

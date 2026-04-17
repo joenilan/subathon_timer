@@ -1,5 +1,6 @@
 import type { AppState } from './useAppStore'
 import type { EventSubState } from './useEventSubStore'
+import type { SharedSessionState } from './useSharedSessionStore'
 import type { TipSessionState } from './useTipSessionStore'
 import type { TwitchSessionState } from './useTwitchSessionStore'
 
@@ -217,4 +218,21 @@ export const selectConnectionsTipState = (state: TipSessionState) => ({
 export const selectRulesTipState = (state: TipSessionState) => ({
   streamElementsStatus: state.streamelementsStatus,
   streamlabsStatus: state.streamlabsStatus,
+})
+
+export const selectSharedSessionPageState = (state: SharedSessionState) => ({
+  checkHealth: state.checkHealth,
+  clearError: state.clearError,
+  createSession: state.createSession,
+  joinSession: state.joinSession,
+  lastError: state.lastError,
+  leaveSession: state.leaveSession,
+  localParticipantId: state.localParticipantId,
+  localRole: state.localRole,
+  serviceHealth: state.serviceHealth,
+  serviceMessage: state.serviceMessage,
+  serviceUrl: state.serviceUrl,
+  session: state.session,
+  status: state.status,
+  syncParticipantStatus: state.syncParticipantStatus,
 })
