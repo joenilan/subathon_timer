@@ -15,6 +15,7 @@ import type {
   SharedSessionSnapshot,
   SharedSessionSocketClientMessage,
   SharedSessionSocketServerMessage,
+  SharedSessionTipEventMessage,
   SharedSessionTwitchEventMessage,
 } from '../lib/sharedSession/types'
 import type { NormalizedTwitchEvent } from '../lib/timer/types'
@@ -51,6 +52,7 @@ export interface SharedSessionState {
   clearError: () => void
   syncParticipantStatus: (payload: SharedParticipantRuntimeState) => void
   submitSharedTwitchEvent: (event: NormalizedTwitchEvent) => boolean
+  submitSharedTipEvent: (event: NormalizedTwitchEvent) => boolean
   startSharedTimer: () => void
   pauseSharedTimer: () => void
   resetSharedTimer: () => void
@@ -221,6 +223,12 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
         type: 'twitch.event',
         payload: event,
       } satisfies SharedSessionTwitchEventMessage),
+
+    submitSharedTipEvent: (event) =>
+      sendSocketMessage({
+        type: 'tip.event',
+        payload: event,
+      } satisfies SharedSessionTipEventMessage),
 
     startSharedTimer: () => {
       sendSocketMessage({

@@ -245,5 +245,6 @@ export const selectSharedSessionPageState = (state: SharedSessionState) => ({
 export const selectSharedSessionIngressState = (state: SharedSessionState) => ({
   session: state.session,
   status: state.status,
+  submitSharedTipEvent: state.submitSharedTipEvent,
   submitSharedTwitchEvent: state.submitSharedTwitchEvent,
 })

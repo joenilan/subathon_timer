@@ -66,6 +66,17 @@ function getActivityDeltaLabel(entry: SharedSessionActivityEntry) {
   return `${entry.deltaSeconds > 0 ? '+' : '-'}${formatDurationClock(Math.abs(entry.deltaSeconds))}`
 }
 
+function getActivityProviderLabel(entry: SharedSessionActivityEntry) {
+  switch (entry.provider) {
+    case 'streamelements':
+      return 'StreamElements'
+    case 'streamlabs':
+      return 'Streamlabs'
+    default:
+      return 'Twitch'
+  }
+}
+
 export function SharedSessionPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
@@ -496,7 +507,7 @@ export function SharedSessionPage() {
                     <div className="shared-session-activity-card__header">
                       <div className="shared-session-activity-card__title-group">
                         <span className="shared-session-activity-card__kicker">
-                          {entry.sourceParticipantLabel} · {entry.provider === 'twitch' ? 'Twitch' : entry.provider}
+                          {entry.sourceParticipantLabel} · {getActivityProviderLabel(entry)}
                         </span>
                         <strong>{entry.title}</strong>
                       </div>

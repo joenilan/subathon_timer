@@ -16,7 +16,7 @@ The legacy root `src/` and `public/` app is kept as behavior reference only. New
 - `apps/desktop/src/`: React UI, state stores, timer logic, overlays
 - `apps/desktop/src-tauri/`: native Tauri shell and loopback overlay server
 - `apps/desktop/docs/`: desktop-specific implementation notes and roadmap docs
-- `apps/shared-session-service/`: Bun shared-session service scaffold for create/join, presence, server-owned shared timer snapshots, and shared Twitch event ingestion
+- `apps/shared-session-service/`: Bun shared-session service scaffold for create/join, presence, server-owned shared timer snapshots, shared Twitch event ingestion, and tip-only provider ingestion
 
 Important planning docs:
 

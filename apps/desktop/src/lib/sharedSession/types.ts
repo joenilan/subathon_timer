@@ -44,7 +44,7 @@ export interface SharedSessionActivityEntry {
   id: string
   sourceParticipantId: string
   sourceParticipantLabel: string
-  provider: 'twitch'
+  provider: 'twitch' | 'streamelements' | 'streamlabs'
   eventType: NormalizedTwitchEvent['eventType']
   title: string
   summary: string
@@ -112,6 +112,11 @@ export interface SharedSessionTwitchEventMessage {
   payload: NormalizedTwitchEvent
 }
 
+export interface SharedSessionTipEventMessage {
+  type: 'tip.event'
+  payload: NormalizedTwitchEvent
+}
+
 export interface SharedSessionHelloMessage {
   type: 'hello'
 }
@@ -121,6 +126,7 @@ export type SharedSessionSocketClientMessage =
   | SharedSessionParticipantStatusMessage
   | SharedSessionTimerActionMessage
   | SharedSessionTwitchEventMessage
+  | SharedSessionTipEventMessage
 
 export interface SharedSessionSnapshotMessage {
   type: 'session.snapshot'

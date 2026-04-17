@@ -24,7 +24,7 @@ This section is the implementation status source of truth for shared-subathon wo
 | 1 | Shared Session Skeleton | Completed | In-memory service scaffold, create/join flow, presence socket, desktop page, and up-to-6 participant structure are in place on the planning branch. |
 | 2 | Shared Timer Snapshot Sync | Completed | Shared-session service owns the timer snapshot, host-only timer actions route through the service, and connected desktops render the same shared timer state. |
 | 3 | Shared Twitch Event Ingestion | Completed | Participant desktops now submit normalized Twitch events to the service, the service dedupes/applies them once, and the shared activity feed labels which creator triggered each event. |
-| 4 | Shared Tip Ingestion | Planned | Host/guest tips feed one timer, tip providers stay tip-only. |
+| 4 | Shared Tip Ingestion | Completed | Participant-local StreamElements and Streamlabs tips now submit to the service, the service applies them once, and non-tip provider activity is ignored. |
 | 5 | Shared Wheel | Planned | Shared wheel trigger, sync, reveal, and single outcome application. |
 | 6 | Hardening | Planned | Reconnect, replay, audit, and recovery coverage. |
 
@@ -715,7 +715,7 @@ Completion notes:
 
 ### Phase 4: Shared Tip Ingestion
 
-Status: `Planned`
+Status: `Completed`
 
 Deliverables:
 
@@ -724,6 +724,13 @@ Deliverables:
 - shared tip activity feed
 
 Keep providers tip-only.
+
+Completion notes:
+
+- connected desktop clients now submit normalized StreamElements and Streamlabs tip events to the shared-session service instead of applying them locally
+- the shared-session service dedupes tip events per participant and applies qualifying timer deltas once
+- non-tip provider activity is rejected in shared mode, so StreamElements and Streamlabs remain tip-only authorities
+- the shared activity feed now includes shared tip events with creator and provider labels
 
 ### Phase 5: Shared Wheel
 

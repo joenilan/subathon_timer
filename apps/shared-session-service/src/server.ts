@@ -301,6 +301,50 @@ function applySharedTwitchEvent(session: SessionRecord, participant: Participant
   return true
 }
 
+function applySharedTipEvent(session: SessionRecord, participant: ParticipantRecord, event: NormalizedTwitchEvent) {
+  if ((event.source !== 'streamelements' && event.source !== 'streamlabs') || event.eventType !== 'tip') {
+    return false
+  }
+
+  const dedupeKey = buildEventDedupeKey(participant.id, event)
+  if (session.appliedEventKeys.includes(dedupeKey)) {
+    return false
+  }
+
+  const result = resolveTimerAdjustment(event, session.ruleConfig)
+  if (!result) {
+    return false
+  }
+
+  const runtime = resolveTimerRuntime(session.timerState)
+  const nextRemaining = clampTimerSeconds(runtime.timerRemainingSeconds + result.deltaSeconds)
+  const nextStatus: SharedTimerStatus = nextRemaining <= 0 ? 'finished' : runtime.timerStatus === 'running' ? 'running' : 'paused'
+  const now = Date.now()
+
+  session.timerState = {
+    timerStatus: nextStatus,
+    timerSessionBaseRemainingSeconds: nextRemaining,
+    timerSessionBaseUptimeSeconds: runtime.uptimeSeconds,
+    timerSessionRunningSince: nextStatus === 'running' ? now : null,
+  }
+
+  session.recentActivity = prependSharedActivityEntry(session.recentActivity, {
+    id: `${event.id}:${participant.id}`,
+    sourceParticipantId: participant.id,
+    sourceParticipantLabel: participant.displayName,
+    provider: event.source,
+    eventType: event.eventType,
+    title: result.title,
+    summary: result.summary,
+    deltaSeconds: result.deltaSeconds,
+    occurredAt: nowIso(),
+    remainingSeconds: nextRemaining,
+  })
+  session.appliedEventKeys = [dedupeKey, ...session.appliedEventKeys].slice(0, 200)
+
+  return true
+}
+
 function generateInviteCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let code = ''
@@ -587,6 +631,7 @@ const server = Bun.serve<SharedSessionSocketData>({
         | { type: 'participant.status'; payload: ParticipantRuntimeState }
         | { type: 'timer.action'; payload: TimerAction }
         | { type: 'twitch.event'; payload: NormalizedTwitchEvent }
+        | { type: 'tip.event'; payload: NormalizedTwitchEvent }
 
       try {
         message = JSON.parse(String(rawMessage)) as typeof message
@@ -625,6 +670,10 @@ const server = Bun.serve<SharedSessionSocketData>({
 
       if (message.type === 'twitch.event') {
         applySharedTwitchEvent(session, participant, message.payload)
+      }
+
+      if (message.type === 'tip.event') {
+        applySharedTipEvent(session, participant, message.payload)
       }
 
       updateSessionStatus(session)

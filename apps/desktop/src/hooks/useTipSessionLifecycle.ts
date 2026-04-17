@@ -9,7 +9,9 @@ export function useTipSessionLifecycle(nativeStateReady: boolean) {
   const seenEventIdsRef = useRef<Set<string>>(new Set())
   const { bootstrap, normalizedEvents } = useTipSessionStore(useShallow(selectTipLifecycleState))
   const processTwitchEvent = useAppStore((state) => state.processTwitchEvent)
-  const { session: sharedSession, status: sharedSessionStatus } = useSharedSessionStore(useShallow(selectSharedSessionIngressState))
+  const { session: sharedSession, status: sharedSessionStatus, submitSharedTipEvent } = useSharedSessionStore(
+    useShallow(selectSharedSessionIngressState),
+  )
 
   useEffect(() => {
     void bootstrap()
@@ -28,12 +30,14 @@ export function useTipSessionLifecycle(nativeStateReady: boolean) {
       }
 
       if (sharedModeActive) {
-        seenEventIdsRef.current.add(event.id)
+        if (submitSharedTipEvent(event)) {
+          seenEventIdsRef.current.add(event.id)
+        }
         continue
       }
 
       processTwitchEvent(event)
       seenEventIdsRef.current.add(event.id)
     }
-  }, [nativeStateReady, normalizedEvents, processTwitchEvent, sharedSession, sharedSessionStatus])
+  }, [nativeStateReady, normalizedEvents, processTwitchEvent, sharedSession, sharedSessionStatus, submitSharedTipEvent])
 }
