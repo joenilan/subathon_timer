@@ -1759,9 +1759,10 @@ fn wheel_overlay_html() -> &'static str {
       }
       .result-panel {
         position: absolute;
-        left: 50%;
+        left: 0;
+        right: 0;
         bottom: 18px;
-        transform: translateX(-50%);
+        margin: 0 auto;
         display: none;
         gap: 8px;
         justify-items: center;
