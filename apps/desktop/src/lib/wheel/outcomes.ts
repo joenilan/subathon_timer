@@ -3,6 +3,9 @@ import type { WheelSegment, WheelSpinState } from './types'
 const MIN_WHEEL_TEXT_SCALE = 0.35
 const MAX_WHEEL_TEXT_SCALE = 0.75
 export const DEFAULT_WHEEL_TEXT_SCALE = 0.55
+const MIN_WHEEL_RESULT_DISPLAY_SECONDS = 2
+const MAX_WHEEL_RESULT_DISPLAY_SECONDS = 12
+export const DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS = 4
 
 export const defaultWheelSpin: WheelSpinState = {
   status: 'idle',
@@ -164,6 +167,17 @@ export function clampWheelTextScale(value: number) {
   }
 
   return Math.min(Math.max(Math.round(value * 100) / 100, MIN_WHEEL_TEXT_SCALE), MAX_WHEEL_TEXT_SCALE)
+}
+
+export function clampWheelResultDisplaySeconds(value: number) {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS
+  }
+
+  return Math.min(
+    Math.max(Math.round(value), MIN_WHEEL_RESULT_DISPLAY_SECONDS),
+    MAX_WHEEL_RESULT_DISPLAY_SECONDS,
+  )
 }
 
 export function buildWheelSpinSummary(segment: WheelSegment) {

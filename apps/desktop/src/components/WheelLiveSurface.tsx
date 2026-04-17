@@ -244,7 +244,6 @@ export function WheelLiveSurface({
   const resultTitle = displaySpin.status === 'spinning'
     ? copy.title
     : (displaySpin.resultTitle ?? 'Result ready')
-  const showWheelVisual = displaySpin.status === 'spinning' || isPlacementPreview
   const isResultVisible = displaySpin.status === 'ready' || isPlacementPreview
   const cardClassName = [
     'wheel-overlay-card',
@@ -256,35 +255,33 @@ export function WheelLiveSurface({
   ]
     .filter(Boolean)
     .join(' ')
-  const resultScreenClassName = [
-    'wheel-overlay-result-screen',
-    `wheel-overlay-result-screen--${phase}`,
-    displaySpin.isTest ? 'wheel-overlay-result-screen--test' : '',
-    variant === 'shell' ? 'wheel-overlay-result-screen--shell' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
 
-  return showWheelVisual ? (
+  return (
     <div className={cardClassName}>
       <div className="wheel-overlay-card__header">
         <span className="wheel-overlay-card__eyebrow">{copy.eyebrow}</span>
         <strong className="wheel-overlay-card__title">{resultTitle}</strong>
         <p className="wheel-overlay-card__summary">{copy.summary}</p>
       </div>
-      <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} />
-      <div className={`wheel-overlay-card__result-banner${isResultVisible ? ' is-visible' : ''}`}>
-        {copy.banner}
+      <div className={`wheel-overlay-card__stage${displaySpin.status === 'ready' ? ' wheel-overlay-card__stage--result' : ''}`}>
+        <WheelDisplay segments={wheelSegments} spin={displaySpin} textScale={wheelTextScale} />
+        {isResultVisible ? (
+          <section
+            className={[
+              'wheel-overlay-result-panel',
+              displaySpin.isTest ? 'wheel-overlay-result-panel--test' : '',
+              variant === 'shell' ? 'wheel-overlay-result-panel--shell' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <span className="wheel-overlay-result-panel__eyebrow">{copy.title}</span>
+            <strong className="wheel-overlay-result-panel__title">{displaySpin.resultTitle ?? 'Result ready'}</strong>
+            <p className="wheel-overlay-result-panel__summary">{displaySpin.resultSummary ?? copy.summary}</p>
+            <div className="wheel-overlay-result-panel__banner">{copy.banner}</div>
+          </section>
+        ) : null}
       </div>
     </div>
-  ) : (
-    <section className={resultScreenClassName}>
-      <span className="wheel-overlay-result-screen__eyebrow">{copy.eyebrow}</span>
-      <div className="wheel-overlay-result-screen__main">
-        <strong className="wheel-overlay-result-screen__title">{displaySpin.resultTitle ?? 'Result ready'}</strong>
-        <p className="wheel-overlay-result-screen__summary">{copy.summary}</p>
-      </div>
-      <div className="wheel-overlay-result-screen__banner">{copy.banner}</div>
-    </section>
   )
 }

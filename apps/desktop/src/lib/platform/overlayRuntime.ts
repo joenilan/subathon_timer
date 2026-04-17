@@ -24,6 +24,7 @@ interface SyncOverlayPayload {
   wheelOverlayTransform: OverlayTransform
   wheelSegments: WheelSegment[]
   wheelSpin: WheelSpinState
+  wheelResultDisplaySeconds: number
   wheelTextScale: number
   incentiveRules: Array<{
     label: string

@@ -117,7 +117,7 @@ describe('useAppStore runtime behavior', () => {
     expect(state.wheelSpin.activeSegmentId).toBe('wheel-gift-bomb')
     expect(state.timerEvents[0]?.title).toBe('Gift bomb applied')
 
-    await vi.advanceTimersByTimeAsync(4600)
+    await vi.advanceTimersByTimeAsync(6000)
 
     const finalState = useAppStore.getState()
     expect(finalState.timerRemainingSeconds).toBe(initial.timerRemainingSeconds + 300 + 300)
@@ -175,10 +175,40 @@ describe('useAppStore runtime behavior', () => {
     expect(midState.wheelSpin.status).toBe('ready')
     expect(midState.wheelSpin.isTest).toBe(true)
 
-    await vi.advanceTimersByTimeAsync(2600)
+    await vi.advanceTimersByTimeAsync(4200)
 
     const finalState = useAppStore.getState()
     expect(finalState.timerRemainingSeconds).toBe(3600)
     expect(finalState.wheelSpin.status).toBe('idle')
+  })
+
+  it('uses the configured wheel result display time before clearing a test spin', async () => {
+    useAppStore.setState({
+      wheelResultDisplaySeconds: 2,
+      wheelSegments: [
+        {
+          id: 'wheel-linger-test',
+          label: 'Quick preview',
+          chance: '100%',
+          outcome: 'Preview outcome',
+          outcomeType: 'time',
+          color: '#22d3ee',
+          minSubs: 1,
+          timeDeltaSeconds: 60,
+          moderationRequired: false,
+        },
+      ],
+    })
+
+    useAppStore.getState().triggerGiftBombTest(1)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(useAppStore.getState().wheelSpin.status).toBe('ready')
+
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(useAppStore.getState().wheelSpin.status).toBe('ready')
+
+    await vi.advanceTimersByTimeAsync(600)
+    expect(useAppStore.getState().wheelSpin.status).toBe('idle')
   })
 })

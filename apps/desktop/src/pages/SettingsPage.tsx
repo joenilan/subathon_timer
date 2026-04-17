@@ -40,6 +40,8 @@ export function SettingsPage() {
     setDefaultTimerSeconds,
     showWheelOverlayInAppShell,
     setShowWheelOverlayInAppShell,
+    wheelResultDisplaySeconds,
+    setWheelResultDisplaySeconds,
     announceWheelResultsInChat,
     setAnnounceWheelResultsInChat,
     commandPermissions,
@@ -162,6 +164,20 @@ export function SettingsPage() {
               <option value="disabled">Disabled</option>
             </select>
             <span className="rule-field__hint">Shows the live wheel animation inside the desktop app so the streamer can see spins without watching OBS.</span>
+          </label>
+
+          <label className="rule-field">
+            <span className="rule-field__label">Wheel result on-screen time</span>
+            <input
+              className="rule-field__input"
+              type="number"
+              min={2}
+              max={12}
+              step={1}
+              value={wheelResultDisplaySeconds}
+              onChange={(event) => setWheelResultDisplaySeconds(Number.parseInt(event.target.value, 10) || 0)}
+            />
+            <span className="rule-field__hint">Keeps the winner visible for this many seconds before a test clears or an automatic wheel action finishes applying.</span>
           </label>
 
           <label className="rule-field">

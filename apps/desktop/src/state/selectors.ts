@@ -29,6 +29,7 @@ export const selectOverlayRuntimeState = (state: AppState) => ({
   ruleConfig: state.ruleConfig,
   setOverlayBootstrapState: state.setOverlayBootstrapState,
   wheelOverlayTransform: state.wheelOverlayTransform,
+  wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
   wheelSegments: state.wheelSegments,
   wheelSpin: state.wheelSpin,
   wheelTextScale: state.wheelTextScale,
@@ -123,9 +124,11 @@ export const selectSettingsPageState = (state: AppState) => ({
   setCommandPermission: state.setCommandPermission,
   setDefaultTimerSeconds: state.setDefaultTimerSeconds,
   setShowWheelOverlayInAppShell: state.setShowWheelOverlayInAppShell,
+  setWheelResultDisplaySeconds: state.setWheelResultDisplaySeconds,
   setTimerWidgetTheme: state.setTimerWidgetTheme,
   showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
   timerWidgetTheme: state.timerWidgetTheme,
+  wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
 })
 
 export const selectWheelPageState = (state: AppState) => ({

@@ -18,9 +18,11 @@ import type {
 import type { WheelSegment, WheelSpinState } from '../lib/wheel/types'
 import {
   buildWheelSpinSummary,
+  clampWheelResultDisplaySeconds,
   clampWheelTextScale,
   createDefaultWheelSegments,
   createWheelSegment,
+  DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS,
   DEFAULT_WHEEL_TEXT_SCALE,
   defaultWheelSpin,
   getEligibleWheelSegmentsForGiftCount,
@@ -77,6 +79,7 @@ export interface AppState {
   commandPermissions: TimerCommandPermissionConfig
   overlayLanAccessEnabled: boolean
   showWheelOverlayInAppShell: boolean
+  wheelResultDisplaySeconds: number
 
   timerStatus: TimerStatus
   timerRemainingSeconds: number
@@ -110,6 +113,7 @@ export interface AppState {
   setCommandPermission: (action: ChatTimerCommandAction, permission: TimerCommandPermission) => void
   setOverlayLanAccessEnabled: (value: boolean) => void
   setShowWheelOverlayInAppShell: (value: boolean) => void
+  setWheelResultDisplaySeconds: (value: number) => void
   setAnnounceWheelResultsInChat: (value: boolean) => void
   setTimerSeconds: (value: number, reason: string, options?: { syncDefault?: boolean }) => void
   setRuleValue: <K extends keyof TimerRuleConfig>(key: K, value: TimerRuleConfig[K]) => void
@@ -142,7 +146,6 @@ export interface AppState {
 const INITIAL_TIMER_SECONDS = 6 * 60 * 60
 const MAX_PROCESSED_IDS = 100
 const WHEEL_RESULT_CHAT_DELAY_MS = 250
-const WHEEL_RESULT_LINGER_MS = 2600
 let wheelSpinTimer: number | null = null
 let wheelAutoApplyTimer: number | null = null
 let wheelAnnouncementTimer: number | null = null
@@ -173,6 +176,7 @@ function queueWheelSpinSelection(
   selectedSegmentId: string,
   requiresModeration: boolean,
   autoApply: boolean,
+  resultDisplaySeconds: number,
   isTest = false,
 ) {
   clearWheelSpinTimer()
@@ -217,16 +221,18 @@ function queueWheelSpinSelection(
       })
     }, WHEEL_RESULT_CHAT_DELAY_MS)
 
+    const lingerMs = clampWheelResultDisplaySeconds(resultDisplaySeconds) * 1000
+
     if (isTest) {
       wheelAutoApplyTimer = window.setTimeout(() => {
         wheelAutoApplyTimer = null
         useAppStore.setState({ wheelSpin: defaultWheelSpin })
-      }, WHEEL_RESULT_LINGER_MS)
+      }, lingerMs)
     } else if (autoApply) {
       wheelAutoApplyTimer = window.setTimeout(() => {
         wheelAutoApplyTimer = null
         void useAppStore.getState().applyWheelResult()
-      }, WHEEL_RESULT_LINGER_MS)
+      }, lingerMs)
     }
   }, 1800)
 }
@@ -362,6 +368,7 @@ export const useAppStore = create<AppState>()(
       commandPermissions: DEFAULT_TIMER_COMMAND_PERMISSIONS,
       overlayLanAccessEnabled: false,
       showWheelOverlayInAppShell: true,
+      wheelResultDisplaySeconds: DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS,
       announceWheelResultsInChat: true,
 
       timerStatus: 'paused',
@@ -430,6 +437,8 @@ export const useAppStore = create<AppState>()(
         })),
       setOverlayLanAccessEnabled: (overlayLanAccessEnabled) => set({ overlayLanAccessEnabled }),
       setShowWheelOverlayInAppShell: (showWheelOverlayInAppShell) => set({ showWheelOverlayInAppShell }),
+      setWheelResultDisplaySeconds: (wheelResultDisplaySeconds) =>
+        set({ wheelResultDisplaySeconds: clampWheelResultDisplaySeconds(wheelResultDisplaySeconds) }),
       setAnnounceWheelResultsInChat: (announceWheelResultsInChat) => set({ announceWheelResultsInChat }),
       setTimerSeconds: (timerRemainingSeconds, reason, options) =>
         set((state) => {
@@ -584,7 +593,13 @@ export const useAppStore = create<AppState>()(
           return
         }
 
-        queueWheelSpinSelection(set, selectedSegment.id, selectedSegment.moderationRequired, false)
+        queueWheelSpinSelection(
+          set,
+          selectedSegment.id,
+          selectedSegment.moderationRequired,
+          false,
+          useAppStore.getState().wheelResultDisplaySeconds,
+        )
       },
       triggerGiftBombTest: (count) => {
         const state = useAppStore.getState()
@@ -601,7 +616,14 @@ export const useAppStore = create<AppState>()(
           return
         }
 
-        queueWheelSpinSelection(set, selectedGiftWheelSegment.id, selectedGiftWheelSegment.moderationRequired, false, true)
+        queueWheelSpinSelection(
+          set,
+          selectedGiftWheelSegment.id,
+          selectedGiftWheelSegment.moderationRequired,
+          false,
+          useAppStore.getState().wheelResultDisplaySeconds,
+          true,
+        )
       },
       applyWheelResult: async () => {
         const { wheelSpin, wheelSegments } = useAppStore.getState()
@@ -1100,7 +1122,13 @@ export const useAppStore = create<AppState>()(
             eligibleGiftWheelSegments.length > 0 ? pickWheelSegment(eligibleGiftWheelSegments) : null
 
           if (selectedGiftWheelSegment) {
-            queueWheelSpinSelection(set, selectedGiftWheelSegment.id, selectedGiftWheelSegment.moderationRequired, true)
+            queueWheelSpinSelection(
+              set,
+              selectedGiftWheelSegment.id,
+              selectedGiftWheelSegment.moderationRequired,
+              true,
+              state.wheelResultDisplaySeconds,
+            )
           }
 
           return {
@@ -1125,7 +1153,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'fdgt.app.state',
-      version: 13,
+      version: 14,
       storage: createJSONStorage(() => window.localStorage),
       migrate: (persistedState, persistedVersion) => {
         const nextState = persistedState as Partial<AppState> | undefined
@@ -1152,6 +1180,7 @@ export const useAppStore = create<AppState>()(
           wheelOverlayTransform: normalizeOverlayTransform(nextState?.wheelOverlayTransform, defaultOverlayTransforms.wheel),
           commandPermissions: normalizeTimerCommandPermissionConfig(nextState?.commandPermissions),
           showWheelOverlayInAppShell: nextState?.showWheelOverlayInAppShell ?? true,
+          wheelResultDisplaySeconds: clampWheelResultDisplaySeconds(nextState?.wheelResultDisplaySeconds ?? DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS),
           announceWheelResultsInChat: nextState?.announceWheelResultsInChat ?? true,
           overlayBaseUrl: null,
           overlayPreviewBaseUrl: null,
@@ -1170,6 +1199,7 @@ export const useAppStore = create<AppState>()(
         timerWidgetTheme: state.timerWidgetTheme,
         wheelTextScale: state.wheelTextScale,
         showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
+        wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
         announceWheelResultsInChat: state.announceWheelResultsInChat,
         timerOverlayTransform: state.timerOverlayTransform,
         reasonOverlayTransform: state.reasonOverlayTransform,

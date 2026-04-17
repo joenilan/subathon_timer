@@ -153,6 +153,7 @@ struct OverlayState {
     graph_points: Vec<u64>,
     wheel_segments: Vec<WheelOverlaySegment>,
     wheel_spin: WheelOverlaySpinState,
+    wheel_result_display_seconds: u64,
     wheel_text_scale: f32,
     incentive_rules: Vec<OverlayRule>,
     overlay_preview: OverlayPreviewState,
@@ -171,6 +172,7 @@ impl Default for OverlayState {
             graph_points: vec![6 * 60 * 60],
             wheel_segments: vec![],
             wheel_spin: WheelOverlaySpinState::default(),
+            wheel_result_display_seconds: 4,
             wheel_text_scale: 0.55,
             incentive_rules: vec![
                 OverlayRule {
@@ -240,6 +242,7 @@ struct OverlaySyncPayload {
     graph_points: Vec<u64>,
     wheel_segments: Vec<WheelOverlaySegment>,
     wheel_spin: WheelOverlaySpinState,
+    wheel_result_display_seconds: u64,
     wheel_text_scale: f32,
     incentive_rules: Vec<OverlayRule>,
     overlay_preview: OverlayPreviewState,
@@ -774,6 +777,7 @@ fn sync_overlay_state(
         graph_points: payload.graph_points,
         wheel_segments: payload.wheel_segments,
         wheel_spin: payload.wheel_spin,
+        wheel_result_display_seconds: payload.wheel_result_display_seconds,
         wheel_text_scale: payload.wheel_text_scale,
         incentive_rules: payload.incentive_rules,
         overlay_preview: payload.overlay_preview,
@@ -1687,71 +1691,6 @@ fn wheel_overlay_html() -> &'static str {
       .stage.result .copy {
         animation: wheelOverlayResultReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
-      .stage.result:not(.studio) {
-        width: min(940px, calc(100vw - 72px));
-        max-width: 100%;
-        min-height: 280px;
-        gap: 18px;
-        align-content: center;
-        justify-items: center;
-        padding: 36px 48px 32px;
-        box-sizing: border-box;
-        border-radius: 30px;
-        background:
-          radial-gradient(circle at top, rgba(156, 240, 0, 0.18), transparent 42%),
-          radial-gradient(circle at 18% 78%, rgba(34, 211, 238, 0.12), transparent 36%),
-          linear-gradient(180deg, rgba(9, 13, 20, 0.97) 0%, rgba(5, 8, 14, 1) 100%);
-        border-color: rgba(156, 240, 0, 0.2);
-        box-shadow: 0 28px 68px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(156, 240, 0, 0.08);
-      }
-      .stage.result:not(.studio) .copy {
-        gap: 18px;
-      }
-      .stage.result:not(.studio) .eyebrow {
-        color: #c7ff5e;
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.18em;
-      }
-      .stage.result:not(.studio) .winner {
-        display: grid;
-        gap: 14px;
-        justify-items: center;
-        width: min(100%, 720px);
-      }
-      .stage.result:not(.studio) .title {
-        max-width: 100%;
-        font-size: clamp(48px, 8vw, 88px);
-        line-height: 0.96;
-        letter-spacing: -0.04em;
-        text-shadow: 0 0 30px rgba(199, 255, 94, 0.18);
-        overflow-wrap: anywhere;
-        text-wrap: balance;
-      }
-      .stage.result:not(.studio) .summary {
-        width: min(100%, 40ch);
-        max-width: 100%;
-        font-size: 19px;
-        line-height: 1.5;
-        color: rgba(226, 232, 240, 0.92);
-        text-wrap: balance;
-      }
-      .stage.result:not(.studio) .wheel-wrap {
-        display: none;
-      }
-      .stage.result:not(.studio).test {
-        border-color: rgba(34, 211, 238, 0.2);
-        background:
-          radial-gradient(circle at top, rgba(34, 211, 238, 0.18), transparent 42%),
-          radial-gradient(circle at 18% 78%, rgba(156, 240, 0, 0.1), transparent 36%),
-          linear-gradient(180deg, rgba(9, 13, 20, 0.97) 0%, rgba(5, 8, 14, 1) 100%);
-      }
-      .stage.result:not(.studio).test .eyebrow {
-        color: var(--accent);
-      }
-      .stage.result:not(.studio).test .title {
-        text-shadow: 0 0 30px rgba(34, 211, 238, 0.2);
-      }
       .eyebrow {
         font-size: 11px;
         font-weight: 700;
@@ -1770,7 +1709,13 @@ fn wheel_overlay_html() -> &'static str {
         color: var(--muted);
       }
       .wheel-wrap {
+        position: relative;
         width: min(100%, 420px);
+      }
+      .stage.result .wheel-wrap svg {
+        filter: saturate(0.9) brightness(0.78);
+        transform: scale(0.98);
+        opacity: 0.92;
       }
       svg {
         width: 100%;
@@ -1801,42 +1746,74 @@ fn wheel_overlay_html() -> &'static str {
         pointer-events: none;
       }
       .result {
-        justify-self: center;
-        min-width: 0;
-        max-width: 34ch;
-        padding: 10px 14px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.04);
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 1.4;
-        text-align: center;
-        color: rgba(226, 232, 240, 0.86);
-        opacity: 0;
-        transform: translateY(12px) scale(0.96);
-        transition:
-          opacity 220ms ease,
-          transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      .result.visible {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-      .stage.result:not(.studio) .result {
-        width: min(520px, 100%);
-        max-width: 100%;
         padding: 14px 18px;
         box-sizing: border-box;
-        background: rgba(255, 255, 255, 0.06);
         border-color: rgba(199, 255, 94, 0.18);
         font-size: 14px;
         font-weight: 700;
         line-height: 1.45;
         color: rgba(241, 245, 249, 0.94);
       }
-      .stage.result:not(.studio).test .result {
+      .stage.test .result {
         border-color: rgba(34, 211, 238, 0.18);
+      }
+      .result-panel {
+        position: absolute;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        display: none;
+        gap: 8px;
+        justify-items: center;
+        width: min(420px, calc(100% - 40px));
+        padding: 18px 20px 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(156, 240, 0, 0.2);
+        background:
+          linear-gradient(180deg, rgba(10, 16, 24, 0.96) 0%, rgba(7, 11, 18, 0.98) 100%),
+          radial-gradient(circle at top, rgba(156, 240, 0, 0.14), transparent 56%);
+        box-shadow:
+          0 18px 40px rgba(0, 0, 0, 0.48),
+          0 0 0 1px rgba(156, 240, 0, 0.06);
+        text-align: center;
+      }
+      .result-panel.visible {
+        display: grid;
+        animation: wheelOverlayResultReveal 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      .stage.test .result-panel {
+        border-color: rgba(34, 211, 238, 0.2);
+        background:
+          linear-gradient(180deg, rgba(10, 16, 24, 0.96) 0%, rgba(7, 11, 18, 0.98) 100%),
+          radial-gradient(circle at top, rgba(34, 211, 238, 0.14), transparent 56%);
+      }
+      .result-panel__eyebrow {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #c7ff5e;
+      }
+      .stage.test .result-panel__eyebrow {
+        color: var(--accent);
+      }
+      .result-panel__title {
+        max-width: 100%;
+        font-size: clamp(30px, 5.6vw, 54px);
+        font-weight: 700;
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+        color: var(--text);
+        text-wrap: balance;
+        overflow-wrap: anywhere;
+      }
+      .result-panel__summary {
+        width: min(100%, 28ch);
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: rgba(226, 232, 240, 0.9);
+        text-wrap: balance;
       }
       @keyframes wheelOverlayEnter {
         from {
@@ -1898,8 +1875,13 @@ fn wheel_overlay_html() -> &'static str {
             <g id="rotor" class="rotor"></g>
             <circle class="hub" cx="50" cy="50" r="8"></circle>
           </svg>
+          <div class="result-panel" id="result-panel">
+            <div class="result-panel__eyebrow" id="result-eyebrow"></div>
+            <div class="result-panel__title" id="result-title"></div>
+            <div class="result-panel__summary" id="result-summary"></div>
+            <div class="result" id="result"></div>
+          </div>
         </div>
-        <div class="result" id="result"></div>
       </section>
     </div>
     <script>
@@ -1909,6 +1891,10 @@ fn wheel_overlay_html() -> &'static str {
       const eyebrow = document.getElementById('eyebrow');
       const title = document.getElementById('title');
       const summary = document.getElementById('summary');
+      const resultPanel = document.getElementById('result-panel');
+      const resultEyebrow = document.getElementById('result-eyebrow');
+      const resultTitle = document.getElementById('result-title');
+      const resultSummary = document.getElementById('result-summary');
       const result = document.getElementById('result');
       const fallbackPalette = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#db2777', '#65a30d', '#ea580c'];
       const OVERLAY_INTRO_MS = 320;
@@ -2185,8 +2171,11 @@ fn wheel_overlay_html() -> &'static str {
 
           if (overlayPhase === 'hidden' || displayedSpin.status === 'idle' || !displayedSpin.activeSegmentId) {
             lastSpinKey = null;
+            resultPanel.classList.remove('visible');
+            resultEyebrow.textContent = '';
+            resultTitle.textContent = '';
+            resultSummary.textContent = '';
             result.textContent = '';
-            result.classList.remove('visible');
             return;
           }
 
@@ -2202,24 +2191,44 @@ fn wheel_overlay_html() -> &'static str {
             summary.textContent = isPlacementPreview
               ? 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.'
               : 'The wheel is choosing the next outcome live on stream.';
-            result.textContent = '';
-            result.classList.remove('visible');
+            if (isPlacementPreview) {
+              resultEyebrow.textContent = 'Overlay placement';
+              resultTitle.textContent = displayedSpin.resultTitle || 'Overlay placement';
+              resultSummary.textContent = 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.';
+              result.textContent = 'Live gifted-sub spins will appear here on stream.';
+              resultPanel.classList.add('visible');
+            } else {
+              resultPanel.classList.remove('visible');
+              resultEyebrow.textContent = '';
+              resultTitle.textContent = '';
+              resultSummary.textContent = '';
+              result.textContent = '';
+            }
           } else {
             eyebrow.textContent = isPlacementPreview
               ? 'Wheel preview'
               : (displayedSpin.isTest ? 'Test result' : 'Wheel picked');
-            title.textContent = displayedSpin.resultTitle || 'Result ready';
-            summary.textContent = displayedSpin.isTest
-              ? 'This test spin announced the winner in chat and stopped before applying anything.'
+            title.textContent = displayedSpin.isTest
+              ? 'Preview complete'
               : displayedSpin.autoApply
-                ? 'Gifted subs triggered this result live and the outcome is moving through its apply flow now.'
-                : 'The wheel landed on this outcome and is waiting for the streamer to apply it from the Wheel page.';
+                ? 'Winner selected'
+                : 'Result ready';
+            summary.textContent = isPlacementPreview
+              ? 'Use the Overlay Studio sliders to place and scale the wheel before the next gifted-sub spin.'
+              : displayedSpin.isTest
+                ? 'This test spin announced the winner in chat and stopped before applying anything.'
+                : displayedSpin.autoApply
+                  ? 'Gifted subs triggered this result live and the outcome is moving through its apply flow now.'
+                  : 'The wheel landed on this outcome and is waiting for the streamer to apply it from the Wheel page.';
+            resultEyebrow.textContent = title.textContent;
+            resultTitle.textContent = displayedSpin.resultTitle || 'Result ready';
+            resultSummary.textContent = displayedSpin.resultSummary || summary.textContent;
             result.textContent = displayedSpin.requiresModeration
               ? 'Reconnect Twitch before timeout outcomes can run.'
               : displayedSpin.isTest
                 ? 'Preview only. No action was applied.'
                 : (displayedSpin.autoApply ? 'Chat announcement sent. Applying after the reveal.' : 'Chat announcement sent. Waiting for manual apply.');
-            result.classList.add('visible');
+            resultPanel.classList.add('visible');
           }
 
           const boundedTransform = clampCanvasTransform(transform);
