@@ -14,11 +14,14 @@ Current scope:
 - accept normalized StreamElements and Streamlabs tip events from connected participants
 - dedupe and apply qualifying tip timer events once
 - ignore non-tip provider activity in shared mode
+- own shared gift-bomb wheel selection and reveal state
+- auto-complete non-timeout wheel outcomes on the service
+- accept source-participant timeout completion/failure reports for shared wheel moderation outcomes
 - broadcast a shared activity feed with creator labels
 - broadcast room snapshots back to both desktop apps
 - structurally support up to 6 creators in one room
 
-This scaffold now covers Phase 4 of the shared-subathon plan. It is still intentionally in-memory only, and wheel sync plus reconnect hardening are still deferred to later phases.
+This scaffold now covers Phase 5 of the shared-subathon plan. It is still intentionally in-memory only, and reconnect/replay hardening is still deferred to the next phase.
 
 ## Run
 

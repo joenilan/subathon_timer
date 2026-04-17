@@ -16,6 +16,7 @@ import type {
   SharedSessionSocketClientMessage,
   SharedSessionSocketServerMessage,
   SharedSessionTipEventMessage,
+  SharedSessionWheelActionMessage,
   SharedSessionTwitchEventMessage,
 } from '../lib/sharedSession/types'
 import type { NormalizedTwitchEvent } from '../lib/timer/types'
@@ -53,6 +54,14 @@ export interface SharedSessionState {
   syncParticipantStatus: (payload: SharedParticipantRuntimeState) => void
   submitSharedTwitchEvent: (event: NormalizedTwitchEvent) => boolean
   submitSharedTipEvent: (event: NormalizedTwitchEvent) => boolean
+  applySharedWheelTimeout: (payload: {
+    activeSegmentId: string
+    targetUserId: string
+    targetLabel: string
+    targetMention: string
+    durationSeconds: number
+  }) => boolean
+  failSharedWheelTimeout: (payload: { activeSegmentId: string; message: string }) => boolean
   startSharedTimer: () => void
   pauseSharedTimer: () => void
   resetSharedTimer: () => void
@@ -229,6 +238,24 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
         type: 'tip.event',
         payload: event,
       } satisfies SharedSessionTipEventMessage),
+
+    applySharedWheelTimeout: (payload) =>
+      sendSocketMessage({
+        type: 'wheel.action',
+        payload: {
+          action: 'apply-timeout',
+          ...payload,
+        },
+      } satisfies SharedSessionWheelActionMessage),
+
+    failSharedWheelTimeout: (payload) =>
+      sendSocketMessage({
+        type: 'wheel.action',
+        payload: {
+          action: 'fail-timeout',
+          ...payload,
+        },
+      } satisfies SharedSessionWheelActionMessage),
 
     startSharedTimer: () => {
       sendSocketMessage({

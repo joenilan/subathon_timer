@@ -3677,6 +3677,35 @@ select.rule-field__input {
     gap: 10px;
 }
 
+.shared-session-wheel-stage {
+    display: grid;
+    gap: 14px;
+}
+
+.shared-session-wheel-action {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background:
+        linear-gradient(180deg, rgba(12, 16, 23, 0.82) 0%, rgba(8, 11, 16, 0.9) 100%),
+        radial-gradient(circle at top right, rgba(56, 215, 255, 0.05) 0%, transparent 42%);
+}
+
+.shared-session-wheel-action strong {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.shared-session-wheel-action p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+
 .shared-session-activity-list {
     display: grid;
     gap: 10px;

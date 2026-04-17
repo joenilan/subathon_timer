@@ -25,7 +25,7 @@ This section is the implementation status source of truth for shared-subathon wo
 | 2 | Shared Timer Snapshot Sync | Completed | Shared-session service owns the timer snapshot, host-only timer actions route through the service, and connected desktops render the same shared timer state. |
 | 3 | Shared Twitch Event Ingestion | Completed | Participant desktops now submit normalized Twitch events to the service, the service dedupes/applies them once, and the shared activity feed labels which creator triggered each event. |
 | 4 | Shared Tip Ingestion | Completed | Participant-local StreamElements and Streamlabs tips now submit to the service, the service applies them once, and non-tip provider activity is ignored. |
-| 5 | Shared Wheel | Planned | Shared wheel trigger, sync, reveal, and single outcome application. |
+| 5 | Shared Wheel | Completed | Shared gift bombs now trigger one server-owned wheel spin, connected desktops receive the same spin/result state, and timeout outcomes are finalized by the participant whose broadcaster session triggered the wheel. |
 | 6 | Hardening | Planned | Reconnect, replay, audit, and recovery coverage. |
 
 Status values:
@@ -523,12 +523,12 @@ For timeout outcomes, do not let both clients race to timeout the same user.
 
 Recommended first release:
 
-- host client executes moderation calls
-- shared service marks the wheel spin as `applying`
-- host client reports success/failure back
+- the participant whose broadcaster session triggered the shared wheel executes moderation calls for timeout outcomes
+- shared service marks the wheel spin as authoritative and waits for that participant's success/failure report
+- source participant client reports success/failure back
 - shared service finalizes the outcome and activity log
 
-This avoids duplicate moderation attempts and keeps one accountable execution path.
+This avoids duplicate moderation attempts and keeps the timeout call on the desktop that actually owns the broadcaster/moderator context for that channel.
 
 ## Pause/Resume/Manual Adjustments
 
@@ -639,7 +639,7 @@ Deliverables:
 - this design doc
 - shared-session event contract
 - exact owner/guest permission scope
-- explicit decision that host executes moderation outcomes
+- explicit decision that timeout moderation is executed by the participant whose broadcaster session triggered the shared wheel
 
 Stop/go decision:
 
@@ -734,14 +734,22 @@ Completion notes:
 
 ### Phase 5: Shared Wheel
 
-Status: `Planned`
+Status: `Completed`
 
 Deliverables:
 
 - server-owned wheel trigger and selection
 - synced spin state to both clients
-- host-executed moderation outcomes
+- source-participant-owned moderation outcomes
 - single application path for wheel results
+
+Completion notes:
+
+- qualifying shared Twitch gift bombs now enqueue one authoritative shared wheel spin on the service
+- connected desktops receive the same shared wheel spin and reveal state through the shared-session socket
+- non-timeout shared wheel results auto-complete on the service after the reveal window
+- timeout outcomes are finalized by the participant whose broadcaster session triggered the wheel, which keeps moderation calls on the correct channel context
+- the `Shared Session` page now renders the shared wheel surface and exposes the timeout apply action only on the owning participant desktop
 
 ### Phase 6: Hardening
 

@@ -1,4 +1,5 @@
 import type { NormalizedTwitchEvent, TimerRuleConfig } from '../timer/types'
+import type { WheelSegment, WheelSpinState } from '../wheel/types'
 
 export type SharedSessionConnectionStatus = 'connected' | 'disconnected'
 export type SharedSessionRole = 'host' | 'guest'
@@ -53,6 +54,14 @@ export interface SharedSessionActivityEntry {
   remainingSeconds: number
 }
 
+export interface SharedSessionWheelSpin extends WheelSpinState {
+  sourceParticipantId: string | null
+  triggerUserId: string | null
+  triggerUserLogin: string | null
+  triggerDisplayName: string | null
+  giftCount: number | null
+}
+
 export interface SharedSessionSnapshot {
   id: string
   title: string
@@ -62,6 +71,8 @@ export interface SharedSessionSnapshot {
   participants: SharedSessionParticipant[]
   timerState: SharedTimerState
   recentActivity: SharedSessionActivityEntry[]
+  wheelSegments: WheelSegment[]
+  wheelSpin: SharedSessionWheelSpin
   createdAt: string
   updatedAt: string
 }
@@ -71,6 +82,7 @@ export interface SharedSessionCreateInput {
   displayName: string
   twitchIdentity: SharedSessionTwitchIdentity | null
   ruleConfig: TimerRuleConfig
+  wheelSegments: WheelSegment[]
 }
 
 export interface SharedSessionJoinInput {
@@ -117,6 +129,24 @@ export interface SharedSessionTipEventMessage {
   payload: NormalizedTwitchEvent
 }
 
+export interface SharedSessionWheelActionMessage {
+  type: 'wheel.action'
+  payload:
+    | {
+        action: 'apply-timeout'
+        activeSegmentId: string
+        targetUserId: string
+        targetLabel: string
+        targetMention: string
+        durationSeconds: number
+      }
+    | {
+        action: 'fail-timeout'
+        activeSegmentId: string
+        message: string
+      }
+}
+
 export interface SharedSessionHelloMessage {
   type: 'hello'
 }
@@ -127,6 +157,7 @@ export type SharedSessionSocketClientMessage =
   | SharedSessionTimerActionMessage
   | SharedSessionTwitchEventMessage
   | SharedSessionTipEventMessage
+  | SharedSessionWheelActionMessage
 
 export interface SharedSessionSnapshotMessage {
   type: 'session.snapshot'

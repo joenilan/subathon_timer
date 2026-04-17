@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { WheelLiveSurface } from '../components/WheelLiveSurface'
 import { TimerWidget } from '../components/TimerWidget'
+import { TWITCH_CLIENT_ID } from '../lib/twitch/constants'
 import { formatDurationClock } from '../lib/timer/engine'
 import { resolveRuntimeFromSession } from '../lib/timer/runtime'
+import { getChatters, timeoutUser } from '../lib/twitch/helix'
 import { selectSharedSessionPageState } from '../state/selectors'
 import { useSharedSessionStore } from '../state/useSharedSessionStore'
 import { useTipSessionStore } from '../state/useTipSessionStore'
@@ -84,9 +87,11 @@ export function SharedSessionPage() {
   const [displayName, setDisplayName] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [setTimerDraft, setSetTimerDraft] = useState('06:00:00')
+  const [sharedWheelActionPending, setSharedWheelActionPending] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const {
     adjustSharedTimer,
+    applySharedWheelTimeout,
     serviceUrl,
     serviceHealth,
     serviceMessage,
@@ -97,6 +102,7 @@ export function SharedSessionPage() {
     lastError,
     checkHealth,
     createSession,
+    failSharedWheelTimeout,
     joinSession,
     leaveSession,
     pauseSharedTimer,
@@ -108,9 +114,12 @@ export function SharedSessionPage() {
   } = useSharedSessionStore(useShallow(selectSharedSessionPageState))
   const twitchStatus = useTwitchSessionStore((state) => state.status)
   const twitchSession = useTwitchSessionStore((state) => state.session)
+  const twitchTokens = useTwitchSessionStore((state) => state.tokens)
   const streamElementsStatus = useTipSessionStore((state) => state.streamelementsStatus)
   const streamlabsStatus = useTipSessionStore((state) => state.streamlabsStatus)
   const localRuleConfig = useAppStore((state) => state.ruleConfig)
+  const localWheelSegments = useAppStore((state) => state.wheelSegments)
+  const localWheelTextScale = useAppStore((state) => state.wheelTextScale)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -148,6 +157,7 @@ export function SharedSessionPage() {
   )
   const participantCards = session?.participants ?? []
   const localParticipant = participantCards.find((participant) => participant.id === localParticipantId) ?? null
+  const sharedWheelSegment = session?.wheelSegments.find((segment) => segment.id === session.wheelSpin.activeSegmentId) ?? null
   const sharedTimer = useMemo(() => {
     if (!session) {
       return null
@@ -164,6 +174,10 @@ export function SharedSessionPage() {
     )
   }, [now, session])
   const isHost = localRole === 'host'
+  const ownsSharedWheelTimeout =
+    session?.wheelSpin.status === 'ready'
+    && session.wheelSpin.sourceParticipantId === localParticipantId
+    && sharedWheelSegment?.outcomeType === 'timeout'
   const runButtonLabel =
     sharedTimer?.timerStatus === 'running'
       ? 'Pause'
@@ -178,6 +192,7 @@ export function SharedSessionPage() {
       displayName: displayName.trim() || twitchSession?.login || 'Host',
       twitchIdentity: localIdentity,
       ruleConfig: localRuleConfig,
+      wheelSegments: localWheelSegments,
     })
     setCreateOpen(false)
     setDisplayName('')
@@ -199,6 +214,80 @@ export function SharedSessionPage() {
     const nextSeconds = parseDurationDraft(setTimerDraft)
     setSharedTimer(nextSeconds, 'Shared session host set timer')
     setSetTimerDraft(formatDurationDraft(nextSeconds))
+  }
+
+  const applySharedTimeoutResult = async () => {
+    if (!session || !ownsSharedWheelTimeout || !sharedWheelSegment || !twitchSession || !twitchTokens) {
+      return
+    }
+
+    setSharedWheelActionPending(true)
+
+    try {
+      let targetUserId: string | null = null
+      let targetLabel = 'selected target'
+      let targetMention = '@target'
+
+      if (sharedWheelSegment.timeoutTarget === 'self') {
+        if (!session.wheelSpin.triggerUserId) {
+          throw new Error('The gifted-sub gifter is missing from this shared wheel result.')
+        }
+
+        targetUserId = session.wheelSpin.triggerUserId
+        targetLabel = session.wheelSpin.triggerDisplayName ?? session.wheelSpin.triggerUserLogin ?? 'gifter'
+        targetMention = session.wheelSpin.triggerUserLogin ? `@${session.wheelSpin.triggerUserLogin}` : targetLabel
+      } else {
+        if (!twitchSession.scopes.includes('moderator:read:chatters')) {
+          throw new Error('Reconnect Twitch to grant moderator:read:chatters before using shared random timeout outcomes.')
+        }
+
+        const chatters = await getChatters({
+          clientId: TWITCH_CLIENT_ID,
+          accessToken: twitchTokens.accessToken,
+          broadcasterId: twitchSession.userId,
+          moderatorId: twitchSession.userId,
+        })
+        const candidates = chatters.filter((chatter) => chatter.userId !== twitchSession.userId)
+
+        if (candidates.length === 0) {
+          throw new Error('No eligible chatters are available for this shared random timeout outcome.')
+        }
+
+        const selectedChatter = candidates[Math.floor(Math.random() * candidates.length)]
+        targetUserId = selectedChatter.userId
+        targetLabel = selectedChatter.userName
+        targetMention = `@${selectedChatter.userLogin}`
+      }
+
+      if (!twitchSession.scopes.includes('moderator:manage:banned_users')) {
+        throw new Error('Reconnect Twitch to grant moderator:manage:banned_users before shared timeout outcomes can run.')
+      }
+
+      await timeoutUser({
+        clientId: TWITCH_CLIENT_ID,
+        accessToken: twitchTokens.accessToken,
+        broadcasterId: twitchSession.userId,
+        moderatorId: twitchSession.userId,
+        userId: targetUserId,
+        durationSeconds: sharedWheelSegment.timeoutSeconds ?? 300,
+        reason: `Shared wheel outcome: ${sharedWheelSegment.label}`,
+      })
+
+      applySharedWheelTimeout({
+        activeSegmentId: sharedWheelSegment.id,
+        targetUserId,
+        targetLabel,
+        targetMention,
+        durationSeconds: sharedWheelSegment.timeoutSeconds ?? 300,
+      })
+    } catch (error) {
+      failSharedWheelTimeout({
+        activeSegmentId: sharedWheelSegment.id,
+        message: error instanceof Error ? error.message : 'Shared timeout outcome failed.',
+      })
+    } finally {
+      setSharedWheelActionPending(false)
+    }
   }
 
   return (
@@ -414,6 +503,56 @@ export function SharedSessionPage() {
                 </div>
               </div>
             ) : null}
+          </section>
+
+          <section className="panel shared-session-wheel-panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Shared Wheel</h2>
+                <p className="panel-copy">
+                  Shared gift bombs can trigger one server-owned wheel spin for the whole room. Every connected desktop sees the same spin and result, and timeout outcomes are applied by the creator whose channel triggered the wheel.
+                </p>
+              </div>
+            </div>
+
+            {session.wheelSpin.status !== 'idle' ? (
+              <div className="shared-session-wheel-stage">
+                <WheelLiveSurface
+                  variant="shell"
+                  wheelSegments={session.wheelSegments}
+                  wheelSpin={session.wheelSpin}
+                  wheelTextScale={localWheelTextScale}
+                />
+                {ownsSharedWheelTimeout && sharedWheelSegment ? (
+                  <div className="shared-session-wheel-action">
+                    <strong>Timeout action needed on this PC</strong>
+                    <p>
+                      This wheel result belongs to your linked broadcaster session, so this desktop is responsible for the timeout call before the shared wheel can finish.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn--accent"
+                      onClick={() => void applySharedTimeoutResult()}
+                      disabled={sharedWheelActionPending}
+                    >
+                      {sharedWheelActionPending ? 'Applying shared timeout…' : 'Apply shared timeout'}
+                    </button>
+                  </div>
+                ) : session.wheelSpin.status === 'ready' && sharedWheelSegment?.outcomeType === 'timeout' ? (
+                  <div className="shared-session-wheel-action">
+                    <strong>Waiting on the source creator</strong>
+                    <p>
+                      This timeout result belongs to the creator whose channel triggered the wheel. Their desktop needs to apply it so the shared wheel can finish cleanly.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="shared-session-empty-state">
+                <strong>No shared wheel spin yet</strong>
+                <p>When a qualifying shared Twitch gift bomb arrives, the service will pick one shared wheel result and every connected desktop will see the same spin here.</p>
+              </div>
+            )}
           </section>
 
           <section className="shared-session-summary-grid">

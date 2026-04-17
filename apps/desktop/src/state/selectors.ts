@@ -222,9 +222,11 @@ export const selectRulesTipState = (state: TipSessionState) => ({
 
 export const selectSharedSessionPageState = (state: SharedSessionState) => ({
   adjustSharedTimer: state.adjustSharedTimer,
+  applySharedWheelTimeout: state.applySharedWheelTimeout,
   checkHealth: state.checkHealth,
   clearError: state.clearError,
   createSession: state.createSession,
+  failSharedWheelTimeout: state.failSharedWheelTimeout,
   joinSession: state.joinSession,
   lastError: state.lastError,
   leaveSession: state.leaveSession,

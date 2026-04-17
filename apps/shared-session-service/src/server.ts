@@ -4,6 +4,14 @@ import {
   resolveTimerAdjustment,
 } from '../../desktop/src/lib/timer/engine'
 import type { NormalizedTwitchEvent, TimerRuleConfig } from '../../desktop/src/lib/timer/types'
+import {
+  buildWheelSpinSummary,
+  DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS,
+  defaultWheelSpin,
+  getEligibleWheelSegmentsForGiftCount,
+  pickWheelSegment,
+} from '../../desktop/src/lib/wheel/outcomes'
+import type { WheelSegment, WheelSpinState } from '../../desktop/src/lib/wheel/types'
 
 type SessionStatus = 'waiting_for_collaborators' | 'active' | 'ended'
 type ParticipantRole = 'host' | 'guest'
@@ -48,6 +56,15 @@ interface SessionRecord {
   ruleConfig: TimerRuleConfig
   recentActivity: SharedActivityEntry[]
   appliedEventKeys: string[]
+  wheelSegments: WheelSegment[]
+  wheelSpin: SharedWheelSpin
+  pendingWheelTriggers: Array<{
+    sourceParticipantId: string
+    triggerUserId: string | null
+    triggerUserLogin: string | null
+    triggerDisplayName: string | null
+    giftCount: number
+  }>
   createdAt: string
   updatedAt: string
 }
@@ -63,13 +80,21 @@ interface SharedActivityEntry {
   id: string
   sourceParticipantId: string
   sourceParticipantLabel: string
-  provider: 'twitch'
+  provider: 'twitch' | 'streamelements' | 'streamlabs'
   eventType: NormalizedTwitchEvent['eventType']
   title: string
   summary: string
   deltaSeconds: number
   occurredAt: string
   remainingSeconds: number
+}
+
+interface SharedWheelSpin extends WheelSpinState {
+  sourceParticipantId: string | null
+  triggerUserId: string | null
+  triggerUserLogin: string | null
+  triggerDisplayName: string | null
+  giftCount: number | null
 }
 
 interface JoinTokenRecord {
@@ -86,11 +111,15 @@ const HOST = process.env.SHARED_SESSION_HOST ?? '127.0.0.1'
 const PORT = Number.parseInt(process.env.SHARED_SESSION_PORT ?? '31947', 10)
 const MAX_PARTICIPANTS = Number.parseInt(process.env.SHARED_SESSION_MAX_PARTICIPANTS ?? '6', 10)
 const DEFAULT_TIMER_SECONDS = Number.parseInt(process.env.SHARED_SESSION_DEFAULT_TIMER_SECONDS ?? '21600', 10)
+const WHEEL_REVEAL_MS = 1800
+const WHEEL_RESULT_DISPLAY_MS = DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS * 1000
 
 const sessions = new Map<string, SessionRecord>()
 const inviteCodeIndex = new Map<string, string>()
 const joinTokens = new Map<string, JoinTokenRecord>()
 const sessionSockets = new Map<string, Set<ServerWebSocket<SharedSessionSocketData>>>()
+const wheelRevealTimers = new Map<string, Timer>()
+const wheelAutoApplyTimers = new Map<string, Timer>()
 
 const defaultRuntimeState = (): ParticipantRuntimeState => ({
   twitchStatus: 'not-linked',
@@ -113,6 +142,8 @@ function sessionSnapshot(session: SessionRecord) {
     participants: session.participants,
     timerState: session.timerState,
     recentActivity: session.recentActivity,
+    wheelSegments: session.wheelSegments,
+    wheelSpin: session.wheelSpin,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
   }
@@ -132,6 +163,17 @@ function createDefaultTimerState(): SharedTimerState {
     timerSessionBaseRemainingSeconds: clampTimerSeconds(DEFAULT_TIMER_SECONDS),
     timerSessionBaseUptimeSeconds: 0,
     timerSessionRunningSince: null,
+  }
+}
+
+function createDefaultSharedWheelSpin(): SharedWheelSpin {
+  return {
+    ...defaultWheelSpin,
+    sourceParticipantId: null,
+    triggerUserId: null,
+    triggerUserLogin: null,
+    triggerDisplayName: null,
+    giftCount: null,
   }
 }
 
@@ -177,6 +219,21 @@ type TimerAction =
   | { action: 'reset' }
   | { action: 'adjust'; deltaSeconds: number; reason: string }
   | { action: 'set'; timerSeconds: number; reason: string }
+
+type WheelAction =
+  | {
+      action: 'apply-timeout'
+      activeSegmentId: string
+      targetUserId: string
+      targetLabel: string
+      targetMention: string
+      durationSeconds: number
+    }
+  | {
+      action: 'fail-timeout'
+      activeSegmentId: string
+      message: string
+    }
 
 function applyTimerAction(timerState: SharedTimerState, action: TimerAction): SharedTimerState {
   const runtime = resolveTimerRuntime(timerState)
@@ -298,6 +355,17 @@ function applySharedTwitchEvent(session: SessionRecord, participant: Participant
   })
   session.appliedEventKeys = [dedupeKey, ...session.appliedEventKeys].slice(0, 200)
 
+  if (event.eventType === 'gift_bomb' && (event.count ?? 0) > 0) {
+    session.pendingWheelTriggers.push({
+      sourceParticipantId: participant.id,
+      triggerUserId: event.userId,
+      triggerUserLogin: event.userLogin,
+      triggerDisplayName: event.displayName,
+      giftCount: event.count ?? 1,
+    })
+    consumeNextWheelTrigger(session)
+  }
+
   return true
 }
 
@@ -343,6 +411,110 @@ function applySharedTipEvent(session: SessionRecord, participant: ParticipantRec
   session.appliedEventKeys = [dedupeKey, ...session.appliedEventKeys].slice(0, 200)
 
   return true
+}
+
+function consumeNextWheelTrigger(session: SessionRecord) {
+  if (session.pendingWheelTriggers.length === 0 || session.wheelSpin.status !== 'idle') {
+    return
+  }
+
+  const nextTrigger = session.pendingWheelTriggers.shift()
+  if (!nextTrigger) {
+    return
+  }
+
+  const eligibleSegments = getEligibleWheelSegmentsForGiftCount(session.wheelSegments, nextTrigger.giftCount)
+  const selectedSegment = eligibleSegments.length > 0 ? pickWheelSegment(eligibleSegments) : null
+  if (!selectedSegment) {
+    return
+  }
+
+  clearWheelRevealTimer(session.id)
+  clearWheelAutoApplyTimer(session.id)
+
+  session.wheelSpin = {
+    status: 'spinning',
+    activeSegmentId: selectedSegment.id,
+    resultTitle: 'Selecting outcome',
+    resultSummary: 'Wheel animation in progress.',
+    requiresModeration: selectedSegment.moderationRequired,
+    autoApply: selectedSegment.outcomeType !== 'timeout',
+    isTest: false,
+    sourceParticipantId: nextTrigger.sourceParticipantId,
+    triggerUserId: nextTrigger.triggerUserId,
+    triggerUserLogin: nextTrigger.triggerUserLogin,
+    triggerDisplayName: nextTrigger.triggerDisplayName,
+    giftCount: nextTrigger.giftCount,
+  }
+  updateSessionStatus(session)
+  broadcastSession(session.id)
+
+  wheelRevealTimers.set(
+    session.id,
+    setTimeout(() => {
+      const currentSession = sessions.get(session.id)
+      if (!currentSession || currentSession.wheelSpin.activeSegmentId !== selectedSegment.id) {
+        return
+      }
+
+      currentSession.wheelSpin = {
+        ...currentSession.wheelSpin,
+        status: 'ready',
+        resultTitle: selectedSegment.label,
+        resultSummary: buildWheelSpinSummary(selectedSegment),
+      }
+      updateSessionStatus(currentSession)
+      broadcastSession(currentSession.id)
+      wheelRevealTimers.delete(currentSession.id)
+
+      if (selectedSegment.outcomeType !== 'timeout') {
+        wheelAutoApplyTimers.set(
+          currentSession.id,
+          setTimeout(() => {
+            const sessionForApply = sessions.get(currentSession.id)
+            if (!sessionForApply || sessionForApply.wheelSpin.activeSegmentId !== selectedSegment.id) {
+              return
+            }
+
+            const runtime = resolveTimerRuntime(sessionForApply.timerState)
+            const deltaSeconds = selectedSegment.outcomeType === 'time' ? selectedSegment.timeDeltaSeconds ?? 0 : 0
+            const nextRemaining = clampTimerSeconds(runtime.timerRemainingSeconds + deltaSeconds)
+            const nextStatus: SharedTimerStatus = nextRemaining <= 0 ? 'finished' : runtime.timerStatus === 'running' ? 'running' : 'paused'
+            const now = Date.now()
+
+            sessionForApply.timerState = {
+              timerStatus: nextStatus,
+              timerSessionBaseRemainingSeconds: nextRemaining,
+              timerSessionBaseUptimeSeconds: runtime.uptimeSeconds,
+              timerSessionRunningSince: nextStatus === 'running' ? now : null,
+            }
+            sessionForApply.recentActivity = prependSharedActivityEntry(sessionForApply.recentActivity, {
+              id: `wheel:${selectedSegment.id}:${now}`,
+              sourceParticipantId: sessionForApply.wheelSpin.sourceParticipantId ?? sessionForApply.hostParticipantId,
+              sourceParticipantLabel:
+                sessionForApply.participants.find((participant) => participant.id === sessionForApply.wheelSpin.sourceParticipantId)?.displayName
+                ?? 'Shared wheel',
+              provider: 'twitch',
+              eventType: 'gift_bomb',
+              title: selectedSegment.outcomeType === 'time' ? 'Wheel outcome applied' : 'Wheel outcome logged',
+              summary:
+                selectedSegment.outcomeType === 'time'
+                  ? `${selectedSegment.label} changed the shared timer by ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s.`
+                  : `${selectedSegment.label} completed on the shared wheel.`,
+              deltaSeconds,
+              occurredAt: nowIso(),
+              remainingSeconds: nextRemaining,
+            })
+            sessionForApply.wheelSpin = createDefaultSharedWheelSpin()
+            updateSessionStatus(sessionForApply)
+            broadcastSession(sessionForApply.id)
+            wheelAutoApplyTimers.delete(sessionForApply.id)
+            consumeNextWheelTrigger(sessionForApply)
+          }, WHEEL_RESULT_DISPLAY_MS),
+        )
+      }
+    }, WHEEL_REVEAL_MS),
+  )
 }
 
 function generateInviteCode() {
@@ -396,6 +568,22 @@ function broadcastSession(sessionId: string) {
 
   for (const socket of sockets) {
     socket.send(payload)
+  }
+}
+
+function clearWheelRevealTimer(sessionId: string) {
+  const timer = wheelRevealTimers.get(sessionId)
+  if (timer) {
+    clearTimeout(timer)
+    wheelRevealTimers.delete(sessionId)
+  }
+}
+
+function clearWheelAutoApplyTimer(sessionId: string) {
+  const timer = wheelAutoApplyTimers.get(sessionId)
+  if (timer) {
+    clearTimeout(timer)
+    wheelAutoApplyTimers.delete(sessionId)
   }
 }
 
@@ -453,6 +641,7 @@ const server = Bun.serve<SharedSessionSocketData>({
           displayName?: string
           twitchIdentity?: TwitchIdentity | null
           ruleConfig?: Partial<TimerRuleConfig> | null
+          wheelSegments?: WheelSegment[] | null
         } | null
 
         const displayName = payload?.displayName?.trim()
@@ -489,6 +678,9 @@ const server = Bun.serve<SharedSessionSocketData>({
           ruleConfig: normalizeTimerRuleConfig(payload?.ruleConfig ?? getDefaultTimerRuleConfig()),
           recentActivity: [],
           appliedEventKeys: [],
+          wheelSegments: Array.isArray(payload?.wheelSegments) && payload.wheelSegments.length > 0 ? payload.wheelSegments : [],
+          wheelSpin: createDefaultSharedWheelSpin(),
+          pendingWheelTriggers: [],
           createdAt,
           updatedAt: createdAt,
         }
@@ -632,6 +824,7 @@ const server = Bun.serve<SharedSessionSocketData>({
         | { type: 'timer.action'; payload: TimerAction }
         | { type: 'twitch.event'; payload: NormalizedTwitchEvent }
         | { type: 'tip.event'; payload: NormalizedTwitchEvent }
+        | { type: 'wheel.action'; payload: WheelAction }
 
       try {
         message = JSON.parse(String(rawMessage)) as typeof message
@@ -674,6 +867,61 @@ const server = Bun.serve<SharedSessionSocketData>({
 
       if (message.type === 'tip.event') {
         applySharedTipEvent(session, participant, message.payload)
+      }
+
+      if (message.type === 'wheel.action') {
+        const currentSpin = session.wheelSpin
+        if (
+          currentSpin.status !== 'ready'
+          || !currentSpin.activeSegmentId
+          || currentSpin.activeSegmentId !== message.payload.activeSegmentId
+          || currentSpin.sourceParticipantId !== participant.id
+        ) {
+          socket.send(JSON.stringify({ type: 'session.error', payload: { message: 'That wheel result is no longer owned by this desktop.' } }))
+          return
+        }
+
+        const selectedSegment = session.wheelSegments.find((segment) => segment.id === currentSpin.activeSegmentId)
+        if (!selectedSegment || selectedSegment.outcomeType !== 'timeout') {
+          socket.send(JSON.stringify({ type: 'session.error', payload: { message: 'That shared wheel result cannot be applied as a timeout.' } }))
+          return
+        }
+
+        clearWheelAutoApplyTimer(session.id)
+        clearWheelRevealTimer(session.id)
+
+        if (message.payload.action === 'apply-timeout') {
+          const runtime = resolveTimerRuntime(session.timerState)
+          session.recentActivity = prependSharedActivityEntry(session.recentActivity, {
+            id: `wheel-timeout:${selectedSegment.id}:${Date.now()}`,
+            sourceParticipantId: participant.id,
+            sourceParticipantLabel: participant.displayName,
+            provider: 'twitch',
+            eventType: 'gift_bomb',
+            title: 'Wheel moderation applied',
+            summary: `${message.payload.targetLabel} was timed out for ${message.payload.durationSeconds}s via ${selectedSegment.label}.`,
+            deltaSeconds: 0,
+            occurredAt: nowIso(),
+            remainingSeconds: runtime.timerRemainingSeconds,
+          })
+        } else {
+          const runtime = resolveTimerRuntime(session.timerState)
+          session.recentActivity = prependSharedActivityEntry(session.recentActivity, {
+            id: `wheel-timeout-fail:${selectedSegment.id}:${Date.now()}`,
+            sourceParticipantId: participant.id,
+            sourceParticipantLabel: participant.displayName,
+            provider: 'twitch',
+            eventType: 'gift_bomb',
+            title: 'Wheel moderation failed',
+            summary: message.payload.message,
+            deltaSeconds: 0,
+            occurredAt: nowIso(),
+            remainingSeconds: runtime.timerRemainingSeconds,
+          })
+        }
+
+        session.wheelSpin = createDefaultSharedWheelSpin()
+        consumeNextWheelTrigger(session)
       }
 
       updateSessionStatus(session)
