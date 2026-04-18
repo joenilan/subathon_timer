@@ -210,30 +210,29 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
-function getBaseLabelRadius(segmentCount: number) {
-  if (segmentCount >= 10) {
+function getBaseLabelRadius(sliceAngleDeg: number) {
+  if (sliceAngleDeg <= 36) {
     return 27
   }
 
-  if (segmentCount >= 8) {
+  if (sliceAngleDeg <= 45) {
     return 29
   }
 
-  if (segmentCount >= 6) {
+  if (sliceAngleDeg <= 60) {
     return 31
   }
 
   return 33
 }
 
-function getLabelDescriptor(segment: WheelSegment, segmentCount: number, textScale: number) {
+function getLabelDescriptor(segment: WheelSegment, sliceAngleDeg: number, textScale: number) {
   const label = toWheelDisplayLabel(segment)
-  const sliceAngle = segmentCount > 0 ? 360 / segmentCount : 360
-  const sliceRadians = (sliceAngle * Math.PI) / 180
-  const radius = getBaseLabelRadius(segmentCount)
+  const sliceRadians = (sliceAngleDeg * Math.PI) / 180
+  const radius = getBaseLabelRadius(sliceAngleDeg)
   const tangentialWidth = Math.max(14, 2 * radius * Math.tan(sliceRadians / 2) - 2.5)
   const radialBand = Math.max(12, RADIUS - LABEL_OUTER_PADDING - LABEL_INNER_RADIUS)
-  const maxFontSize = segmentCount >= 10 ? 6.1 : segmentCount >= 8 ? 6.7 : segmentCount >= 6 ? 7.2 : 7.8
+  const maxFontSize = sliceAngleDeg <= 36 ? 6.1 : sliceAngleDeg <= 45 ? 6.7 : sliceAngleDeg <= 60 ? 7.2 : 7.8
   const minFontSize = 2.5
 
   const descriptor = buildLabelLineCandidates(label)
@@ -263,15 +262,27 @@ export function WheelDisplay({ segments, spin, textScale }: WheelDisplayProps) {
   const [rotationDegrees, setRotationDegrees] = useState(0)
   const [isSpinning, setIsSpinning] = useState(false)
 
-  const sliceAngle = segments.length > 0 ? 360 / segments.length : 360
+  const segmentAngles = useMemo(() => {
+    const weights = segments.map((s) => Math.max(Number.parseFloat(s.chance), 0))
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0)
+    const fallbackAngle = segments.length > 0 ? 360 / segments.length : 360
+
+    let cursor = 0
+    return weights.map((weight) => {
+      const sliceAngle = totalWeight > 0 ? (weight / totalWeight) * 360 : fallbackAngle
+      const startAngle = cursor
+      const endAngle = cursor + sliceAngle
+      cursor = endAngle
+      return { startAngle, endAngle, centerAngle: startAngle + sliceAngle / 2, sliceAngle }
+    })
+  }, [segments])
+
   const segmentDescriptors = useMemo(
     () =>
       segments.map((segment, index) => {
-        const startAngle = index * sliceAngle
-        const endAngle = startAngle + sliceAngle
-        const centerAngle = startAngle + sliceAngle / 2
+        const { startAngle, endAngle, centerAngle, sliceAngle } = segmentAngles[index]
         const background = segment.color ?? fallbackPalette[index % fallbackPalette.length]
-        const label = getLabelDescriptor(segment, segments.length, textScale)
+        const label = getLabelDescriptor(segment, sliceAngle, textScale)
 
         return {
           background,
@@ -284,7 +295,7 @@ export function WheelDisplay({ segments, spin, textScale }: WheelDisplayProps) {
           path: describeSlicePath(startAngle, endAngle),
         }
       }),
-    [segments, sliceAngle, textScale],
+    [segments, segmentAngles, textScale],
   )
 
   useEffect(() => {
@@ -304,7 +315,7 @@ export function WheelDisplay({ segments, spin, textScale }: WheelDisplayProps) {
 
     lastSpinKeyRef.current = spinKey
 
-    const centerAngle = index * sliceAngle + sliceAngle / 2
+    const centerAngle = segmentAngles[index]?.centerAngle ?? 0
     const currentRotation = normalizeDegrees(rotationRef.current)
     const targetRotation = normalizeDegrees(360 - centerAngle)
     let delta = targetRotation - currentRotation
@@ -318,7 +329,7 @@ export function WheelDisplay({ segments, spin, textScale }: WheelDisplayProps) {
     window.requestAnimationFrame(() => {
       setRotationDegrees(nextRotation)
     })
-  }, [segments, sliceAngle, spin.activeSegmentId, spin.status])
+  }, [segments, segmentAngles, spin.activeSegmentId, spin.status])
 
   useEffect(() => {
     if (spin.status !== 'spinning') {
