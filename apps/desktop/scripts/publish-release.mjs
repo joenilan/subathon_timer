@@ -31,6 +31,7 @@ const msiName = `subathon-timer_${version}_x64_en-US.msi`
 const manifestName = 'manifest.json'
 const notesName = 'notes.md'
 const latestName = 'latest.json'
+const updaterName = 'updater.json'
 const remoteLatestPath = `${remoteDir}/${latestName}`
 const remoteArchiveRoot = `${remoteDir}/archive`
 const downloadBase = `https://apps.zombie.digital/downloads/${appSlug}`
@@ -39,16 +40,32 @@ const notesMarkdown = extractVersionNotes(patchNotesSource, version)
 
 // Sign the NSIS installer for Tauri's updater
 const setupPath = resolve(releaseRoot, setupName)
-const privateKeyPath = requiredEnv(env, 'TAURI_SIGNING_PRIVATE_KEY_PATH')
-const privateKeyPassword = env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
+const privateKeyPath = process.env.TAURI_SIGNING_PRIVATE_KEY_PATH
+const privateKeyPassword = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
+if (!privateKeyPath) throw new Error('TAURI_SIGNING_PRIVATE_KEY_PATH env var is not set')
 execSync(
   `bunx tauri signer sign -k "${privateKeyPath}" --password "${privateKeyPassword}" "${setupPath}"`,
   { stdio: 'inherit' },
 )
 const setupSig = readFileSync(resolve(releaseRoot, setupSigName), 'utf8').trim()
 
-// Tauri updater format
+// latest.json — site download button format (unchanged)
 const latest = {
+  version,
+  channel,
+  publishedAt: new Date().toISOString(),
+  file: setupName,
+  notes: summarizeNotes(notesMarkdown),
+  notesFile: notesName,
+  files: {
+    setup: setupName,
+    portable: portableName,
+    msi: msiName,
+  },
+}
+
+// updater.json — Tauri plugin format
+const updater = {
   version,
   notes: notesMarkdown.trim(),
   pub_date: new Date().toISOString(),
@@ -61,9 +78,11 @@ const latest = {
 }
 
 const latestPath = resolve(releaseRoot, latestName)
+const updaterPath = resolve(releaseRoot, updaterName)
 const notesPath = resolve(releaseRoot, notesName)
 
 writeFileSync(latestPath, `${JSON.stringify(latest, null, 2)}\n`)
+writeFileSync(updaterPath, `${JSON.stringify(updater, null, 2)}\n`)
 writeFileSync(notesPath, `${notesMarkdown.trim()}\n`)
 
 const uploadPaths = [
@@ -76,6 +95,7 @@ const uploadPaths = [
   `${msiName}.sha256`,
   manifestName,
   latestName,
+  updaterName,
   notesName,
 ].map((name) => resolve(releaseRoot, name))
 
