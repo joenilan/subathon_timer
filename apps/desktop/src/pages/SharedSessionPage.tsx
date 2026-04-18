@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { WheelLiveSurface } from '../components/WheelLiveSurface'
 import { TimerWidget } from '../components/TimerWidget'
@@ -20,75 +21,64 @@ import type {
 
 function getServiceTone(status: SharedSessionServiceHealth) {
   switch (status) {
-    case 'online':
-      return 'connected'
-    case 'checking':
-      return 'pending'
-    case 'offline':
-      return 'critical'
-    default:
-      return 'idle'
+    case 'online': return 'connected'
+    case 'checking': return 'pending'
+    case 'offline': return 'critical'
+    default: return 'idle'
   }
 }
 
-function getRuntimeStateLabel(state: SharedParticipantRuntimeState) {
-  if (state.twitchStatus !== 'connected') {
-    return 'Twitch not linked yet'
-  }
-
-  if (state.streamElementsStatus === 'connected' || state.streamlabsStatus === 'connected') {
-    return 'Twitch linked, tip feeds ready'
-  }
-
-  return 'Twitch linked, waiting on optional tip feeds'
+function getTwitchHealthLabel(state: SharedParticipantRuntimeState) {
+  if (state.twitchStatus === 'connected') return 'Twitch connected'
+  if (state.twitchStatus === 'needs-attention') return 'Twitch needs attention'
+  return 'Twitch not linked'
 }
 
 function getParticipantPresenceLabel(participant: SharedSessionParticipant) {
-  return participant.connectionStatus === 'connected' ? 'Live on session' : 'Disconnected'
-}
-
-function getParticipantTone(participant: SharedSessionParticipant) {
-  return participant.connectionStatus === 'connected' ? 'connected' : 'critical'
+  return participant.connectionStatus === 'connected' ? 'Live' : 'Disconnected'
 }
 
 function formatActivityTime(occurredAt: string) {
   const date = new Date(occurredAt)
   return Number.isNaN(date.valueOf())
     ? 'Just now'
-    : new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(date)
+    : new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date)
 }
 
 function getActivityDeltaLabel(entry: SharedSessionActivityEntry) {
-  if (entry.deltaSeconds === 0) {
-    return 'No timer change'
-  }
-
+  if (entry.deltaSeconds === 0) return 'No change'
   return `${entry.deltaSeconds > 0 ? '+' : '-'}${formatDurationClock(Math.abs(entry.deltaSeconds))}`
 }
 
 function getActivityProviderLabel(entry: SharedSessionActivityEntry) {
   switch (entry.provider) {
-    case 'streamelements':
-      return 'StreamElements'
-    case 'streamlabs':
-      return 'Streamlabs'
-    default:
-      return 'Twitch'
+    case 'streamelements': return 'StreamElements'
+    case 'streamlabs': return 'Streamlabs'
+    default: return 'Twitch'
   }
 }
 
+function getParticipantInitials(name: string) {
+  return name.slice(0, 2).toUpperCase()
+}
+
+function getRuntimeStatusColor(status: string): string | undefined {
+  if (status === 'connected') return 'var(--green)'
+  if (status === 'needs-attention') return 'var(--yellow)'
+  return undefined
+}
+
 export function SharedSessionPage() {
+  const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
   const [sessionTitle, setSessionTitle] = useState('')
-  const [displayName, setDisplayName] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [setTimerDraft, setSetTimerDraft] = useState('06:00:00')
+  const [codeCopied, setCodeCopied] = useState(false)
   const [sharedWheelActionPending, setSharedWheelActionPending] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+
   const {
     adjustSharedTimer,
     applySharedWheelTimeout,
@@ -114,6 +104,7 @@ export function SharedSessionPage() {
     clearError,
     syncParticipantStatus,
   } = useSharedSessionStore(useShallow(selectSharedSessionPageState))
+
   const twitchStatus = useTwitchSessionStore((state) => state.status)
   const twitchSession = useTwitchSessionStore((state) => state.session)
   const twitchTokens = useTwitchSessionStore((state) => state.tokens)
@@ -122,6 +113,7 @@ export function SharedSessionPage() {
   const localRuleConfig = useAppStore((state) => state.ruleConfig)
   const localWheelSegments = useAppStore((state) => state.wheelSegments)
   const localWheelTextScale = useAppStore((state) => state.wheelTextScale)
+  const setSharedSessionEnabled = useAppStore((state) => state.setSharedSessionEnabled)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -133,10 +125,7 @@ export function SharedSessionPage() {
   }, [checkHealth])
 
   useEffect(() => {
-    if (status !== 'connected') {
-      return
-    }
-
+    if (status !== 'connected') return
     syncParticipantStatus({
       twitchStatus: twitchStatus === 'connected' ? 'connected' : twitchSession ? 'needs-attention' : 'not-linked',
       twitchLogin: twitchSession?.login ?? null,
@@ -147,24 +136,15 @@ export function SharedSessionPage() {
 
   const serviceTone = getServiceTone(serviceHealth)
   const localIdentity = useMemo(
-    () =>
-      twitchSession
-        ? {
-            userId: twitchSession.userId,
-            login: twitchSession.login,
-            displayName: twitchSession.login,
-          }
-        : null,
+    () => twitchSession
+      ? { userId: twitchSession.userId, login: twitchSession.login, displayName: twitchSession.login }
+      : null,
     [twitchSession],
   )
   const participantCards = session?.participants ?? []
-  const localParticipant = participantCards.find((participant) => participant.id === localParticipantId) ?? null
-  const sharedWheelSegment = session?.wheelSegments.find((segment) => segment.id === session.wheelSpin.activeSegmentId) ?? null
+  const sharedWheelSegment = session?.wheelSegments.find((s) => s.id === session.wheelSpin.activeSegmentId) ?? null
   const sharedTimer = useMemo(() => {
-    if (!session) {
-      return null
-    }
-
+    if (!session) return null
     return resolveRuntimeFromSession(
       {
         timerStatus: session.timerState.timerStatus,
@@ -175,41 +155,42 @@ export function SharedSessionPage() {
       now,
     )
   }, [now, session])
+
   const isHost = localRole === 'host'
   const ownsSharedWheelTimeout =
-    session?.wheelSpin.status === 'ready'
-    && session.wheelSpin.sourceParticipantId === localParticipantId
-    && sharedWheelSegment?.outcomeType === 'timeout'
+    session?.wheelSpin.status === 'ready' &&
+    session.wheelSpin.sourceParticipantId === localParticipantId &&
+    sharedWheelSegment?.outcomeType === 'timeout'
   const runButtonLabel =
-    sharedTimer?.timerStatus === 'running'
-      ? 'Pause'
-      : sharedTimer?.timerStatus === 'paused' && sharedTimer.timerRemainingSeconds > 0
-        ? 'Resume'
-        : 'Start'
+    sharedTimer?.timerStatus === 'running' ? 'Pause' :
+    sharedTimer?.timerStatus === 'paused' && sharedTimer.timerRemainingSeconds > 0 ? 'Resume' : 'Start'
   const runButtonAction = sharedTimer?.timerStatus === 'running' ? pauseSharedTimer : startSharedTimer
 
   const handleCreate = async () => {
     await createSession({
       title: sessionTitle.trim(),
-      displayName: displayName.trim() || twitchSession?.login || 'Host',
       twitchIdentity: localIdentity,
       ruleConfig: localRuleConfig,
       wheelSegments: localWheelSegments,
     })
     setCreateOpen(false)
-    setDisplayName('')
     setSessionTitle('')
   }
 
   const handleJoin = async () => {
     await joinSession({
       inviteCode: joinCode.trim().toUpperCase(),
-      displayName: displayName.trim() || twitchSession?.login || 'Guest',
       twitchIdentity: localIdentity,
     })
     setJoinOpen(false)
-    setDisplayName('')
     setJoinCode('')
+  }
+
+  const copyInviteCode = async () => {
+    if (!session) return
+    await navigator.clipboard.writeText(session.inviteCode)
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 2000)
   }
 
   const applyExactTimer = () => {
@@ -219,12 +200,8 @@ export function SharedSessionPage() {
   }
 
   const applySharedTimeoutResult = async () => {
-    if (!session || !ownsSharedWheelTimeout || !sharedWheelSegment || !twitchSession || !twitchTokens) {
-      return
-    }
-
+    if (!session || !ownsSharedWheelTimeout || !sharedWheelSegment || !twitchSession || !twitchTokens) return
     setSharedWheelActionPending(true)
-
     try {
       let targetUserId: string | null = null
       let targetLabel = 'selected target'
@@ -234,7 +211,6 @@ export function SharedSessionPage() {
         if (!session.wheelSpin.triggerUserId) {
           throw new Error('The gifted-sub gifter is missing from this shared wheel result.')
         }
-
         targetUserId = session.wheelSpin.triggerUserId
         targetLabel = session.wheelSpin.triggerDisplayName ?? session.wheelSpin.triggerUserLogin ?? 'gifter'
         targetMention = session.wheelSpin.triggerUserLogin ? `@${session.wheelSpin.triggerUserLogin}` : targetLabel
@@ -242,19 +218,16 @@ export function SharedSessionPage() {
         if (!twitchSession.scopes.includes('moderator:read:chatters')) {
           throw new Error('Reconnect Twitch to grant moderator:read:chatters before using shared random timeout outcomes.')
         }
-
         const chatters = await getChatters({
           clientId: TWITCH_CLIENT_ID,
           accessToken: twitchTokens.accessToken,
           broadcasterId: twitchSession.userId,
           moderatorId: twitchSession.userId,
         })
-        const candidates = chatters.filter((chatter) => chatter.userId !== twitchSession.userId)
-
+        const candidates = chatters.filter((c) => c.userId !== twitchSession.userId)
         if (candidates.length === 0) {
           throw new Error('No eligible chatters are available for this shared random timeout outcome.')
         }
-
         const selectedChatter = candidates[Math.floor(Math.random() * candidates.length)]
         targetUserId = selectedChatter.userId
         targetLabel = selectedChatter.userName
@@ -297,42 +270,46 @@ export function SharedSessionPage() {
       <section className="page-header rules-header">
         <div>
           <h1 className="page-title">Shared Session</h1>
-          <p className="page-desc">
-            Link up to six creators into one shared subathon room, verify each broadcaster account is attached to the right PC, and keep one shared timer snapshot in sync across every desktop client.
-          </p>
+          <p className="page-desc">Run one shared subathon timer across up to six creator desktops, each contributing their own Twitch and tip events.</p>
         </div>
       </section>
 
-      <section className={`panel shared-session-strip shared-session-strip--${serviceTone}`}>
-        <div className="shared-session-strip__copy">
-          <span className="shared-session-strip__kicker">Shared service</span>
-          <strong className="shared-session-strip__title">
-            {serviceHealth === 'online'
-              ? 'Shared session service reachable'
-              : serviceHealth === 'checking'
-                ? 'Checking shared session service'
-                : serviceHealth === 'offline'
-                  ? 'Shared session service unavailable'
-                  : 'Shared session service not checked yet'}
-          </strong>
-          <p className="shared-session-strip__detail">
-            {serviceMessage ?? `Shared session traffic uses ${serviceUrl}.`}
-          </p>
+      {/* Server health strip */}
+      <div className={`shared-session-status-bar shared-session-status-bar--${serviceTone}`}>
+        <div className="shared-session-status-bar__left">
+          <span className={`shared-session-status-bar__dot shared-session-status-bar__dot--${serviceTone}`} />
+          <span className="shared-session-status-bar__text">
+            {serviceHealth === 'online' ? 'Session server reachable'
+              : serviceHealth === 'checking' ? 'Checking session server…'
+              : serviceHealth === 'offline' ? 'Session server unavailable'
+              : 'Session server not checked'}
+          </span>
+          <span className="shared-session-status-bar__url">{serviceMessage ?? serviceUrl}</span>
         </div>
-        <button type="button" className="btn btn--ghost shared-session-strip__action" onClick={() => void checkHealth()}>
-          Check again
-        </button>
-      </section>
+        <div className="shared-session-status-bar__right">
+          <button type="button" className="btn-link" onClick={() => void checkHealth()}>Check again</button>
+          <span aria-hidden="true" className="shared-session-status-bar__sep">·</span>
+          <button
+            type="button"
+            className="btn-link btn-link--muted"
+            onClick={() => { setSharedSessionEnabled(false); void navigate('/settings') }}
+          >
+            Disable
+          </button>
+        </div>
+      </div>
 
+      {/* Reconnecting banner */}
       {status === 'reconnecting' ? (
         <section className="panel shared-session-alert shared-session-alert--warning">
           <div>
-            <strong>Reconnecting</strong>
-            <p>Lost contact with the shared session service. Attempting to reconnect automatically.</p>
+            <strong>Reconnecting…</strong>
+            <p>Lost connection to the session server. Attempting to reconnect automatically.</p>
           </div>
         </section>
       ) : null}
 
+      {/* Error banners */}
       {lastError && status === 'error' && session ? (
         <section className="panel shared-session-alert shared-session-alert--critical">
           <div>
@@ -340,126 +317,186 @@ export function SharedSessionPage() {
             <p>{lastError}</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="btn btn--primary" onClick={() => void rejoinSession()}>
-              Reconnect
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={leaveSession}>
-              Leave session
-            </button>
+            <button type="button" className="btn btn--primary" onClick={() => void rejoinSession()}>Reconnect</button>
+            <button type="button" className="btn btn--ghost" onClick={leaveSession}>Leave session</button>
           </div>
         </section>
       ) : lastError ? (
         <section className="panel shared-session-alert shared-session-alert--critical">
           <div>
-            <strong>Shared session error</strong>
+            <strong>Error</strong>
             <p>{lastError}</p>
           </div>
-          <button type="button" className="btn btn--ghost" onClick={clearError}>
-            Dismiss
-          </button>
+          <button type="button" className="btn btn--ghost" onClick={clearError}>Dismiss</button>
         </section>
       ) : null}
 
+      {/* ---- No session: landing ---- */}
       {!session ? (
         <>
-          <section className="panel shared-session-hero">
-            <div className="shared-session-hero__copy">
-              <span className="mini-chip">Phase 2</span>
-              <h2 className="panel-title">Create the room, link the creators, and let the host drive one shared timer</h2>
-              <p className="panel-copy">
-                The shared-session flow now covers room creation, invite flow, creator presence, broadcaster identity, provider health, and one server-owned timer snapshot. The host can drive the shared timer while every guest sees the same live value.
-              </p>
-            </div>
-            <div className="shared-session-hero__grid">
-              <div className="shared-session-callout">
-                <strong>Host streamer</strong>
-                <p>Create the room, share the invite code, and stay responsible for the future shared runtime controls for the whole collaboration.</p>
-                <button type="button" className="btn btn--primary" onClick={() => setCreateOpen(true)}>
-                  Create shared session
+          <section className="panel shared-session-landing">
+            <div className="shared-session-landing__actions">
+              <div className="shared-session-action-card">
+                <div className="shared-session-action-card__body">
+                  <strong className="shared-session-action-card__title">Host</strong>
+                  <p className="shared-session-action-card__desc">Create the room on this PC. Your timer rules and wheel segments carry over automatically. Share the invite code once the room is open.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setCreateOpen(true)}
+                  disabled={!twitchSession}
+                >
+                  Create session
                 </button>
+                {!twitchSession ? (
+                  <p className="shared-session-action-card__warn">Connect Twitch first to identify your broadcaster account in the room.</p>
+                ) : null}
               </div>
-              <div className="shared-session-callout">
-                <strong>Joining creator</strong>
-                <p>Join the host’s room with the invite code from their app and confirm your own Twitch account is the one attached to this PC.</p>
-                <button type="button" className="btn btn--accent" onClick={() => setJoinOpen(true)}>
-                  Join shared session
+
+              <div className="shared-session-action-card shared-session-action-card--join">
+                <div className="shared-session-action-card__body">
+                  <strong className="shared-session-action-card__title">Join</strong>
+                  <p className="shared-session-action-card__desc">Enter the six-character code from the host's app to connect this PC to their room. Your Twitch account is confirmed automatically.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--accent"
+                  onClick={() => setJoinOpen(true)}
+                  disabled={!twitchSession}
+                >
+                  Join session
                 </button>
+                {!twitchSession ? (
+                  <p className="shared-session-action-card__warn">Connect Twitch first to identify your broadcaster account in the room.</p>
+                ) : null}
               </div>
             </div>
-          </section>
 
-          <section className="shared-session-summary-grid">
-            <article className="panel shared-session-summary-card">
-              <span className="shared-session-summary-card__label">Local Twitch account</span>
-              <strong className="shared-session-summary-card__value">
-                {twitchSession ? `@${twitchSession.login}` : 'Not connected'}
-              </strong>
-              <p className="shared-session-summary-card__detail">
-                {twitchSession
-                  ? 'This broadcaster account will be attached to the shared session from this PC.'
-                  : 'Connect Twitch first so the shared session can clearly identify which broadcaster belongs to this app.'}
-              </p>
-            </article>
-
-            <article className="panel shared-session-summary-card">
-              <span className="shared-session-summary-card__label">Tip feeds on this PC</span>
-              <strong className="shared-session-summary-card__value">
-                {streamElementsStatus === 'connected' || streamlabsStatus === 'connected' ? 'Ready to contribute' : 'Optional later'}
-              </strong>
-              <p className="shared-session-summary-card__detail">
-                StreamElements and Streamlabs stay tip-only in shared mode. Twitch remains the source for follows, subs, cheers, and gift bombs.
-              </p>
-            </article>
+            <div className="shared-session-landing__status">
+              <div className="shared-session-readiness-row">
+                <div className={`health-dot ${twitchSession ? 'connected' : 'action-required'}`} />
+                <span className="shared-session-readiness-row__label">Twitch</span>
+                <strong className="shared-session-readiness-row__value">
+                  {twitchSession ? `@${twitchSession.login}` : 'Not connected'}
+                </strong>
+              </div>
+              <div className="shared-session-readiness-row">
+                <div className={`health-dot ${streamElementsStatus === 'connected' || streamlabsStatus === 'connected' ? 'connected' : 'degraded'}`} />
+                <span className="shared-session-readiness-row__label">Tip feeds</span>
+                <strong className="shared-session-readiness-row__value">
+                  {streamElementsStatus === 'connected' || streamlabsStatus === 'connected' ? 'Ready' : 'Optional'}
+                </strong>
+              </div>
+            </div>
           </section>
         </>
       ) : (
+        /* ---- Active session ---- */
         <>
-          <section className="panel shared-session-session-card">
-            <div className="shared-session-session-card__header">
-              <div>
-                <div className="shared-session-session-card__badges">
-                  <span className="mini-chip">Invite code {session.inviteCode}</span>
-                  <span className="mini-chip">{session.participants.length} / 6 creators joined</span>
-                  <span className={`status-chip ${session.status === 'active' ? 'status-chip--connected' : 'status-chip--pending'}`}>
-                    {session.status === 'active' ? 'Shared room active' : 'Waiting for collaborators'}
-                  </span>
-                  {localRole ? <span className="mini-chip">{localRole === 'host' ? 'Host controls only' : 'Guest view'}</span> : null}
-                </div>
-                <h2 className="panel-title">{session.title}</h2>
-                <p className="panel-copy">
-                  This room is live. Use this page to confirm creator presence, linked Twitch accounts, provider health, and the shared timer snapshot before Twitch and tip ingestion are added in later phases.
-                </p>
+          {/* Session header bar */}
+          <section className="panel shared-session-bar">
+            <div className="shared-session-bar__left">
+              <div className="shared-session-bar__badges">
+                <span className={`status-chip ${session.status === 'active' ? 'status-chip--connected' : 'status-chip--pending'}`}>
+                  {session.status === 'active' ? 'Active' : 'Waiting'}
+                </span>
+                <span className="mini-chip">{localRole === 'host' ? 'Host' : 'Guest'}</span>
+                <span className="mini-chip">{session.participants.length} / 6</span>
               </div>
-              <div className="shared-session-session-card__actions">
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => void navigator.clipboard.writeText(session.inviteCode)}
-                >
-                  Copy invite code
-                </button>
-                {isHost ? (
-                  <button type="button" className="btn btn--danger" onClick={endSharedSession}>
-                    End session
-                  </button>
-                ) : (
-                  <button type="button" className="btn btn--danger" onClick={leaveSession}>
-                    Leave session
-                  </button>
-                )}
-              </div>
+              <h2 className="shared-session-bar__title">{session.title}</h2>
+            </div>
+
+            <div className="shared-session-bar__code" onClick={() => void copyInviteCode()} title="Click to copy invite code">
+              <span className="shared-session-bar__code-label">Invite code</span>
+              <span className="shared-session-bar__code-value">{session.inviteCode}</span>
+              <span className="shared-session-bar__code-copy">{codeCopied ? 'Copied!' : 'Copy'}</span>
+            </div>
+
+            <div className="shared-session-bar__actions">
+              {isHost ? (
+                <button type="button" className="btn btn--danger" onClick={endSharedSession}>End session</button>
+              ) : (
+                <button type="button" className="btn btn--danger" onClick={leaveSession}>Leave session</button>
+              )}
             </div>
           </section>
 
+          {/* Participants */}
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Participants</h2>
+                <p className="panel-copy">Each creator's Twitch account, connection status, and tip feed health from their PC.</p>
+              </div>
+            </div>
+            <div className="shared-session-participant-grid">
+              {participantCards.map((participant) => (
+                <article
+                  key={participant.id}
+                  className={`shared-session-participant-card shared-session-participant-card--${participant.connectionStatus === 'connected' ? 'connected' : 'critical'}`}
+                >
+                  <div className="shared-session-participant-card__header">
+                    <div className="shared-session-participant-card__identity">
+                      <div className="shared-session-participant-card__avatar">
+                        {getParticipantInitials(participant.displayName)}
+                      </div>
+                      <div>
+                        <span className="shared-session-participant-card__role">
+                          {participant.role === 'host' ? 'Host' : 'Guest'}
+                          {participant.id === localParticipantId ? ' · You' : ''}
+                        </span>
+                        <strong className="shared-session-participant-card__name">{participant.displayName}</strong>
+                      </div>
+                    </div>
+                    <span className={`status-chip ${participant.connectionStatus === 'connected' ? 'status-chip--connected' : 'status-chip--critical'}`}>
+                      {getParticipantPresenceLabel(participant)}
+                    </span>
+                  </div>
+
+                  <div className="shared-session-participant-card__body">
+                    <div className="shared-session-detail-row">
+                      <span>Twitch</span>
+                      <strong style={{ color: participant.twitchIdentity ? 'var(--green)' : undefined }}>
+                        {participant.twitchIdentity ? `@${participant.twitchIdentity.login}` : 'Not linked'}
+                      </strong>
+                    </div>
+                    <div className="shared-session-detail-row">
+                      <span>Connection</span>
+                      <strong style={{ color: getRuntimeStatusColor(participant.runtimeState.twitchStatus) }}>
+                        {getTwitchHealthLabel(participant.runtimeState)}
+                      </strong>
+                    </div>
+                    <div className="shared-session-detail-row">
+                      <span>StreamElements</span>
+                      <strong style={{ textTransform: 'capitalize', color: getRuntimeStatusColor(participant.runtimeState.streamElementsStatus) }}>
+                        {participant.runtimeState.streamElementsStatus}
+                      </strong>
+                    </div>
+                    <div className="shared-session-detail-row">
+                      <span>Streamlabs</span>
+                      <strong style={{ textTransform: 'capitalize', color: getRuntimeStatusColor(participant.runtimeState.streamlabsStatus) }}>
+                        {participant.runtimeState.streamlabsStatus}
+                      </strong>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {/* Shared Timer */}
           <section className="panel shared-session-timer-panel">
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">Shared Timer</h2>
                 <p className="panel-copy">
-                  This timer snapshot now comes from the shared-session service. Only the host can start, pause, reset, add time, remove time, or set the exact shared timer value in this phase.
+                  {isHost
+                    ? 'You control the shared timer. All connected desktops see the same value in real time.'
+                    : 'The host controls the shared timer. Your desktop receives live updates.'}
                 </p>
               </div>
-              <div className="shared-session-session-card__badges">
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span className={`status-chip ${sharedTimer?.timerStatus === 'running' ? 'status-chip--connected' : 'status-chip--idle'}`}>
                   {sharedTimer?.timerStatus ?? 'idle'}
                 </span>
@@ -468,8 +505,8 @@ export function SharedSessionPage() {
             </div>
 
             {sharedTimer ? (
-              <div className="shared-session-timer-grid">
-                <div className="shared-session-timer-stage">
+              <div className="shared-session-timer-layout">
+                <div className="shared-session-timer-display">
                   <TimerWidget
                     theme="app"
                     surface="dashboard"
@@ -483,53 +520,38 @@ export function SharedSessionPage() {
                 </div>
 
                 <div className="shared-session-timer-controls">
-                  <div className="shared-session-callout">
-                    <strong>Host controls</strong>
-                    <p>
-                      {isHost
-                        ? 'These controls write to the shared-session service and every connected desktop app will receive the same timer snapshot.'
-                        : 'Only the host can change the shared timer right now. Guest desktops stay read-only until later permission work lands.'}
-                    </p>
+                  {!isHost ? (
+                    <p className="shared-session-timer-controls__guest-note">Timer controls are host-only. Your events still contribute to the shared timer.</p>
+                  ) : null}
+
+                  <div className="shared-session-control-group">
+                    <span className="shared-session-control-group__label">Playback</span>
                     <div className="shared-session-control-row">
-                      <button type="button" className="btn btn--primary" onClick={runButtonAction} disabled={!isHost}>
-                        {runButtonLabel}
-                      </button>
-                      <button type="button" className="btn btn--ghost" onClick={resetSharedTimer} disabled={!isHost}>
-                        Reset
-                      </button>
+                      <button type="button" className="btn btn--primary" onClick={runButtonAction} disabled={!isHost}>{runButtonLabel}</button>
+                      <button type="button" className="btn btn--ghost" onClick={resetSharedTimer} disabled={!isHost}>Reset</button>
                     </div>
                   </div>
 
-                  <div className="shared-session-callout">
-                    <strong>Quick adjust</strong>
-                    <p>Use the same operator shortcuts here before shared Twitch and tip events are wired in.</p>
+                  <div className="shared-session-control-group">
+                    <span className="shared-session-control-group__label">Quick adjust</span>
                     <div className="shared-session-control-row">
-                      <button type="button" className="btn btn--accent" onClick={() => adjustSharedTimer(300, 'Shared session host add 5 min')} disabled={!isHost}>
-                        +5 min
-                      </button>
-                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(60, 'Shared session host add 1 min')} disabled={!isHost}>
-                        +1 min
-                      </button>
-                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(-120, 'Shared session host remove 2 min')} disabled={!isHost}>
-                        -2 min
-                      </button>
+                      <button type="button" className="btn btn--accent" onClick={() => adjustSharedTimer(300, 'host +5 min')} disabled={!isHost}>+5 min</button>
+                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(60, 'host +1 min')} disabled={!isHost}>+1 min</button>
+                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(-120, 'host -2 min')} disabled={!isHost}>−2 min</button>
                     </div>
                   </div>
 
-                  <div className="shared-session-callout">
-                    <strong>Set exact timer</strong>
-                    <p>Use `HH:MM:SS` to set the shared timer directly when you need to recover or start from a specific value.</p>
+                  <div className="shared-session-control-group">
+                    <span className="shared-session-control-group__label">Set exact time</span>
                     <div className="shared-session-set-row">
                       <input
                         className="rule-field__input"
                         value={setTimerDraft}
-                        onChange={(event) => setSetTimerDraft(normalizeDurationDraft(event.target.value))}
+                        onChange={(e) => setSetTimerDraft(normalizeDurationDraft(e.target.value))}
                         placeholder="06:00:00"
                         disabled={!isHost}
                       />
-                      <button type="button" className="btn btn--accent" onClick={applyExactTimer} disabled={!isHost}>
-                        Set timer
-                      </button>
+                      <button type="button" className="btn btn--accent" onClick={applyExactTimer} disabled={!isHost}>Set</button>
                     </div>
                   </div>
                 </div>
@@ -537,13 +559,12 @@ export function SharedSessionPage() {
             ) : null}
           </section>
 
+          {/* Shared Wheel */}
           <section className="panel shared-session-wheel-panel">
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">Shared Wheel</h2>
-                <p className="panel-copy">
-                  Shared gift bombs can trigger one server-owned wheel spin for the whole room. Every connected desktop sees the same spin and result, and timeout outcomes are applied by the creator whose channel triggered the wheel.
-                </p>
+                <p className="panel-copy">Qualifying gift bombs trigger one shared wheel spin. Every desktop sees the same result, and timeout outcomes are carried out by the creator whose channel triggered it.</p>
               </div>
             </div>
 
@@ -558,116 +579,37 @@ export function SharedSessionPage() {
                 {ownsSharedWheelTimeout && sharedWheelSegment ? (
                   <div className="shared-session-wheel-action">
                     <strong>Timeout action needed on this PC</strong>
-                    <p>
-                      This wheel result belongs to your linked broadcaster session, so this desktop is responsible for the timeout call before the shared wheel can finish.
-                    </p>
+                    <p>This result was triggered on your channel — apply the timeout to finish the shared wheel spin.</p>
                     <button
                       type="button"
                       className="btn btn--accent"
                       onClick={() => void applySharedTimeoutResult()}
                       disabled={sharedWheelActionPending}
                     >
-                      {sharedWheelActionPending ? 'Applying shared timeout…' : 'Apply shared timeout'}
+                      {sharedWheelActionPending ? 'Applying…' : 'Apply timeout'}
                     </button>
                   </div>
                 ) : session.wheelSpin.status === 'ready' && sharedWheelSegment?.outcomeType === 'timeout' ? (
                   <div className="shared-session-wheel-action">
-                    <strong>Waiting on the source creator</strong>
-                    <p>
-                      This timeout result belongs to the creator whose channel triggered the wheel. Their desktop needs to apply it so the shared wheel can finish cleanly.
-                    </p>
+                    <strong>Waiting on source creator</strong>
+                    <p>The creator whose channel triggered this wheel spin needs to apply the timeout from their desktop.</p>
                   </div>
                 ) : null}
               </div>
             ) : (
               <div className="shared-session-empty-state">
-                <strong>No shared wheel spin yet</strong>
-                <p>When a qualifying shared Twitch gift bomb arrives, the service will pick one shared wheel result and every connected desktop will see the same spin here.</p>
+                <strong>No active spin</strong>
+                <p>When a qualifying gift bomb arrives from any participant's channel, the shared wheel will spin here for everyone in the room.</p>
               </div>
             )}
           </section>
 
-          <section className="shared-session-summary-grid">
-            <article className="panel shared-session-summary-card">
-              <span className="shared-session-summary-card__label">Your role</span>
-              <strong className="shared-session-summary-card__value">{localRole === 'host' ? 'Host' : 'Guest'}</strong>
-              <p className="shared-session-summary-card__detail">
-                {localRole === 'host'
-                  ? 'This PC owns the room and will later own the shared timer controls and moderation outcomes.'
-                  : 'This PC contributes its own streamer events and stays read-only for shared controls in the first release.'}
-              </p>
-            </article>
-
-            <article className="panel shared-session-summary-card">
-              <span className="shared-session-summary-card__label">Local presence</span>
-              <strong className="shared-session-summary-card__value">
-                {localParticipant ? getParticipantPresenceLabel(localParticipant) : 'Connecting'}
-              </strong>
-              <p className="shared-session-summary-card__detail">
-                {localParticipant ? getRuntimeStateLabel(localParticipant.runtimeState) : 'Waiting for the room snapshot from the shared service.'}
-              </p>
-            </article>
-          </section>
-
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h2 className="panel-title">Participants</h2>
-                <p className="panel-copy">Each participant card shows who is in the room, which broadcaster account is linked, and whether that PC is still online. The scaffold is already structured for up to six creators.</p>
-              </div>
-            </div>
-
-            <div className="shared-session-participant-grid">
-              {participantCards.map((participant) => (
-                <article
-                  key={participant.id}
-                  className={`shared-session-participant-card shared-session-participant-card--${getParticipantTone(participant)}`}
-                >
-                  <div className="shared-session-participant-card__header">
-                    <div>
-                      <span className="shared-session-participant-card__role">
-                        {participant.role === 'host' ? 'Host' : 'Guest'}
-                        {participant.id === localParticipantId ? ' · This PC' : ''}
-                      </span>
-                      <strong className="shared-session-participant-card__name">{participant.displayName}</strong>
-                    </div>
-                    <span className={`status-chip ${participant.connectionStatus === 'connected' ? 'status-chip--connected' : 'status-chip--critical'}`}>
-                      {getParticipantPresenceLabel(participant)}
-                    </span>
-                  </div>
-
-                  <div className="shared-session-participant-card__body">
-                    <div className="shared-session-detail-row">
-                      <span>Broadcaster</span>
-                      <strong>
-                        {participant.twitchIdentity ? `@${participant.twitchIdentity.login}` : 'Not linked yet'}
-                      </strong>
-                    </div>
-                    <div className="shared-session-detail-row">
-                      <span>Twitch state</span>
-                      <strong>{participant.runtimeState.twitchStatus === 'connected' ? 'Connected' : participant.runtimeState.twitchStatus === 'needs-attention' ? 'Needs attention' : 'Not linked'}</strong>
-                    </div>
-                    <div className="shared-session-detail-row">
-                      <span>StreamElements</span>
-                      <strong>{participant.runtimeState.streamElementsStatus}</strong>
-                    </div>
-                    <div className="shared-session-detail-row">
-                      <span>Streamlabs</span>
-                      <strong>{participant.runtimeState.streamlabsStatus}</strong>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
+          {/* Shared Activity */}
           <section className="panel">
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">Shared Activity</h2>
-                <p className="panel-copy">
-                  Shared Twitch events are applied once on the service, then labeled here with the creator who triggered them so both desktops can audit the same runtime history.
-                </p>
+                <p className="panel-copy">Events from all participants applied to the shared timer, labeled by source creator.</p>
               </div>
             </div>
 
@@ -693,45 +635,59 @@ export function SharedSessionPage() {
               </div>
             ) : (
               <div className="shared-session-empty-state">
-                <strong>No shared Twitch events yet</strong>
-                <p>When one of the linked creators receives a qualifying Twitch event, the shared timer and this activity timeline will update for everyone in the room.</p>
+                <strong>No activity yet</strong>
+                <p>Qualifying Twitch and tip events from any connected creator will appear here once the session is active.</p>
               </div>
             )}
           </section>
         </>
       )}
 
+      {/* Create modal */}
       {createOpen ? (
         <div className="shared-session-modal-backdrop" role="presentation" onClick={() => setCreateOpen(false)}>
-          <div className="shared-session-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+          <div className="shared-session-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="shared-session-modal__header">
               <div>
                 <h2 className="panel-title">Create shared session</h2>
-                <p className="panel-copy">Create the room on this PC, then send the invite code to the other streamer.</p>
+                <p className="panel-copy">Your timer rules and wheel segments are copied into the session automatically.</p>
               </div>
-              <button type="button" className="btn btn--ghost" onClick={() => setCreateOpen(false)}>
-                Close
-              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => setCreateOpen(false)}>Close</button>
             </div>
 
-            <div className="settings-grid settings-grid--single">
+            <div className="shared-session-modal__fields">
               <label className="rule-field">
-                <span className="rule-field__label">Session title</span>
-                <span className="rule-field__hint">Use a short label the whole collaboration will recognize during setup.</span>
-                <input className="rule-field__input" value={sessionTitle} onChange={(event) => setSessionTitle(event.target.value)} placeholder="Shared Subathon" />
+                <span className="rule-field__label">Session title <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></span>
+                <input
+                  className="rule-field__input"
+                  value={sessionTitle}
+                  onChange={(e) => setSessionTitle(e.target.value)}
+                  placeholder={twitchSession ? `${twitchSession.login}'s Shared Subathon` : 'Shared Subathon'}
+                  autoFocus
+                />
               </label>
-              <label className="rule-field">
-                <span className="rule-field__label">Your participant label</span>
-                <span className="rule-field__hint">Shown on the participant card inside the shared room.</span>
-                <input className="rule-field__input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={twitchSession?.login ?? 'Host streamer'} />
-              </label>
+
+              <div className="shared-session-modal__identity">
+                <span className="shared-session-modal__identity-label">Hosting as</span>
+                <div className="shared-session-modal__identity-row">
+                  <div className="shared-session-participant-card__avatar shared-session-participant-card__avatar--sm">
+                    {twitchSession ? getParticipantInitials(twitchSession.login) : '?'}
+                  </div>
+                  <strong className="shared-session-modal__identity-name">
+                    {twitchSession ? `@${twitchSession.login}` : 'No Twitch account connected'}
+                  </strong>
+                </div>
+              </div>
             </div>
 
             <div className="shared-session-modal__actions">
-              <button type="button" className="btn btn--ghost" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn--primary" onClick={() => void handleCreate()} disabled={status === 'creating' || status === 'connecting'}>
+              <button type="button" className="btn btn--ghost" onClick={() => setCreateOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => void handleCreate()}
+                disabled={status === 'creating' || status === 'connecting' || !twitchSession}
+              >
                 {status === 'creating' || status === 'connecting' ? 'Creating…' : 'Create session'}
               </button>
             </div>
@@ -739,37 +695,53 @@ export function SharedSessionPage() {
         </div>
       ) : null}
 
+      {/* Join modal */}
       {joinOpen ? (
         <div className="shared-session-modal-backdrop" role="presentation" onClick={() => setJoinOpen(false)}>
-          <div className="shared-session-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+          <div className="shared-session-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="shared-session-modal__header">
               <div>
                 <h2 className="panel-title">Join shared session</h2>
-                <p className="panel-copy">Enter the invite code from the host app, then confirm the Twitch account on this PC is the streamer you want attached to the room.</p>
+                <p className="panel-copy">Get the invite code from the host's app and enter it below.</p>
               </div>
-              <button type="button" className="btn btn--ghost" onClick={() => setJoinOpen(false)}>
-                Close
-              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => setJoinOpen(false)}>Close</button>
             </div>
 
-            <div className="settings-grid settings-grid--single">
+            <div className="shared-session-modal__fields">
               <label className="rule-field">
                 <span className="rule-field__label">Invite code</span>
-                <span className="rule-field__hint">Codes are short and uppercase to make voice sharing easier during setup.</span>
-                <input className="rule-field__input" value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} placeholder="ABC123" />
+                <input
+                  className="rule-field__input shared-session-modal__code-input"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="ABC123"
+                  maxLength={6}
+                  autoFocus
+                />
+                <span className="rule-field__hint">Six characters, uppercase. Easy to read over voice chat.</span>
               </label>
-              <label className="rule-field">
-                <span className="rule-field__label">Your participant label</span>
-                <span className="rule-field__hint">Shown on the participant card once you join the room.</span>
-                <input className="rule-field__input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={twitchSession?.login ?? 'Guest streamer'} />
-              </label>
+
+              <div className="shared-session-modal__identity">
+                <span className="shared-session-modal__identity-label">Joining as</span>
+                <div className="shared-session-modal__identity-row">
+                  <div className="shared-session-participant-card__avatar shared-session-participant-card__avatar--sm">
+                    {twitchSession ? getParticipantInitials(twitchSession.login) : '?'}
+                  </div>
+                  <strong className="shared-session-modal__identity-name">
+                    {twitchSession ? `@${twitchSession.login}` : 'No Twitch account connected'}
+                  </strong>
+                </div>
+              </div>
             </div>
 
             <div className="shared-session-modal__actions">
-              <button type="button" className="btn btn--ghost" onClick={() => setJoinOpen(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn--accent" onClick={() => void handleJoin()} disabled={status === 'joining' || status === 'connecting' || joinCode.trim().length < 4}>
+              <button type="button" className="btn btn--ghost" onClick={() => setJoinOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                className="btn btn--accent"
+                onClick={() => void handleJoin()}
+                disabled={status === 'joining' || status === 'connecting' || joinCode.trim().length < 4 || !twitchSession}
+              >
                 {status === 'joining' || status === 'connecting' ? 'Joining…' : 'Join session'}
               </button>
             </div>
@@ -791,19 +763,12 @@ function parseDurationDraft(value: string) {
     .filter(Boolean)
     .map((part) => Math.max(0, Number.parseInt(part, 10) || 0))
 
-  if (parts.length === 0) {
-    return 0
-  }
-
-  if (parts.length === 1) {
-    return parts[0] * 60
-  }
-
+  if (parts.length === 0) return 0
+  if (parts.length === 1) return parts[0] * 60
   if (parts.length === 2) {
     const [minutes, seconds] = parts
     return minutes * 60 + Math.min(seconds, 59)
   }
-
   const [hours, minutes, seconds] = parts.slice(-3)
   return hours * 3600 + Math.min(minutes, 59) * 60 + Math.min(seconds, 59)
 }
@@ -813,6 +778,5 @@ function formatDurationDraft(totalSeconds: number) {
   const hours = Math.floor(safeTotal / 3600)
   const minutes = Math.floor((safeTotal % 3600) / 60)
   const seconds = safeTotal % 60
-
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }

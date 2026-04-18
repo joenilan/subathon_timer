@@ -78,6 +78,7 @@ export interface AppState {
   defaultTimerSeconds: number
   commandPermissions: TimerCommandPermissionConfig
   overlayLanAccessEnabled: boolean
+  sharedSessionEnabled: boolean
   showWheelOverlayInAppShell: boolean
   wheelResultDisplaySeconds: number
 
@@ -112,6 +113,7 @@ export interface AppState {
   setDefaultTimerSeconds: (value: number) => void
   setCommandPermission: (action: ChatTimerCommandAction, permission: TimerCommandPermission) => void
   setOverlayLanAccessEnabled: (value: boolean) => void
+  setSharedSessionEnabled: (value: boolean) => void
   setShowWheelOverlayInAppShell: (value: boolean) => void
   setWheelResultDisplaySeconds: (value: number) => void
   setAnnounceWheelResultsInChat: (value: boolean) => void
@@ -367,6 +369,7 @@ export const useAppStore = create<AppState>()(
       defaultTimerSeconds: INITIAL_TIMER_SECONDS,
       commandPermissions: DEFAULT_TIMER_COMMAND_PERMISSIONS,
       overlayLanAccessEnabled: false,
+      sharedSessionEnabled: false,
       showWheelOverlayInAppShell: true,
       wheelResultDisplaySeconds: DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS,
       announceWheelResultsInChat: true,
@@ -436,6 +439,7 @@ export const useAppStore = create<AppState>()(
           },
         })),
       setOverlayLanAccessEnabled: (overlayLanAccessEnabled) => set({ overlayLanAccessEnabled }),
+      setSharedSessionEnabled: (sharedSessionEnabled) => set({ sharedSessionEnabled }),
       setShowWheelOverlayInAppShell: (showWheelOverlayInAppShell) => set({ showWheelOverlayInAppShell }),
       setWheelResultDisplaySeconds: (wheelResultDisplaySeconds) =>
         set({ wheelResultDisplaySeconds: clampWheelResultDisplaySeconds(wheelResultDisplaySeconds) }),
@@ -1201,6 +1205,7 @@ export const useAppStore = create<AppState>()(
         showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
         wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
         announceWheelResultsInChat: state.announceWheelResultsInChat,
+        sharedSessionEnabled: state.sharedSessionEnabled,
         timerOverlayTransform: state.timerOverlayTransform,
         reasonOverlayTransform: state.reasonOverlayTransform,
         wheelOverlayTransform: state.wheelOverlayTransform,

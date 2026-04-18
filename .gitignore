@@ -31,3 +31,4 @@ token_cache.json
 /wheel-*.png
 /apps/desktop/release/
 /.env.raspi
+/.env.lc-server

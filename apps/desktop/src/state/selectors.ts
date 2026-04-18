@@ -130,6 +130,8 @@ export const selectSettingsPageState = (state: AppState) => ({
   showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
   timerWidgetTheme: state.timerWidgetTheme,
   wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
+  sharedSessionEnabled: state.sharedSessionEnabled,
+  setSharedSessionEnabled: state.setSharedSessionEnabled,
 })
 
 export const selectWheelPageState = (state: AppState) => ({

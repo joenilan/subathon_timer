@@ -713,8 +713,18 @@ export function createSharedSessionServer(options: CreateServerOptions): SharedS
     return request.json().catch(() => null)
   }
 
+  const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  }
+
   function jsonResponse(payload: unknown, init?: ResponseInit) {
-    return Response.json(payload, init)
+    const headers = new Headers(init?.headers)
+    for (const [key, value] of Object.entries(CORS_HEADERS)) {
+      headers.set(key, value)
+    }
+    return Response.json(payload, { ...init, headers })
   }
 
   function errorResponse(message: string, status = 400) {
@@ -727,6 +737,10 @@ export function createSharedSessionServer(options: CreateServerOptions): SharedS
 
     fetch(request, server) {
       const url = new URL(request.url)
+
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: CORS_HEADERS })
+      }
 
       if (url.pathname === '/health' && request.method === 'GET') {
         return jsonResponse({
@@ -741,16 +755,15 @@ export function createSharedSessionServer(options: CreateServerOptions): SharedS
         return parseJsonBody(request).then((body) => {
           const payload = body as {
             title?: string
-            displayName?: string
             twitchIdentity?: TwitchIdentity | null
             ruleConfig?: Partial<TimerRuleConfig> | null
             wheelSegments?: WheelSegment[] | null
           } | null
 
-          const displayName = payload?.displayName?.trim()
-          if (!displayName) {
-            return errorResponse('A participant label is required to create the room.')
-          }
+          const displayName =
+            payload?.twitchIdentity?.displayName ||
+            payload?.twitchIdentity?.login ||
+            'Host'
 
           const sessionId = crypto.randomUUID()
           const participantId = crypto.randomUUID()
@@ -808,19 +821,17 @@ export function createSharedSessionServer(options: CreateServerOptions): SharedS
         return parseJsonBody(request).then((body) => {
           const payload = body as {
             inviteCode?: string
-            displayName?: string
             twitchIdentity?: TwitchIdentity | null
           } | null
 
           const inviteCode = payload?.inviteCode?.trim().toUpperCase()
-          const displayName = payload?.displayName?.trim()
+          const displayName =
+            payload?.twitchIdentity?.displayName ||
+            payload?.twitchIdentity?.login ||
+            'Guest'
 
           if (!inviteCode) {
             return errorResponse('Enter the invite code from the host app.')
-          }
-
-          if (!displayName) {
-            return errorResponse('A participant label is required to join the room.')
           }
 
           const session = getSessionByInviteCode(inviteCode)

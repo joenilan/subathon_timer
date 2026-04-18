@@ -79,7 +79,6 @@ export interface SharedSessionSnapshot {
 
 export interface SharedSessionCreateInput {
   title?: string
-  displayName: string
   twitchIdentity: SharedSessionTwitchIdentity | null
   ruleConfig: TimerRuleConfig
   wheelSegments: WheelSegment[]
@@ -87,7 +86,6 @@ export interface SharedSessionCreateInput {
 
 export interface SharedSessionJoinInput {
   inviteCode: string
-  displayName: string
   twitchIdentity: SharedSessionTwitchIdentity | null
 }
 
@@ -149,6 +147,9 @@ export interface SharedSessionWheelActionMessage {
 
 export interface SharedSessionHelloMessage {
   type: 'hello'
+  displayName?: string
+  twitchIdentity?: SharedSessionTwitchIdentity | null
+  participantId?: string | null
 }
 
 export interface SharedSessionEndSessionMessage {
@@ -169,6 +170,13 @@ export interface SharedSessionSnapshotMessage {
   payload: SharedSessionSnapshot
 }
 
+// Sent to a newly joined or reconnected participant; includes their assigned participantId.
+export interface SharedSessionWelcomeMessage {
+  type: 'session.welcome'
+  participantId: string
+  payload: SharedSessionSnapshot
+}
+
 export interface SharedSessionErrorMessage {
   type: 'session.error'
   payload: {
@@ -185,5 +193,6 @@ export interface SharedSessionEndedMessage {
 
 export type SharedSessionSocketServerMessage =
   | SharedSessionSnapshotMessage
+  | SharedSessionWelcomeMessage
   | SharedSessionErrorMessage
   | SharedSessionEndedMessage

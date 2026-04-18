@@ -8,6 +8,8 @@ import {
 import { useAppStore } from '../state/useAppStore'
 import { selectSettingsPageState } from '../state/selectors'
 
+type SettingsTab = 'appearance' | 'commands' | 'features' | 'import'
+
 function formatDurationDraft(totalSeconds: number) {
   const safeTotal = Math.max(0, Math.floor(totalSeconds))
   const hours = Math.floor(safeTotal / 3600)
@@ -33,6 +35,7 @@ function parseDurationDraft(draft: { hours: string; minutes: string; seconds: st
 }
 
 export function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance')
   const {
     timerWidgetTheme,
     setTimerWidgetTheme,
@@ -47,6 +50,8 @@ export function SettingsPage() {
     commandPermissions,
     setCommandPermission,
     applyImportedLegacyConfig,
+    sharedSessionEnabled,
+    setSharedSessionEnabled,
   } = useAppStore(useShallow(selectSettingsPageState))
 
   const [importText, setImportText] = useState('')
@@ -85,205 +90,282 @@ export function SettingsPage() {
     setImportMessage(null)
   }
 
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'commands', label: 'Commands' },
+    { id: 'features', label: 'Features' },
+    { id: 'import', label: 'Import' },
+  ]
+
   return (
     <div className="page-container settings-page">
       <section className="page-header rules-header">
         <div>
           <h1 className="page-title">Settings</h1>
-          <p className="page-desc">App-wide defaults live here. Run-specific controls stay on their own pages and save automatically where you use them.</p>
+          <p className="page-desc">App-wide defaults and optional features.</p>
         </div>
       </section>
 
-      <section className="panel settings-panel settings-panel--appearance">
-        <div className="panel-header">
-          <div>
-            <h2 className="panel-title">Appearance</h2>
-            <p className="panel-copy">Choose the timer style used on the dashboard and in the timer overlay.</p>
-          </div>
-        </div>
+      <div className="settings-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`settings-tab${activeTab === tab.id ? ' settings-tab--active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        <div className="rules-grid">
-          <label className="rule-field">
-            <span className="rule-field__label">Timer theme</span>
-            <select
-              className="rule-field__input"
-              value={timerWidgetTheme}
-              onChange={(event) => setTimerWidgetTheme(event.target.value as 'original' | 'app')}
-            >
-              <option value="app">App (Default)</option>
-              <option value="original">Original</option>
-            </select>
-            <span className="rule-field__hint">Applies to the dashboard timer and the timer overlay.</span>
-          </label>
+      {activeTab === 'appearance' && (
+        <div className="settings-tab-content">
+          <section className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Timer</h2>
+                <p className="panel-copy">Visual style and default start value for the countdown timer.</p>
+              </div>
+            </div>
+            <div className="settings-two-col">
+              <label className="rule-field">
+                <span className="rule-field__label">Timer theme</span>
+                <select
+                  className="rule-field__input"
+                  value={timerWidgetTheme}
+                  onChange={(event) => setTimerWidgetTheme(event.target.value as 'original' | 'app')}
+                >
+                  <option value="app">App (Default)</option>
+                  <option value="original">Original</option>
+                </select>
+                <span className="rule-field__hint">Applies to the dashboard timer and the timer overlay.</span>
+              </label>
 
-          <div className="rule-field">
-            <span className="rule-field__label">Default timer start</span>
-            <div className="settings-duration-fields">
-              <label className="timer-widget__editor-field">
-                <span>HH</span>
-                <input
-                  className="timer-widget__editor-input"
-                  inputMode="numeric"
-                  value={timerDefaultDraft.hours}
-                  onChange={(event) => handleTimerDefaultChange('hours', event.target.value)}
-                />
+              <div className="rule-field">
+                <span className="rule-field__label">Default timer start</span>
+                <div className="settings-duration-fields">
+                  <label className="timer-widget__editor-field">
+                    <span>HH</span>
+                    <input
+                      className="timer-widget__editor-input"
+                      inputMode="numeric"
+                      value={timerDefaultDraft.hours}
+                      onChange={(event) => handleTimerDefaultChange('hours', event.target.value)}
+                    />
+                  </label>
+                  <label className="timer-widget__editor-field">
+                    <span>MM</span>
+                    <input
+                      className="timer-widget__editor-input"
+                      inputMode="numeric"
+                      value={timerDefaultDraft.minutes}
+                      onChange={(event) => handleTimerDefaultChange('minutes', event.target.value)}
+                    />
+                  </label>
+                  <label className="timer-widget__editor-field">
+                    <span>SS</span>
+                    <input
+                      className="timer-widget__editor-input"
+                      inputMode="numeric"
+                      value={timerDefaultDraft.seconds}
+                      onChange={(event) => handleTimerDefaultChange('seconds', event.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="wheel-config-actions settings-duration-actions">
+                  <button className="btn btn--primary" onClick={handleApplyTimerDefault}>Save Default</button>
+                </div>
+                <span className="rule-field__hint">Reset returns the timer to this value. Editing the live timer on the dashboard does not change the saved default.</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Wheel</h2>
+                <p className="panel-copy">In-app animation, result display time, and chat announcements.</p>
+              </div>
+            </div>
+            <div className="settings-two-col">
+              <label className="rule-field">
+                <span className="rule-field__label">In-app wheel animation</span>
+                <select
+                  className="rule-field__input"
+                  value={showWheelOverlayInAppShell ? 'enabled' : 'disabled'}
+                  onChange={(event) => setShowWheelOverlayInAppShell(event.target.value === 'enabled')}
+                >
+                  <option value="enabled">Enabled</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+                <span className="rule-field__hint">Shows the live wheel animation inside the desktop app so the streamer can see spins without watching OBS.</span>
               </label>
-              <label className="timer-widget__editor-field">
-                <span>MM</span>
+
+              <label className="rule-field">
+                <span className="rule-field__label">Wheel result on-screen time</span>
                 <input
-                  className="timer-widget__editor-input"
-                  inputMode="numeric"
-                  value={timerDefaultDraft.minutes}
-                  onChange={(event) => handleTimerDefaultChange('minutes', event.target.value)}
+                  className="rule-field__input"
+                  type="number"
+                  min={2}
+                  max={12}
+                  step={1}
+                  value={wheelResultDisplaySeconds}
+                  onChange={(event) => setWheelResultDisplaySeconds(Number.parseInt(event.target.value, 10) || 0)}
                 />
+                <span className="rule-field__hint">Keeps the winner visible for this many seconds before a test clears or an automatic outcome finishes.</span>
               </label>
-              <label className="timer-widget__editor-field">
-                <span>SS</span>
-                <input
-                  className="timer-widget__editor-input"
-                  inputMode="numeric"
-                  value={timerDefaultDraft.seconds}
-                  onChange={(event) => handleTimerDefaultChange('seconds', event.target.value)}
-                />
+
+              <label className="rule-field">
+                <span className="rule-field__label">Wheel result chat message</span>
+                <select
+                  className="rule-field__input"
+                  value={announceWheelResultsInChat ? 'enabled' : 'disabled'}
+                  onChange={(event) => setAnnounceWheelResultsInChat(event.target.value === 'enabled')}
+                >
+                  <option value="enabled">Enabled</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+                <span className="rule-field__hint">Announces the selected wheel result in Twitch chat when your session has chat write access.</span>
               </label>
             </div>
-            <div className="wheel-config-actions settings-duration-actions">
-              <button className="btn btn--primary" onClick={handleApplyTimerDefault}>Save Default</button>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'commands' && (
+        <div className="settings-tab-content">
+          <section className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Chat command permissions</h2>
+                <p className="panel-copy">Choose whether each timer chat command is available to the streamer, moderators, or both.</p>
+              </div>
             </div>
-            <span className="rule-field__hint">Reset returns the timer to this value. Editing the live timer on the dashboard does not change the saved default.</span>
-          </div>
 
-          <label className="rule-field">
-            <span className="rule-field__label">In-app wheel animation</span>
-            <select
-              className="rule-field__input"
-              value={showWheelOverlayInAppShell ? 'enabled' : 'disabled'}
-              onChange={(event) => setShowWheelOverlayInAppShell(event.target.value === 'enabled')}
-            >
-              <option value="enabled">Enabled</option>
-              <option value="disabled">Disabled</option>
-            </select>
-            <span className="rule-field__hint">Shows the live wheel animation inside the desktop app so the streamer can see spins without watching OBS.</span>
-          </label>
+            <div className="settings-command-notes">
+              <div className="settings-mini-note">
+                <strong>Safe default</strong>
+                <span>Day-to-day commands stay open to streamer + mods</span>
+              </div>
+              <div className="settings-mini-note">
+                <strong>Lock down</strong>
+                <span>!timer set and !timer reset start as streamer only</span>
+              </div>
+              <div className="settings-mini-note">
+                <strong>Applies live</strong>
+                <span>New EventSub chat commands use these permissions immediately</span>
+              </div>
+            </div>
 
-          <label className="rule-field">
-            <span className="rule-field__label">Wheel result on-screen time</span>
-            <input
-              className="rule-field__input"
-              type="number"
-              min={2}
-              max={12}
-              step={1}
-              value={wheelResultDisplaySeconds}
-              onChange={(event) => setWheelResultDisplaySeconds(Number.parseInt(event.target.value, 10) || 0)}
-            />
-            <span className="rule-field__hint">Keeps the winner visible for this many seconds before a test clears or an automatic wheel action finishes applying.</span>
-          </label>
-
-          <label className="rule-field">
-            <span className="rule-field__label">Wheel result chat message</span>
-            <select
-              className="rule-field__input"
-              value={announceWheelResultsInChat ? 'enabled' : 'disabled'}
-              onChange={(event) => setAnnounceWheelResultsInChat(event.target.value === 'enabled')}
-            >
-              <option value="enabled">Enabled</option>
-              <option value="disabled">Disabled</option>
-            </select>
-            <span className="rule-field__hint">Announces the selected wheel result in Twitch chat when your session has chat write access.</span>
-          </label>
+            <div className="settings-two-col">
+              {TIMER_COMMAND_PERMISSION_DEFINITIONS.map((definition) => (
+                <label key={definition.action} className="rule-field">
+                  <span className="rule-field__label">{definition.commandLabel}</span>
+                  <select
+                    className="rule-field__input"
+                    value={commandPermissions[definition.action]}
+                    onChange={(event) =>
+                      setCommandPermission(
+                        definition.action,
+                        event.target.value as 'streamer' | 'mod' | 'both',
+                      )
+                    }
+                  >
+                    {TIMER_COMMAND_PERMISSION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="rule-field__hint">{definition.description}</span>
+                </label>
+              ))}
+            </div>
+          </section>
         </div>
-      </section>
+      )}
 
-      <section className="panel settings-panel settings-panel--commands">
-        <div className="panel-header">
-          <div>
-            <h2 className="panel-title">Chat command permissions</h2>
-            <p className="panel-copy">Choose whether each timer chat command is available to the streamer, moderators, or both.</p>
-          </div>
-        </div>
+      {activeTab === 'features' && (
+        <div className="settings-tab-content">
+          <section className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Features</h2>
+                <p className="panel-copy">Optional features that connect to external services. Disabled by default to keep the app fully self-contained.</p>
+              </div>
+            </div>
 
-        <div className="settings-migration-summary">
-          <div className="settings-mini-note">
-            <strong>Safe default</strong>
-            <span>Day-to-day commands stay open to streamer + mods</span>
-          </div>
-          <div className="settings-mini-note">
-            <strong>Lock down</strong>
-            <span>!timer set and !timer reset start as streamer only</span>
-          </div>
-          <div className="settings-mini-note">
-            <strong>Applies live</strong>
-            <span>New EventSub chat commands use these permissions immediately</span>
-          </div>
+            <div className="settings-feature-list">
+              <div className="settings-feature-row">
+                <div className="settings-feature-row__copy">
+                  <strong className="settings-feature-row__title">Shared session</strong>
+                  <p className="settings-feature-row__detail">
+                    Connects to a shared session server so up to six creator desktops can run one timer and wheel together. Each creator's Twitch and tip events contribute to the same countdown in real time. Disabling this removes the Shared Session page and stops all connections to the session server.
+                  </p>
+                </div>
+                <div className="settings-feature-row__control">
+                  <button
+                    type="button"
+                    className={`btn ${sharedSessionEnabled ? 'btn--danger' : 'btn--primary'}`}
+                    onClick={() => setSharedSessionEnabled(!sharedSessionEnabled)}
+                  >
+                    {sharedSessionEnabled ? 'Disable' : 'Enable'}
+                  </button>
+                  <span className={`settings-feature-status ${sharedSessionEnabled ? 'settings-feature-status--on' : 'settings-feature-status--off'}`}>
+                    {sharedSessionEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
+      )}
 
-        <div className="rules-grid">
-          {TIMER_COMMAND_PERMISSION_DEFINITIONS.map((definition) => (
-            <label key={definition.action} className="rule-field">
-              <span className="rule-field__label">{definition.commandLabel}</span>
-              <select
-                className="rule-field__input"
-                value={commandPermissions[definition.action]}
-                onChange={(event) =>
-                  setCommandPermission(
-                    definition.action,
-                    event.target.value as 'streamer' | 'mod' | 'both',
-                  )
-                }
-              >
-                {TIMER_COMMAND_PERMISSION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <span className="rule-field__hint">{definition.description}</span>
-            </label>
-          ))}
-        </div>
-      </section>
+      {activeTab === 'import' && (
+        <div className="settings-tab-content">
+          <section className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Import legacy config.json</h2>
+                <p className="panel-copy">Paste an older config here to bring over the parts that still matter in the desktop app: timing rules and wheel setup.</p>
+              </div>
+            </div>
 
-      <section className="panel settings-panel settings-panel--migration">
-        <div className="panel-header">
-          <div>
-            <h2 className="panel-title">Import legacy config.json</h2>
-            <p className="panel-copy">Paste an older config here to bring over the parts that still matter in the desktop app: timing rules and wheel setup.</p>
-          </div>
-        </div>
+            <div className="settings-command-notes">
+              <div className="settings-mini-note">
+                <strong>Imports</strong>
+                <span>Rules and wheel entries</span>
+              </div>
+              <div className="settings-mini-note">
+                <strong>Skips</strong>
+                <span>Channel, admins, blacklist, and provider fields</span>
+              </div>
+              <div className="settings-mini-note">
+                <strong>Next step</strong>
+                <span>Review the imported values on Rules, Wheel, Dashboard, and Overlays</span>
+              </div>
+            </div>
 
-        <div className="settings-migration-summary">
-          <div className="settings-mini-note">
-            <strong>Imports</strong>
-            <span>Rules and wheel entries</span>
-          </div>
-          <div className="settings-mini-note">
-            <strong>Skips</strong>
-            <span>Channel, admins, blacklist, and provider fields</span>
-          </div>
-          <div className="settings-mini-note">
-            <strong>Next step</strong>
-            <span>Review the imported values on Rules, Wheel, Dashboard, and Overlays</span>
-          </div>
+            <div className="wheel-config-panel settings-import-card">
+              <label className="rule-field">
+                <span className="rule-field__label">Legacy config payload</span>
+                <textarea
+                  className="wheel-config-textarea settings-json-textarea"
+                  value={importText}
+                  onChange={(event) => setImportText(event.target.value)}
+                />
+                <span className="rule-field__hint">Imports timer rules and wheel segments from the legacy config format.</span>
+              </label>
+              <div className="wheel-config-actions">
+                <button className="btn btn--primary" onClick={handleImport} disabled={!importText.trim()}>Import Legacy Config</button>
+                <button className="btn btn--ghost" onClick={handleClearImport} disabled={!importText && !importMessage}>Clear</button>
+              </div>
+              {importMessage ? <div className="settings-inline-message">{importMessage}</div> : null}
+            </div>
+          </section>
         </div>
-
-        <div className="wheel-config-panel settings-import-card">
-          <label className="rule-field">
-            <span className="rule-field__label">Legacy config payload</span>
-            <textarea
-              className="wheel-config-textarea settings-json-textarea"
-              value={importText}
-              onChange={(event) => setImportText(event.target.value)}
-            />
-            <span className="rule-field__hint">Imports timer rules and wheel segments from the legacy config format.</span>
-          </label>
-          <div className="wheel-config-actions">
-            <button className="btn btn--primary" onClick={handleImport} disabled={!importText.trim()}>Import Legacy Config</button>
-            <button className="btn btn--ghost" onClick={handleClearImport} disabled={!importText && !importMessage}>Clear</button>
-          </div>
-          {importMessage ? <div className="settings-inline-message">{importMessage}</div> : null}
-        </div>
-      </section>
+      )}
     </div>
   )
 }

@@ -24,16 +24,17 @@ const icons = {
     about: <svg viewBox="0 0 24 24"><path d="M11 17h2v-6h-2v6zm0-8h2V7h-2v2zm1 13C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8z" /></svg>
 }
 
-const navItems = [
+const baseNavItems = [
     { to: '/', label: 'Dashboard', icon: 'dashboard' },
     { to: '/overlays', label: 'Overlays', icon: 'overlays' },
     { to: '/rules', label: 'Rules', icon: 'rules' },
     { to: '/wheel', label: 'Wheel', icon: 'wheel' },
     { to: '/connections', label: 'Connections', icon: 'connections' },
-    { to: '/shared-session', label: 'Shared Session', icon: 'shared' },
     { to: '/settings', label: 'Settings', icon: 'settings' },
     { to: '/about', label: 'About', icon: 'about' }
 ] as const
+
+const sharedSessionNavItem = { to: '/shared-session', label: 'Shared Session', icon: 'shared' } as const
 
 const pageLabels: Record<string, string> = {
     '/': 'Dashboard',
@@ -63,6 +64,10 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         wheelSpin,
         wheelTextScale,
     } = useAppStore(useShallow(selectSidebarFrameState))
+    const sharedSessionEnabled = useAppStore((state) => state.sharedSessionEnabled)
+    const navItems = sharedSessionEnabled
+        ? [...baseNavItems.slice(0, 5), sharedSessionNavItem, ...baseNavItems.slice(5)]
+        : baseNavItems
     const {
         twitchStatus,
         twitchTokens,

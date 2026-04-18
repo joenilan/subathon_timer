@@ -27,6 +27,7 @@ This section is the implementation status source of truth for shared-subathon wo
 | 4 | Shared Tip Ingestion | Completed | Participant-local StreamElements and Streamlabs tips now submit to the service, the service applies them once, and non-tip provider activity is ignored. |
 | 5 | Shared Wheel | Completed | Shared gift bombs now trigger one server-owned wheel spin, connected desktops receive the same spin/result state, and timeout outcomes are finalized by the participant whose broadcaster session triggered the wheel. |
 | 6 | Hardening | Completed | Auto-reconnect with backoff, rejoin endpoint, host-driven session end, and 21 integration tests covering dedupe, timer authority, wheel ownership, reconnect, and session lifecycle. |
+| 7 | WebRTC P2P Transport | Completed | Session authority moved into the host desktop app. Bun service replaced by PeerJS WebRTC data channels. Signaling via peers.zombie.digital with public PeerJS fallback. No central service required at runtime. |
 
 Status values:
 
@@ -53,7 +54,7 @@ Phase update rule:
 - More than six creators in the first version.
 - General team/collab support with arbitrary membership.
 - Cross-provider follow/sub normalization in the first release beyond the specific duplicate protections defined here.
-- Local peer-to-peer sync between the two PCs.
+- ~~Local peer-to-peer sync between the two PCs.~~ (Superseded by Phase 7 — WebRTC P2P is now the transport.)
 - Replacing the desktop app with a web app.
 
 ## Why A Shared Service Is Required
@@ -771,6 +772,28 @@ Completion notes:
 - the shared-session page shows an "End session" button for the host and a "Reconnect" button when the store status is `error` with a live session reference
 - the `apps/shared-session-service/src/createServer.ts` factory function wraps all server state in a closure, enabling isolated test instances per test run
 - 21 integration tests in `apps/shared-session-service/src/server.test.ts` cover: session create/join, capacity enforcement, WebSocket connect, reconnect with same token, rejoin with participantId, Twitch event dedupe, non-tip provider rejection, host timer authority, guest timer rejection, session end from host, session end rejection from guest, and 410 guard on ended sessions
+
+### Phase 7: WebRTC P2P Transport
+
+Status: `Completed`
+
+Deliverables:
+
+- session authority embedded in the host desktop app
+- PeerJS WebRTC data channels replace the Bun shared-session-service
+- fallback signaling chain: peers.zombie.digital → api.peerjs.com
+- no central service required at runtime
+
+Completion notes:
+
+- `apps/desktop/src/lib/sharedSession/hostAuthority.ts` contains the full session authority logic (timer, dedupe, wheel, activity feed) ported from the Bun service as pure in-memory functions with a broadcast callback
+- `apps/desktop/src/lib/sharedSession/peerTransport.ts` handles PeerJS peer creation with a two-server fallback chain (peers.zombie.digital → 0.peerjs.com) and a `checkSignalingHealth()` utility for the health strip
+- `useSharedSessionStore.ts` is now mode-aware: host mode creates a PeerJS peer with a derived ID from the invite code and listens for incoming DataConnections; guest mode connects to the host's peer ID via DataConnection
+- the invite code doubles as the PeerJS peer ID segment — host's peer ID is `subathon-timer-{inviteCode}`; guests connect using the invite code directly
+- `session.welcome` is a new server → client message that carries the assigned `participantId` back to a newly joined guest; subsequent updates use the existing `session.snapshot` message
+- guests reconnect by sending `hello` with their stored `participantId`; host reuses the existing participant slot instead of creating a new one
+- `apps/desktop/src/lib/sharedSession/client.ts` HTTP helper layer is preserved but no longer called by the store; the Bun service under `apps/shared-session-service/` remains in the repo as a reference and test harness but is not required at runtime
+- PeerJS signaling server (`peerjs/peerjs-server`) deployed at `peers.zombie.digital` via Docker on the zombie-lab server, exposed through the existing Cloudflare tunnel and Traefik routing; no Cloudflare account usage beyond one DNS CNAME
 
 ## Risks
 
