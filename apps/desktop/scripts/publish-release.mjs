@@ -40,8 +40,8 @@ const notesMarkdown = extractVersionNotes(patchNotesSource, version)
 
 // Sign the NSIS installer for Tauri's updater
 const setupPath = resolve(releaseRoot, setupName)
-const privateKeyPath = process.env.TAURI_SIGNING_PRIVATE_KEY_PATH
-const privateKeyPassword = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
+const privateKeyPath = env.TAURI_SIGNING_PRIVATE_KEY_PATH
+const privateKeyPassword = env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
 if (!privateKeyPath) throw new Error('TAURI_SIGNING_PRIVATE_KEY_PATH env var is not set')
 execSync(
   `bunx tauri signer sign --private-key-path "${privateKeyPath}" --password "${privateKeyPassword}" "${setupPath}"`,
@@ -195,17 +195,17 @@ function requiredEnv(env, key) {
 }
 
 function extractVersionNotes(source, targetVersion) {
-  const sectionPattern = new RegExp(
-    `^##\\s+${escapeRegExp(targetVersion)}\\s*$([\\s\\S]*?)(?=^##\\s+\\S|\\s*$)`,
-    'm',
-  )
-  const match = source.match(sectionPattern)
+  const sections = source.replaceAll('\r\n', '\n').split(/\n(?=## )/)
+  const section = sections.find((s) => {
+    const firstLine = s.split('\n')[0]
+    return new RegExp(`^##\\s+${escapeRegExp(targetVersion)}\\s*$`).test(firstLine)
+  })
 
-  if (!match) {
+  if (!section) {
     throw new Error(`Unable to find patch notes for version ${targetVersion}`)
   }
 
-  return `## ${targetVersion}\n${match[1].trimEnd()}`
+  return section.trimEnd()
 }
 
 function summarizeNotes(notesMarkdown) {
