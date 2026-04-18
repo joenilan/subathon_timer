@@ -1,5 +1,10 @@
 # Patch Notes
 
+## 0.10.0
+
+- Wheel slices now draw proportionally to their chance weight so the visual matches the actual odds — a 2% segment looks like 2% of the wheel, not the same size as a 28% one.
+- Added Shared Session, an optional feature that connects up to six creator desktops to one shared timer and wheel via a central server. Each creator's Twitch and tip events contribute to the same countdown in real time. Enable it under Settings → Features.
+
 ## 0.9.4
 
 - Added a setting for how long wheel results stay visible after a spin.
