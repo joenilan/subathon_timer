@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../state/useAppStore'
 import { useUpdateStore } from '../state/useUpdateStore'
-import { DOWNLOAD_BASE } from '../lib/update/checkForUpdate'
 import { applyWindowSizing } from '../lib/platform/windowSizing'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
 import { useEventSubStore } from '../state/useEventSubStore'
@@ -91,18 +89,16 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         }),
     )
     const eventSubStatus = useEventSubStore((state) => state.status)
-    const updateInfo = useUpdateStore((state) => state.updateInfo)
+    const update = useUpdateStore((state) => state.update)
     const updateChecking = useUpdateStore((state) => state.checking)
-    const updateFetchFailed = useUpdateStore((state) => state.fetchFailed)
-    const updateAvailable = !!updateInfo
     const [dismissedVersion, setDismissedVersion] = useState<string | null>(
         () => localStorage.getItem('dismissed-update')
     )
-    const showUpdateBanner = updateAvailable && updateInfo!.version !== dismissedVersion
+    const showUpdateBanner = !!update && update.version !== dismissedVersion
     const dismissUpdate = () => {
-        if (updateInfo) {
-            localStorage.setItem('dismissed-update', updateInfo.version)
-            setDismissedVersion(updateInfo.version)
+        if (update) {
+            localStorage.setItem('dismissed-update', update.version)
+            setDismissedVersion(update.version)
         }
     }
     const shellRef = useRef<HTMLDivElement>(null)
@@ -201,7 +197,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
 
                 <nav className="sidebar-nav">
                     {navItems.map((item) => {
-                        const hasBadge = item.to === '/about' && updateAvailable
+                        const hasBadge = item.to === '/about' && !!update
                         return (
                             <NavLink
                                 key={item.to}
@@ -313,22 +309,22 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                             <>
                                 <div className="health-item__meta">
                                     <div
-                                        className={`health-dot ${updateAvailable ? 'action-required' : updateFetchFailed ? 'degraded' : updateChecking ? 'degraded' : 'connected'}`}
-                                        title={updateAvailable ? `Update v${updateInfo!.version} available` : updateChecking ? 'Checking for updates' : updateFetchFailed ? 'Update check failed' : 'App is up to date'}
+                                        className={`health-dot ${update ? 'action-required' : updateChecking ? 'degraded' : 'connected'}`}
+                                        title={update ? `Update v${update.version} available` : updateChecking ? 'Checking for updates' : 'App is up to date'}
                                     />
                                     <span className="health-label">App</span>
                                 </div>
                                 <div className="health-item__body">
                                     <span className="health-status">
-                                        {updateChecking ? 'Checking…' : updateAvailable ? `v${updateInfo!.version} ready` : updateFetchFailed ? 'Check failed' : 'Up to date'}
+                                        {updateChecking ? 'Checking…' : update ? `v${update.version} ready` : 'Up to date'}
                                     </span>
                                 </div>
                             </>
                         )}
                         {sidebarCollapsed && (
                             <div
-                                className={`health-dot ${updateAvailable ? 'action-required' : updateFetchFailed ? 'degraded' : updateChecking ? 'degraded' : 'connected'}`}
-                                title={updateAvailable ? `Update v${updateInfo!.version} available` : 'App up to date'}
+                                className={`health-dot ${update ? 'action-required' : updateChecking ? 'degraded' : 'connected'}`}
+                                title={update ? `Update v${update.version} available` : 'App up to date'}
                             />
                         )}
                     </div>
@@ -348,15 +344,14 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
                         fontSize: '13px', flexShrink: 0,
                     }}>
                         <span style={{ color: '#fde047', fontWeight: 600, flex: 1 }}>
-                            Subathon Timer v{updateInfo!.version} is available
-                            {updateInfo!.notes ? <span style={{ fontWeight: 400, color: 'rgba(253,224,71,0.6)', marginLeft: '6px' }}>{updateInfo!.notes}</span> : null}
+                            Subathon Timer v{update!.version} is available
                         </span>
                         <button
                             type="button"
-                            onClick={() => void openUrl(`${DOWNLOAD_BASE}/${updateInfo!.files.setup}`).catch(() => {})}
+                            onClick={() => void useUpdateStore.getState().installUpdate()}
                             style={{ padding: '4px 12px', background: '#facc15', color: '#000', fontWeight: 700, fontSize: '12px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
                         >
-                            Download
+                            Update &amp; Restart
                         </button>
                         <button
                             type="button"

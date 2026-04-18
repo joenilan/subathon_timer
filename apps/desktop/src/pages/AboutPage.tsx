@@ -1,7 +1,6 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import appVersionText from '../../VERSION?raw'
 import { useUpdateStore } from '../state/useUpdateStore'
-import { DOWNLOAD_BASE } from '../lib/update/checkForUpdate'
 
 const appVersion = appVersionText.trim()
 
@@ -60,7 +59,7 @@ const supportLinks = [
 ] as const
 
 export function AboutPage() {
-  const { updateInfo, checking, fetchFailed, checkForUpdate } = useUpdateStore()
+  const { update, checking, downloading, downloadProgress, error, checkForUpdate, installUpdate } = useUpdateStore()
 
   return (
     <div className="page-container settings-page about-page">
@@ -72,27 +71,31 @@ export function AboutPage() {
       </section>
 
       {/* Update strip */}
-      {updateInfo ? (
+      {update ? (
         <section className="panel about-update-strip about-update-strip--update">
           <div className="about-update-strip__copy">
             <span className="about-update-strip__kicker">Update available</span>
-            <strong className="about-update-strip__title">Version {updateInfo.version} is ready to download</strong>
-            <p className="about-update-strip__detail">{updateInfo.notes}</p>
+            <strong className="about-update-strip__title">Version {update.version} is ready to install</strong>
+            {update.body ? <p className="about-update-strip__detail">{update.body}</p> : null}
           </div>
-          <button
-            type="button"
-            className="btn btn--primary about-update-strip__action"
-            onClick={() => void openExternal(`${DOWNLOAD_BASE}/${updateInfo.files.setup}`)}
-          >
-            Download update
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
+            <button
+              type="button"
+              className="btn btn--primary about-update-strip__action"
+              onClick={() => void installUpdate()}
+              disabled={downloading}
+            >
+              {downloading ? `Downloading… ${downloadProgress}%` : 'Update & Restart'}
+            </button>
+            {error ? <span style={{ fontSize: 11, color: 'var(--red)' }}>{error}</span> : null}
+          </div>
         </section>
       ) : (
         <div className="about-update-row">
           <span className="about-update-row__status">
             {checking
               ? 'Checking for updates…'
-              : fetchFailed
+              : error
                 ? 'Could not reach the update feed.'
                 : 'You\'re on the latest version.'}
           </span>

@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import SftpClient from 'ssh2-sftp-client'
@@ -24,6 +25,7 @@ const channel = env.RELEASE_CHANNEL ?? 'stable'
 const remoteDir = `${baseDir.replace(/\/+$/, '')}/${appSlug}`
 
 const setupName = `subathon-timer_${version}_x64-setup.exe`
+const setupSigName = `${setupName}.sig`
 const portableName = `subathon-timer_${version}_x64_portable.zip`
 const msiName = `subathon-timer_${version}_x64_en-US.msi`
 const manifestName = 'manifest.json'
@@ -31,19 +33,30 @@ const notesName = 'notes.md'
 const latestName = 'latest.json'
 const remoteLatestPath = `${remoteDir}/${latestName}`
 const remoteArchiveRoot = `${remoteDir}/archive`
+const downloadBase = `https://apps.zombie.digital/downloads/${appSlug}`
 
 const notesMarkdown = extractVersionNotes(patchNotesSource, version)
+
+// Sign the NSIS installer for Tauri's updater
+const setupPath = resolve(releaseRoot, setupName)
+const privateKeyPath = requiredEnv(env, 'TAURI_SIGNING_PRIVATE_KEY_PATH')
+const privateKeyPassword = env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
+execSync(
+  `bunx tauri signer sign -k "${privateKeyPath}" --password "${privateKeyPassword}" "${setupPath}"`,
+  { stdio: 'inherit' },
+)
+const setupSig = readFileSync(resolve(releaseRoot, setupSigName), 'utf8').trim()
+
+// Tauri updater format
 const latest = {
   version,
-  channel,
-  publishedAt: new Date().toISOString(),
-  file: setupName,
-  notes: summarizeNotes(notesMarkdown),
-  notesFile: notesName,
-  files: {
-    setup: setupName,
-    portable: portableName,
-    msi: msiName,
+  notes: notesMarkdown.trim(),
+  pub_date: new Date().toISOString(),
+  platforms: {
+    'windows-x86_64': {
+      signature: setupSig,
+      url: `${downloadBase}/${setupName}`,
+    },
   },
 }
 
@@ -55,6 +68,7 @@ writeFileSync(notesPath, `${notesMarkdown.trim()}\n`)
 
 const uploadPaths = [
   setupName,
+  setupSigName,
   `${setupName}.sha256`,
   portableName,
   `${portableName}.sha256`,
