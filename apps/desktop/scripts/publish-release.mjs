@@ -44,7 +44,7 @@ const privateKeyPath = process.env.TAURI_SIGNING_PRIVATE_KEY_PATH
 const privateKeyPassword = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
 if (!privateKeyPath) throw new Error('TAURI_SIGNING_PRIVATE_KEY_PATH env var is not set')
 execSync(
-  `bunx tauri signer sign -k "${privateKeyPath}" --password "${privateKeyPassword}" "${setupPath}"`,
+  `bunx tauri signer sign --private-key-path "${privateKeyPath}" --password "${privateKeyPassword}" "${setupPath}"`,
   { stdio: 'inherit' },
 )
 const setupSig = readFileSync(resolve(releaseRoot, setupSigName), 'utf8').trim()
