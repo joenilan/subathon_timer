@@ -1,5 +1,6 @@
 import type { AppState } from './useAppStore'
 import type { EventSubState } from './useEventSubStore'
+import type { GoalsState } from './useGoalsStore'
 import type { SharedSessionState } from './useSharedSessionStore'
 import type { TipSessionState } from './useTipSessionStore'
 import type { TwitchSessionState } from './useTwitchSessionStore'
@@ -7,6 +8,10 @@ import type { TwitchSessionState } from './useTwitchSessionStore'
 export const selectBootstrapRuntimeState = (state: AppState) => ({
   hydrateNativeSnapshot: state.hydrateNativeSnapshot,
   setOverlayBootstrapState: state.setOverlayBootstrapState,
+})
+
+export const selectBootstrapGoalsState = (state: GoalsState) => ({
+  hydrateGoalsSnapshot: state.hydrateGoalsSnapshot,
 })
 
 export const selectNativeSnapshotInputs = (state: AppState) => ({
@@ -23,6 +28,29 @@ export const selectNativeSnapshotInputs = (state: AppState) => ({
   wheelSegments: state.wheelSegments,
 })
 
+export const selectNativeGoalsSnapshotInputs = (state: GoalsState) => ({
+  announceGoalCompletionsInChat: state.announceGoalCompletionsInChat,
+  goalsHistory: state.history,
+  goalLadders: state.ladders,
+})
+
+export const selectGoalsPageState = (state: GoalsState) => ({
+  adjustGoalProgress: state.adjustGoalProgress,
+  announceGoalCompletionsInChat: state.announceGoalCompletionsInChat,
+  archiveLadder: state.archiveLadder,
+  createLadder: state.createLadder,
+  deleteLadder: state.deleteLadder,
+  history: state.history,
+  ladders: state.ladders,
+  reopenMilestone: state.reopenMilestone,
+  resetLadderProgress: state.resetLadderProgress,
+  setAnnounceGoalCompletionsInChat: state.setAnnounceGoalCompletionsInChat,
+  skipMilestone: state.skipMilestone,
+  updateLadder: state.updateLadder,
+  clearAllLadders: state.clearAllLadders,
+  unarchiveLadder: state.unarchiveLadder,
+})
+
 export const selectOverlayRuntimeState = (state: AppState) => ({
   activity: state.activity,
   overlayLanAccessEnabled: state.overlayLanAccessEnabled,
@@ -30,6 +58,7 @@ export const selectOverlayRuntimeState = (state: AppState) => ({
   ruleConfig: state.ruleConfig,
   setOverlayBootstrapState: state.setOverlayBootstrapState,
   wheelOverlayTransform: state.wheelOverlayTransform,
+  goalsOverlayTransform: state.goalsOverlayTransform,
   wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
   wheelSegments: state.wheelSegments,
   wheelSpin: state.wheelSpin,
@@ -91,6 +120,7 @@ export const selectOverlaysPageState = (state: AppState) => ({
   timerOverlayTransform: state.timerOverlayTransform,
   timerWidgetTheme: state.timerWidgetTheme,
   wheelOverlayTransform: state.wheelOverlayTransform,
+  goalsOverlayTransform: state.goalsOverlayTransform,
 })
 
 export const selectTimerOverlayState = (state: AppState) => ({
@@ -114,6 +144,10 @@ export const selectWheelOverlayState = (state: AppState) => ({
   wheelSegments: state.wheelSegments,
   wheelSpin: state.wheelSpin,
   wheelTextScale: state.wheelTextScale,
+})
+
+export const selectGoalsOverlayState = (state: AppState) => ({
+  goalsOverlayTransform: state.goalsOverlayTransform,
 })
 
 export const selectSettingsPageState = (state: AppState) => ({
