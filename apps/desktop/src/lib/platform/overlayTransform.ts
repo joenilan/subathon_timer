@@ -1,4 +1,4 @@
-export type OverlayKind = 'timer' | 'reason' | 'wheel'
+export type OverlayKind = 'timer' | 'reason' | 'wheel' | 'goals' | 'compact'
 export type OverlayAnchor = 'center'
 
 export interface OverlayTransform {
@@ -35,6 +35,16 @@ export const defaultOverlayTransforms: Record<OverlayKind, OverlayTransform> = {
     scale: 1,
   },
   wheel: {
+    x: 0,
+    y: 0,
+    scale: 1,
+  },
+  goals: {
+    x: 0,
+    y: 0,
+    scale: 1,
+  },
+  compact: {
     x: 0,
     y: 0,
     scale: 1,

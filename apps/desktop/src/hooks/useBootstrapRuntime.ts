@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../state/useAppStore'
-import { selectBootstrapRuntimeState } from '../state/selectors'
+import { selectBootstrapGoalsState, selectBootstrapRuntimeState } from '../state/selectors'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
+import { useGoalsStore } from '../state/useGoalsStore'
 import { getOverlayBootstrapState } from '../lib/platform/overlayRuntime'
 import { loadNativeAppSnapshot } from '../lib/platform/nativeAppState'
 
@@ -10,6 +11,7 @@ export function useBootstrapRuntime() {
   const [nativeStateReady, setNativeStateReady] = useState(false)
   const bootstrap = useTwitchSessionStore((state) => state.bootstrap)
   const { hydrateNativeSnapshot, setOverlayBootstrapState } = useAppStore(useShallow(selectBootstrapRuntimeState))
+  const { hydrateGoalsSnapshot } = useGoalsStore(useShallow(selectBootstrapGoalsState))
 
   useEffect(() => {
     void bootstrap()
@@ -22,6 +24,7 @@ export function useBootstrapRuntime() {
       .then((snapshot) => {
         if (snapshot) {
           hydrateNativeSnapshot(snapshot, Date.now())
+          hydrateGoalsSnapshot(snapshot.goals)
         }
       })
       .catch(() => {
@@ -36,7 +39,7 @@ export function useBootstrapRuntime() {
     return () => {
       cancelled = true
     }
-  }, [hydrateNativeSnapshot])
+  }, [hydrateGoalsSnapshot, hydrateNativeSnapshot])
 
   useEffect(() => {
     let cancelled = false

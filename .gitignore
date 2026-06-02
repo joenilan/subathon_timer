@@ -32,3 +32,4 @@ token_cache.json
 /apps/desktop/release/
 /.env.raspi
 /.env.lc-server
+/.playwright-mcp/

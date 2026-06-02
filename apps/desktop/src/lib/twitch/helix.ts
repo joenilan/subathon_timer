@@ -23,6 +23,84 @@ async function parseJson(response: Response) {
   }
 }
 
+async function isChannelModerator(params: {
+  clientId: string
+  accessToken: string
+  broadcasterId: string
+  userId: string
+}) {
+  const url = new URL('https://api.twitch.tv/helix/moderation/moderators')
+  url.searchParams.set('broadcaster_id', params.broadcasterId)
+  url.searchParams.set('user_id', params.userId)
+
+  const response = await fetch(url, {
+    headers: {
+      'Client-Id': params.clientId,
+      Authorization: `Bearer ${params.accessToken}`,
+    },
+  })
+
+  const payload = (await parseJson(response)) as {
+    data?: Array<{ user_id?: string }>
+  } & HelixErrorPayload
+
+  if (!response.ok) {
+    throw new Error(buildErrorMessage(payload as Record<string, unknown>, 'Failed to check Twitch moderator status.'))
+  }
+
+  return (payload.data ?? []).some((moderator) => moderator.user_id === params.userId)
+}
+
+async function removeChannelModerator(params: {
+  clientId: string
+  accessToken: string
+  broadcasterId: string
+  userId: string
+}) {
+  const url = new URL('https://api.twitch.tv/helix/moderation/moderators')
+  url.searchParams.set('broadcaster_id', params.broadcasterId)
+  url.searchParams.set('user_id', params.userId)
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Client-Id': params.clientId,
+      Authorization: `Bearer ${params.accessToken}`,
+    },
+  })
+
+  const payload = await parseJson(response)
+
+  if (!response.ok) {
+    throw new Error(buildErrorMessage(payload, 'Failed to temporarily remove Twitch moderator status.'))
+  }
+}
+
+async function addChannelModerator(params: {
+  clientId: string
+  accessToken: string
+  broadcasterId: string
+  userId: string
+}) {
+  const url = new URL('https://api.twitch.tv/helix/moderation/moderators')
+  url.searchParams.set('broadcaster_id', params.broadcasterId)
+  url.searchParams.set('user_id', params.userId)
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Client-Id': params.clientId,
+      Authorization: `Bearer ${params.accessToken}`,
+    },
+  })
+
+  const payload = await parseJson(response)
+
+  if (!response.ok) {
+    throw new Error(buildErrorMessage(payload, 'Failed to restore Twitch moderator status.'))
+  }
+}
+
 function buildErrorMessage(payload: Record<string, unknown>, fallback: string) {
   const message = payload.message
   const error = payload.error
@@ -74,6 +152,39 @@ export async function timeoutUser(params: {
   }
 
   return payload
+}
+
+export async function timeoutTwitchUserWithModRestore(params: {
+  clientId: string
+  accessToken: string
+  broadcasterId: string
+  moderatorId: string
+  userId: string
+  durationSeconds: number
+  reason?: string
+}) {
+  const targetWasModerator = await isChannelModerator(params)
+
+  if (!targetWasModerator) {
+    return timeoutUser(params)
+  }
+
+  await removeChannelModerator(params)
+
+  try {
+    const timeoutResult = await timeoutUser(params)
+
+    // Twitch does not restore moderator status automatically after timeout expiry.
+    // This in-process timer is lost if the app exits before the timeout ends.
+    globalThis.setTimeout(() => {
+      void addChannelModerator(params)
+    }, Math.max(1, params.durationSeconds) * 1000)
+
+    return timeoutResult
+  } catch (error) {
+    await addChannelModerator(params)
+    throw error
+  }
 }
 
 export async function getChatters(params: {

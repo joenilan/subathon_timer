@@ -265,6 +265,14 @@ export function normalizeEventSubMessage(message: EventSubEnvelope): NormalizedT
         command,
       }
     }
+    case 'channel.channel_points_custom_reward_redemption.add': {
+      const reward = asRecord(event.reward)
+      return {
+        ...baseEvent,
+        eventType: 'channel_point_redemption',
+        amount: getNumber(reward ?? {}, 'cost'),
+      }
+    }
     default:
       return null
   }

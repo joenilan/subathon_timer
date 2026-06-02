@@ -417,6 +417,7 @@ export function resolveTimerAdjustment(
       }
     }
     case 'chat_command':
+    case 'channel_point_redemption':
       return null
   }
 }

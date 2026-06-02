@@ -22,8 +22,11 @@ Important planning docs:
 
 - [apps/desktop/docs/persistence-roadmap.md](/E:/git/subathon_timer/apps/desktop/docs/persistence-roadmap.md)
 - [apps/desktop/docs/shared-subathon-plan.md](/E:/git/subathon_timer/apps/desktop/docs/shared-subathon-plan.md)
+- [apps/desktop/docs/subathon-goals-plan.md](/E:/git/subathon_timer/apps/desktop/docs/subathon-goals-plan.md)
 
 Shared-subathon phase status is tracked directly inside [apps/desktop/docs/shared-subathon-plan.md](/E:/git/subathon_timer/apps/desktop/docs/shared-subathon-plan.md). Keep that document updated as phases start, change scope, or complete.
+
+Subathon reward ladders are planned separately from timer rules in [apps/desktop/docs/subathon-goals-plan.md](/E:/git/subathon_timer/apps/desktop/docs/subathon-goals-plan.md). They use the same normalized live events as inputs, but milestone progress must not change timer additions.
 
 ## Quick Start
 

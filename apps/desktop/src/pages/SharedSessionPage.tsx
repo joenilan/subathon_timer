@@ -6,12 +6,15 @@ import { TimerWidget } from '../components/TimerWidget'
 import { TWITCH_CLIENT_ID } from '../lib/twitch/constants'
 import { formatDurationClock } from '../lib/timer/engine'
 import { resolveRuntimeFromSession } from '../lib/timer/runtime'
-import { getChatters, timeoutUser } from '../lib/twitch/helix'
+import { getChatters, timeoutTwitchUserWithModRestore } from '../lib/twitch/helix'
+import { normalizeWheelBlacklist } from '../lib/wheel/outcomes'
 import { selectSharedSessionPageState } from '../state/selectors'
 import { useSharedSessionStore } from '../state/useSharedSessionStore'
 import { useTipSessionStore } from '../state/useTipSessionStore'
 import { useTwitchSessionStore } from '../state/useTwitchSessionStore'
 import { useAppStore } from '../state/useAppStore'
+import { useGoalsStore } from '../state/useGoalsStore'
+import { buildGoalOverlayLadders } from '../lib/goals/overlay'
 import type {
   SharedSessionActivityEntry,
   SharedParticipantRuntimeState,
@@ -113,7 +116,10 @@ export function SharedSessionPage() {
   const localRuleConfig = useAppStore((state) => state.ruleConfig)
   const localWheelSegments = useAppStore((state) => state.wheelSegments)
   const localWheelTextScale = useAppStore((state) => state.wheelTextScale)
+  const wheelBlacklist = useAppStore((state) => state.wheelBlacklist)
   const setSharedSessionEnabled = useAppStore((state) => state.setSharedSessionEnabled)
+  const localGoalsLadders = useGoalsStore((state) => state.ladders)
+  const receivedGoalsLadders = useSharedSessionStore((state) => state.receivedGoalsLadders)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -157,6 +163,7 @@ export function SharedSessionPage() {
   }, [now, session])
 
   const isHost = localRole === 'host'
+  const sharedGoalLadders = buildGoalOverlayLadders(isHost ? localGoalsLadders : (receivedGoalsLadders ?? []))
   const ownsSharedWheelTimeout =
     session?.wheelSpin.status === 'ready' &&
     session.wheelSpin.sourceParticipantId === localParticipantId &&
@@ -224,7 +231,10 @@ export function SharedSessionPage() {
           broadcasterId: twitchSession.userId,
           moderatorId: twitchSession.userId,
         })
-        const candidates = chatters.filter((c) => c.userId !== twitchSession.userId)
+        const blacklistedLogins = normalizeWheelBlacklist(wheelBlacklist)
+        const candidates = chatters.filter(
+          (c) => c.userId !== twitchSession.userId && !blacklistedLogins.includes(c.userLogin.toLowerCase()),
+        )
         if (candidates.length === 0) {
           throw new Error('No eligible chatters are available for this shared random timeout outcome.')
         }
@@ -237,8 +247,11 @@ export function SharedSessionPage() {
       if (!twitchSession.scopes.includes('moderator:manage:banned_users')) {
         throw new Error('Reconnect Twitch to grant moderator:manage:banned_users before shared timeout outcomes can run.')
       }
+      if (!twitchSession.scopes.includes('channel:manage:moderators')) {
+        throw new Error('Reconnect Twitch to grant channel:manage:moderators before shared timeout outcomes can run.')
+      }
 
-      await timeoutUser({
+      await timeoutTwitchUserWithModRestore({
         clientId: TWITCH_CLIENT_ID,
         accessToken: twitchTokens.accessToken,
         broadcasterId: twitchSession.userId,
@@ -536,8 +549,9 @@ export function SharedSessionPage() {
                     <span className="shared-session-control-group__label">Quick adjust</span>
                     <div className="shared-session-control-row">
                       <button type="button" className="btn btn--accent" onClick={() => adjustSharedTimer(300, 'host +5 min')} disabled={!isHost}>+5 min</button>
-                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(60, 'host +1 min')} disabled={!isHost}>+1 min</button>
-                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(-120, 'host -2 min')} disabled={!isHost}>−2 min</button>
+                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(-300, 'host -5 min')} disabled={!isHost}>−5 min</button>
+                      <button type="button" className="btn btn--accent" onClick={() => adjustSharedTimer(60, 'host +1 min')} disabled={!isHost}>+1 min</button>
+                      <button type="button" className="btn btn--ghost" onClick={() => adjustSharedTimer(-60, 'host -1 min')} disabled={!isHost}>−1 min</button>
                     </div>
                   </div>
 
@@ -600,6 +614,59 @@ export function SharedSessionPage() {
               <div className="shared-session-empty-state">
                 <strong>No active spin</strong>
                 <p>When a qualifying gift bomb arrives from any participant's channel, the shared wheel will spin here for everyone in the room.</p>
+              </div>
+            )}
+          </section>
+
+          {/* Shared Goals */}
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Shared Goals</h2>
+                <p className="panel-copy">
+                  {isHost
+                    ? 'Your active goal ladders are broadcast to all guests automatically.'
+                    : 'Host\'s active reward ladders. Progress updates as events come in.'}
+                </p>
+              </div>
+              {!isHost && receivedGoalsLadders === null ? (
+                <div className="status-chip status-chip--idle">Waiting for host</div>
+              ) : null}
+            </div>
+
+            {sharedGoalLadders.length > 0 ? (
+              <div className="shared-session-goals-list">
+                {sharedGoalLadders.map((ladder) => (
+                  <div key={ladder.id} className="shared-session-goal-card">
+                    <div className="shared-session-goal-card__header">
+                      <strong>{ladder.title}</strong>
+                      {ladder.nextRewardTitle ? (
+                        <span className="shared-session-goal-card__next">Next: {ladder.nextRewardTitle}</span>
+                      ) : (
+                        <span className="shared-session-goal-card__next">All rewards unlocked</span>
+                      )}
+                    </div>
+                    <div className="goals-progress shared-session-goal-card__bar">
+                      <span style={{ width: `${ladder.progressPercent}%` }} />
+                    </div>
+                    <div className="shared-session-goal-card__milestones">
+                      {ladder.milestones.map((milestone) => (
+                        <div
+                          key={milestone.id}
+                          className={`shared-session-goal-milestone shared-session-goal-milestone--${milestone.status}`}
+                        >
+                          <span>{milestone.status === 'completed' ? '✓' : milestone.status === 'skipped' ? '–' : ''}</span>
+                          <strong>{milestone.rewardTitle}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="shared-session-empty-state">
+                <strong>No active goal ladders</strong>
+                <p>{isHost ? 'Add a reward ladder on the Goals page to share it here.' : 'The host has no active goal ladders right now.'}</p>
               </div>
             )}
           </section>

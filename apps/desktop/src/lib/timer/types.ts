@@ -8,6 +8,7 @@ export type NormalizedTimerEventType =
   | 'raid'
   | 'tip'
   | 'chat_command'
+  | 'channel_point_redemption'
 
 export type NormalizedTimerEventSource = 'twitch-eventsub' | 'streamelements' | 'streamlabs'
 

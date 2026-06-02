@@ -103,6 +103,11 @@ export const CORE_EVENTSUB_SUBSCRIPTIONS: EventSubSubscriptionRequest[] = [
     version: '1',
     condition: {},
   },
+  {
+    type: 'channel.channel_points_custom_reward_redemption.add',
+    version: '1',
+    condition: {},
+  },
 ]
 
 function safeString(value: unknown) {
@@ -268,6 +273,12 @@ export function summarizeEventSubNotification(envelope: EventSubEnvelope): Event
     const viewers = typeof event.viewers === 'number' ? event.viewers : 0
     title = 'Incoming raid'
     detail = `${userName} raided with ${viewers} viewer${viewers === 1 ? '' : 's'}`
+  } else if (type === 'channel.channel_points_custom_reward_redemption.add') {
+    const reward = typeof event.reward === 'object' && event.reward ? event.reward as Record<string, unknown> : null
+    const rewardTitle = typeof reward?.title === 'string' ? reward.title : 'a reward'
+    const cost = typeof reward?.cost === 'number' ? reward.cost : 0
+    title = 'Channel point redemption'
+    detail = `${userName} redeemed "${rewardTitle}"${cost > 0 ? ` (${cost} pts)` : ''}`
   }
 
   return {

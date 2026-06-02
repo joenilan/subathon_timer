@@ -20,6 +20,7 @@ import type {
   SharedSessionTwitchEventMessage,
   SharedSessionWheelActionMessage,
 } from '../lib/sharedSession/types'
+import type { SubathonGoalLadder } from '../lib/goals/types'
 import type { NormalizedTwitchEvent } from '../lib/timer/types'
 
 const RECONNECT_MAX_ATTEMPTS = 4
@@ -65,6 +66,7 @@ export interface SharedSessionState {
   localSessionId: string | null
   localRole: SharedSessionRole | null
   lastError: string | null
+  receivedGoalsLadders: SubathonGoalLadder[] | null
 
   checkHealth: () => Promise<void>
   createSession: (input: SharedSessionCreateInput) => Promise<void>
@@ -89,6 +91,7 @@ export interface SharedSessionState {
   adjustSharedTimer: (deltaSeconds: number, reason: string) => void
   setSharedTimer: (timerSeconds: number, reason: string) => void
   endSharedSession: () => void
+  pushGoalsSnapshot: (ladders: SubathonGoalLadder[]) => boolean
 }
 
 export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
@@ -126,6 +129,11 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
 
       if (message.type === 'session.snapshot') {
         set({ status: 'connected', session: message.payload, lastError: null })
+        return
+      }
+
+      if (message.type === 'goal.snapshot') {
+        set({ receivedGoalsLadders: message.payload.ladders })
         return
       }
 
@@ -212,6 +220,7 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
     localSessionId: null,
     localRole: null,
     lastError: null,
+    receivedGoalsLadders: null,
 
     checkHealth: async () => {
       const baseUrl = savedBaseUrl
@@ -322,6 +331,7 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
         localSessionId: null,
         localRole: null,
         lastError: null,
+        receivedGoalsLadders: null,
       })
     },
 
@@ -388,5 +398,8 @@ export const useSharedSessionStore = create<SharedSessionState>((set, get) => {
     endSharedSession: () => {
       sendToServer({ type: 'session.end' })
     },
+
+    pushGoalsSnapshot: (ladders) =>
+      sendToServer({ type: 'goal.snapshot', payload: { ladders } }),
   }
 })

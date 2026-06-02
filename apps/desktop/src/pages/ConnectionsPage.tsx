@@ -707,6 +707,40 @@ export function ConnectionsPage() {
         </div>
       </section>
 
+      <div className="connections-grid connections-grid--tips">
+        <section className="panel connections-panel connections-panel--provider connections-panel--provider-stub">
+          <div className="panel-header">
+            <div>
+              <h3 className="panel-title">TipeeeStream</h3>
+              <p className="panel-copy">Direct donation tracking via TipeeeStream's live widget feed.</p>
+            </div>
+            <div className="status-chip status-chip--idle">Coming soon</div>
+          </div>
+          <div className="connections-panel__body">
+            <div className="connection-banner connection-banner--idle">
+              <strong>Not yet available</strong>
+              <p>TipeeeStream integration is planned. When supported, paste your widget API token here to connect the live tip feed.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="panel connections-panel connections-panel--provider connections-panel--provider-stub">
+          <div className="panel-header">
+            <div>
+              <h3 className="panel-title">Pally.gg</h3>
+              <p className="panel-copy">Community-first donation platform built for streamers.</p>
+            </div>
+            <div className="status-chip status-chip--idle">Coming soon</div>
+          </div>
+          <div className="connections-panel__body">
+            <div className="connection-banner connection-banner--idle">
+              <strong>Not yet available</strong>
+              <p>Pally.gg integration is planned. When supported, connect your Pally.gg account here to receive live tip events.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
       <section className="panel connections-panel connections-panel--eventsub">
         <div className="panel-header">
           <div>

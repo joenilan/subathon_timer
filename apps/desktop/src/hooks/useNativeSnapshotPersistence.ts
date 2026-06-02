@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { buildNativeAppSnapshot, saveNativeAppSnapshot } from '../lib/platform/nativeAppState'
 import { useAppStore } from '../state/useAppStore'
-import { selectNativeSnapshotInputs } from '../state/selectors'
+import { useGoalsStore } from '../state/useGoalsStore'
+import { selectNativeGoalsSnapshotInputs, selectNativeSnapshotInputs } from '../state/selectors'
 
 export function useNativeSnapshotPersistence(nativeStateReady: boolean) {
   const lastSavedNativeSnapshot = useRef<string | null>(null)
@@ -18,7 +19,13 @@ export function useNativeSnapshotPersistence(nativeStateReady: boolean) {
     timerSessionRunningSince,
     timerStatus,
     wheelSegments,
+    wheelBlacklist,
   } = useAppStore(useShallow(selectNativeSnapshotInputs))
+  const {
+    announceGoalCompletionsInChat,
+    goalLadders,
+    goalsHistory,
+  } = useGoalsStore(useShallow(selectNativeGoalsSnapshotInputs))
   const nativeSnapshot = useMemo(
     () =>
       buildNativeAppSnapshot({
@@ -27,16 +34,25 @@ export function useNativeSnapshotPersistence(nativeStateReady: boolean) {
         overlayLanAccessEnabled,
         ruleConfig,
         wheelSegments,
+        wheelBlacklist,
         timerStatus,
         timerSessionBaseRemainingSeconds,
         timerSessionBaseUptimeSeconds,
         timerSessionRunningSince,
         lastAppliedDeltaSeconds,
         timerEvents,
+        goals: {
+          ladders: goalLadders,
+          history: goalsHistory,
+          announceGoalCompletionsInChat,
+        },
       }),
     [
+      announceGoalCompletionsInChat,
       commandPermissions,
       defaultTimerSeconds,
+      goalLadders,
+      goalsHistory,
       lastAppliedDeltaSeconds,
       overlayLanAccessEnabled,
       ruleConfig,
@@ -46,6 +62,7 @@ export function useNativeSnapshotPersistence(nativeStateReady: boolean) {
       timerSessionRunningSince,
       timerStatus,
       wheelSegments,
+      wheelBlacklist,
     ],
   )
   const serializedNativeSnapshot = useMemo(() => JSON.stringify(nativeSnapshot), [nativeSnapshot])

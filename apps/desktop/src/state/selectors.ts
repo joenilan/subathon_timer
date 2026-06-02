@@ -26,6 +26,7 @@ export const selectNativeSnapshotInputs = (state: AppState) => ({
   timerSessionRunningSince: state.timerSessionRunningSince,
   timerStatus: state.timerStatus,
   wheelSegments: state.wheelSegments,
+  wheelBlacklist: state.wheelBlacklist,
 })
 
 export const selectNativeGoalsSnapshotInputs = (state: GoalsState) => ({
@@ -59,6 +60,7 @@ export const selectOverlayRuntimeState = (state: AppState) => ({
   setOverlayBootstrapState: state.setOverlayBootstrapState,
   wheelOverlayTransform: state.wheelOverlayTransform,
   goalsOverlayTransform: state.goalsOverlayTransform,
+  compactOverlayTransform: state.compactOverlayTransform,
   wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
   wheelSegments: state.wheelSegments,
   wheelSpin: state.wheelSpin,
@@ -121,6 +123,17 @@ export const selectOverlaysPageState = (state: AppState) => ({
   timerWidgetTheme: state.timerWidgetTheme,
   wheelOverlayTransform: state.wheelOverlayTransform,
   goalsOverlayTransform: state.goalsOverlayTransform,
+  compactOverlayTransform: state.compactOverlayTransform,
+})
+
+export const selectCompactOverlayState = (state: AppState) => ({
+  compactOverlayTransform: state.compactOverlayTransform,
+  ruleConfig: state.ruleConfig,
+  timerRemainingSeconds: state.timerRemainingSeconds,
+  timerStatus: state.timerStatus,
+  timerWidgetTheme: state.timerWidgetTheme,
+  trendPoints: state.trendPoints,
+  uptimeSeconds: state.uptimeSeconds,
 })
 
 export const selectTimerOverlayState = (state: AppState) => ({
@@ -173,11 +186,13 @@ export const selectWheelPageState = (state: AppState) => ({
   applyWheelResult: state.applyWheelResult,
   removeWheelSegment: state.removeWheelSegment,
   setWheelTextScale: state.setWheelTextScale,
+  setWheelBlacklist: state.setWheelBlacklist,
   spinWheel: state.spinWheel,
   triggerGiftBombTest: state.triggerGiftBombTest,
   updateWheelSegment: state.updateWheelSegment,
   wheelSegments: state.wheelSegments,
   wheelSpin: state.wheelSpin,
+  wheelBlacklist: state.wheelBlacklist,
   wheelTextScale: state.wheelTextScale,
 })
 
@@ -283,8 +298,16 @@ export const selectSharedSessionPageState = (state: SharedSessionState) => ({
 })
 
 export const selectSharedSessionIngressState = (state: SharedSessionState) => ({
+  localRole: state.localRole,
+  pushGoalsSnapshot: state.pushGoalsSnapshot,
   session: state.session,
   status: state.status,
   submitSharedTipEvent: state.submitSharedTipEvent,
   submitSharedTwitchEvent: state.submitSharedTwitchEvent,
+})
+
+export const selectSharedGoalsSyncState = (state: SharedSessionState) => ({
+  localRole: state.localRole,
+  receivedGoalsLadders: state.receivedGoalsLadders,
+  status: state.status,
 })

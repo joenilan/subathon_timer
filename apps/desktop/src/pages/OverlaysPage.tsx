@@ -34,6 +34,8 @@ export function OverlaysPage() {
     timerOverlayTransform,
     reasonOverlayTransform,
     wheelOverlayTransform,
+    goalsOverlayTransform,
+    compactOverlayTransform,
     setTimerWidgetTheme,
     setOverlayTransform,
     resetOverlayTransform,
@@ -48,9 +50,13 @@ export function OverlaysPage() {
     const timerSourceUrl = buildNativeUrl(overlayBaseUrl, '/overlay/timer')
     const reasonSourceUrl = buildNativeUrl(overlayBaseUrl, '/overlay/reason')
     const wheelSourceUrl = buildNativeUrl(overlayBaseUrl, '/overlay/wheel')
+    const goalsSourceUrl = buildNativeUrl(overlayBaseUrl, '/overlay/goals')
+    const compactSourceUrl = buildNativeUrl(overlayBaseUrl, '/overlay/compact')
     const timerPreviewUrl = buildNativeUrl(overlayPreviewBaseUrl ?? overlayBaseUrl, '/overlay/timer')
     const reasonPreviewUrl = buildNativeUrl(overlayPreviewBaseUrl ?? overlayBaseUrl, '/overlay/reason')
     const wheelPreviewUrl = buildNativeUrl(overlayPreviewBaseUrl ?? overlayBaseUrl, '/overlay/wheel')
+    const goalsPreviewUrl = buildNativeUrl(overlayPreviewBaseUrl ?? overlayBaseUrl, '/overlay/goals')
+    const compactPreviewUrl = buildNativeUrl(overlayPreviewBaseUrl ?? overlayBaseUrl, '/overlay/compact')
 
     return [
       {
@@ -83,6 +89,26 @@ export function OverlaysPage() {
         openUrl: wheelPreviewUrl,
         previewUrl: buildStudioPreviewUrl(wheelPreviewUrl),
       },
+      {
+        id: 'goals' as const,
+        name: 'Goals overlay',
+        description: 'On-stream reward ladder checklist for subathon milestones and unlock progress.',
+        sceneLabel: 'Goals scene',
+        usageLabel: 'Progress widget',
+        sourceUrl: goalsSourceUrl,
+        openUrl: goalsPreviewUrl,
+        previewUrl: buildStudioPreviewUrl(goalsPreviewUrl),
+      },
+      {
+        id: 'compact' as const,
+        name: 'Compact combined',
+        description: 'Timer and goals in one widget. Goals section appears automatically when ladders are configured.',
+        sceneLabel: 'Just chatting',
+        usageLabel: 'Combined widget',
+        sourceUrl: compactSourceUrl,
+        openUrl: compactPreviewUrl,
+        previewUrl: buildStudioPreviewUrl(compactPreviewUrl),
+      },
     ]
   }, [overlayBaseUrl, overlayPreviewBaseUrl])
 
@@ -102,7 +128,11 @@ export function OverlaysPage() {
       ? timerOverlayTransform
       : selected === 'reason'
         ? reasonOverlayTransform
-        : wheelOverlayTransform
+        : selected === 'wheel'
+          ? wheelOverlayTransform
+          : selected === 'goals'
+            ? goalsOverlayTransform
+            : compactOverlayTransform
   const selectedAnchor = 'Center anchor'
 
   const handleCopy = async (overlay: (typeof overlays)[number]) => {

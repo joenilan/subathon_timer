@@ -1006,6 +1006,7 @@ export function createSharedSessionServer(options: CreateServerOptions): SharedS
           | { type: 'twitch.event'; payload: NormalizedTwitchEvent }
           | { type: 'tip.event'; payload: NormalizedTwitchEvent }
           | { type: 'wheel.action'; payload: WheelAction }
+          | { type: 'goal.snapshot'; payload: { ladders: unknown[] } }
           | { type: 'session.end' }
 
         try {
@@ -1129,6 +1130,22 @@ export function createSharedSessionServer(options: CreateServerOptions): SharedS
 
           session.wheelSpin = createDefaultSharedWheelSpin()
           consumeNextWheelTrigger(session)
+        }
+
+        if (message.type === 'goal.snapshot') {
+          if (participant.id !== session.hostParticipantId) {
+            return
+          }
+          const sockets = sessionSockets.get(session.id)
+          if (sockets) {
+            const payload = String(rawMessage)
+            for (const s of sockets) {
+              if (s !== socket) {
+                try { s.send(payload) } catch { /* ignore closed */ }
+              }
+            }
+          }
+          return
         }
 
         if (message.type === 'session.end') {

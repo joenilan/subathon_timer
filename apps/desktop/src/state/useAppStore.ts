@@ -24,11 +24,13 @@ import {
   createWheelSegment,
   DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS,
   DEFAULT_WHEEL_TEXT_SCALE,
+  filterWheelSegmentsForActor,
   defaultWheelSpin,
   getEligibleWheelSegmentsForGiftCount,
+  normalizeWheelBlacklist,
   pickWheelSegment,
 } from '../lib/wheel/outcomes'
-import { getChatters, sendChatMessage, timeoutUser } from '../lib/twitch/helix'
+import { getChatters, sendChatMessage, timeoutTwitchUserWithModRestore } from '../lib/twitch/helix'
 import { TWITCH_CLIENT_ID } from '../lib/twitch/constants'
 import {
   applyChatTimerCommand,
@@ -72,9 +74,12 @@ export interface AppState {
   showActivity: boolean
   timerWidgetTheme: TimerWidgetTheme
   wheelTextScale: number
+  wheelBlacklist: string
   timerOverlayTransform: OverlayTransform
   reasonOverlayTransform: OverlayTransform
   wheelOverlayTransform: OverlayTransform
+  goalsOverlayTransform: OverlayTransform
+  compactOverlayTransform: OverlayTransform
   defaultTimerSeconds: number
   commandPermissions: TimerCommandPermissionConfig
   overlayLanAccessEnabled: boolean
@@ -108,6 +113,7 @@ export interface AppState {
   setShowActivity: (v: boolean) => void
   setTimerWidgetTheme: (value: TimerWidgetTheme) => void
   setWheelTextScale: (value: number) => void
+  setWheelBlacklist: (value: string) => void
   setOverlayTransform: (overlay: OverlayKind, patch: Partial<OverlayTransform>) => void
   resetOverlayTransform: (overlay: OverlayKind) => void
   setDefaultTimerSeconds: (value: number) => void
@@ -128,6 +134,7 @@ export interface AppState {
   applyImportedLegacyConfig: (payload: {
     rules: TimerRuleConfig
     wheelSegments: WheelSegment[]
+    wheelBlacklist?: string
   }) => void
   hydrateNativeSnapshot: (snapshot: NativeAppSnapshot, now: number) => void
   addWheelSegment: (outcomeType?: WheelSegment['outcomeType']) => string
@@ -363,9 +370,12 @@ export const useAppStore = create<AppState>()(
       showActivity: true,
       timerWidgetTheme: 'app',
       wheelTextScale: DEFAULT_WHEEL_TEXT_SCALE,
+      wheelBlacklist: '',
       timerOverlayTransform: defaultOverlayTransforms.timer,
       reasonOverlayTransform: defaultOverlayTransforms.reason,
       wheelOverlayTransform: defaultOverlayTransforms.wheel,
+      goalsOverlayTransform: defaultOverlayTransforms.goals,
+      compactOverlayTransform: defaultOverlayTransforms.compact,
       defaultTimerSeconds: INITIAL_TIMER_SECONDS,
       commandPermissions: DEFAULT_TIMER_COMMAND_PERMISSIONS,
       overlayLanAccessEnabled: false,
@@ -402,6 +412,7 @@ export const useAppStore = create<AppState>()(
       setShowActivity: (showActivity) => set({ showActivity }),
       setTimerWidgetTheme: (timerWidgetTheme) => set({ timerWidgetTheme }),
       setWheelTextScale: (wheelTextScale) => set({ wheelTextScale: clampWheelTextScale(wheelTextScale) }),
+      setWheelBlacklist: (wheelBlacklist) => set({ wheelBlacklist }),
       setOverlayTransform: (overlay, patch) =>
         set((state) => {
           const current =
@@ -409,7 +420,11 @@ export const useAppStore = create<AppState>()(
               ? state.timerOverlayTransform
               : overlay === 'reason'
                 ? state.reasonOverlayTransform
-                : state.wheelOverlayTransform
+                : overlay === 'wheel'
+                  ? state.wheelOverlayTransform
+                  : overlay === 'goals'
+                    ? state.goalsOverlayTransform
+                    : state.compactOverlayTransform
           const nextTransform = {
             x: clampOverlayOffset(patch.x ?? current.x),
             y: clampOverlayOffset(patch.y ?? current.y),
@@ -420,7 +435,11 @@ export const useAppStore = create<AppState>()(
             ? { timerOverlayTransform: nextTransform }
             : overlay === 'reason'
               ? { reasonOverlayTransform: nextTransform }
-              : { wheelOverlayTransform: nextTransform }
+              : overlay === 'wheel'
+                ? { wheelOverlayTransform: nextTransform }
+                : overlay === 'goals'
+                  ? { goalsOverlayTransform: nextTransform }
+                  : { compactOverlayTransform: nextTransform }
         }),
       resetOverlayTransform: (overlay) =>
         set(
@@ -428,7 +447,11 @@ export const useAppStore = create<AppState>()(
             ? { timerOverlayTransform: defaultOverlayTransforms.timer }
             : overlay === 'reason'
               ? { reasonOverlayTransform: defaultOverlayTransforms.reason }
-              : { wheelOverlayTransform: defaultOverlayTransforms.wheel },
+              : overlay === 'wheel'
+                ? { wheelOverlayTransform: defaultOverlayTransforms.wheel }
+                : overlay === 'goals'
+                  ? { goalsOverlayTransform: defaultOverlayTransforms.goals }
+                  : { compactOverlayTransform: defaultOverlayTransforms.compact },
         ),
       setDefaultTimerSeconds: (defaultTimerSeconds) => set({ defaultTimerSeconds: clampTimer(defaultTimerSeconds) }),
       setCommandPermission: (action, permission) =>
@@ -498,10 +521,11 @@ export const useAppStore = create<AppState>()(
           overlayLanBaseUrl: payload.overlayLanBaseUrl,
           overlayLanAccessEnabled: payload.overlayLanAccessEnabled ?? state.overlayLanAccessEnabled,
         })),
-      applyImportedLegacyConfig: ({ rules, wheelSegments }) =>
+      applyImportedLegacyConfig: ({ rules, wheelSegments, wheelBlacklist }) =>
         set({
           ruleConfig: normalizeTimerRuleConfig(rules),
           wheelSegments: wheelSegments.length > 0 ? wheelSegments : createDefaultWheelSegments(),
+          wheelBlacklist: normalizeWheelBlacklist(wheelBlacklist).join(', '),
           wheelSpin: defaultWheelSpin,
         }),
       hydrateNativeSnapshot: (snapshot, now) =>
@@ -515,6 +539,7 @@ export const useAppStore = create<AppState>()(
           return {
             defaultTimerSeconds: nextDefaultTimerSeconds,
             commandPermissions: normalizeTimerCommandPermissionConfig(snapshot.settings.commandPermissions),
+            wheelBlacklist: normalizeWheelBlacklist(snapshot.settings.wheelBlacklist).join(', '),
             overlayLanAccessEnabled: snapshot.settings.overlayLanAccessEnabled,
             timerStatus: timerSession.timerStatus,
             timerRemainingSeconds: nextRemainingSeconds,
@@ -592,7 +617,9 @@ export const useAppStore = create<AppState>()(
           return
         }
 
-        const selectedSegment = pickWheelSegment(state.wheelSegments)
+        const selectedSegment = pickWheelSegment(
+          filterWheelSegmentsForActor(state.wheelSegments, state.lastTwitchActor?.userLogin, state.wheelBlacklist),
+        )
         if (!selectedSegment) {
           return
         }
@@ -806,7 +833,10 @@ export const useAppStore = create<AppState>()(
               moderatorId: session.userId,
             })
 
-            const candidates = chatters.filter((chatter) => chatter.userId !== session.userId)
+            const blacklistedLogins = normalizeWheelBlacklist(useAppStore.getState().wheelBlacklist)
+            const candidates = chatters.filter(
+              (chatter) => chatter.userId !== session.userId && !blacklistedLogins.includes(chatter.userLogin.toLowerCase()),
+            )
 
             if (candidates.length === 0) {
               throw new Error('No eligible chatters are available for a random timeout outcome.')
@@ -818,7 +848,11 @@ export const useAppStore = create<AppState>()(
             targetMention = `@${selectedChatter.userLogin}`
           }
 
-          await timeoutUser({
+          if (!session.scopes.includes('channel:manage:moderators')) {
+            throw new Error('Reconnect Twitch to grant channel:manage:moderators before applying timeout outcomes.')
+          }
+
+          await timeoutTwitchUserWithModRestore({
             clientId: TWITCH_CLIENT_ID,
             accessToken: tokens.accessToken,
             broadcasterId: session.userId,
@@ -1120,7 +1154,11 @@ export const useAppStore = create<AppState>()(
             && state.wheelSpin.status === 'idle'
             && (event.count ?? 0) > 0
           const eligibleGiftWheelSegments = shouldAutoSpinGiftWheel
-            ? getEligibleWheelSegmentsForGiftCount(state.wheelSegments, event.count ?? 1)
+            ? filterWheelSegmentsForActor(
+                getEligibleWheelSegmentsForGiftCount(state.wheelSegments, event.count ?? 1),
+                event.userLogin,
+                state.wheelBlacklist,
+              )
             : []
           const selectedGiftWheelSegment =
             eligibleGiftWheelSegments.length > 0 ? pickWheelSegment(eligibleGiftWheelSegments) : null
@@ -1179,9 +1217,12 @@ export const useAppStore = create<AppState>()(
           dashMode: nextDashMode,
           timerWidgetTheme: nextState?.timerWidgetTheme === 'original' ? 'app' : (nextState?.timerWidgetTheme ?? 'app'),
           wheelTextScale: clampWheelTextScale(nextState?.wheelTextScale ?? DEFAULT_WHEEL_TEXT_SCALE),
+          wheelBlacklist: normalizeWheelBlacklist(nextState?.wheelBlacklist).join(', '),
           timerOverlayTransform: normalizeOverlayTransform(nextState?.timerOverlayTransform, defaultOverlayTransforms.timer),
           reasonOverlayTransform: normalizeOverlayTransform(nextState?.reasonOverlayTransform, defaultOverlayTransforms.reason),
           wheelOverlayTransform: normalizeOverlayTransform(nextState?.wheelOverlayTransform, defaultOverlayTransforms.wheel),
+          goalsOverlayTransform: normalizeOverlayTransform(nextState?.goalsOverlayTransform, defaultOverlayTransforms.goals),
+          compactOverlayTransform: normalizeOverlayTransform(nextState?.compactOverlayTransform, defaultOverlayTransforms.compact),
           commandPermissions: normalizeTimerCommandPermissionConfig(nextState?.commandPermissions),
           showWheelOverlayInAppShell: nextState?.showWheelOverlayInAppShell ?? true,
           wheelResultDisplaySeconds: clampWheelResultDisplaySeconds(nextState?.wheelResultDisplaySeconds ?? DEFAULT_WHEEL_RESULT_DISPLAY_SECONDS),
@@ -1202,6 +1243,7 @@ export const useAppStore = create<AppState>()(
         showActivity: state.showActivity,
         timerWidgetTheme: state.timerWidgetTheme,
         wheelTextScale: state.wheelTextScale,
+        wheelBlacklist: state.wheelBlacklist,
         showWheelOverlayInAppShell: state.showWheelOverlayInAppShell,
         wheelResultDisplaySeconds: state.wheelResultDisplaySeconds,
         announceWheelResultsInChat: state.announceWheelResultsInChat,
@@ -1209,6 +1251,8 @@ export const useAppStore = create<AppState>()(
         timerOverlayTransform: state.timerOverlayTransform,
         reasonOverlayTransform: state.reasonOverlayTransform,
         wheelOverlayTransform: state.wheelOverlayTransform,
+        goalsOverlayTransform: state.goalsOverlayTransform,
+        compactOverlayTransform: state.compactOverlayTransform,
       }),
     },
   ),

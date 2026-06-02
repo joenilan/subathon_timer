@@ -139,6 +139,31 @@ export function getEligibleWheelSegmentsForGiftCount(segments: WheelSegment[], g
   return segments.filter((segment) => (segment.minSubs ?? 1) <= normalizedGiftCount)
 }
 
+export function normalizeWheelBlacklist(value: string | string[] | null | undefined) {
+  const rawEntries = Array.isArray(value) ? value : String(value ?? '').split(',')
+
+  return rawEntries
+    .map((entry) => entry.trim().replace(/^@/, '').toLowerCase())
+    .filter((entry, index, entries) => entry.length > 0 && entries.indexOf(entry) === index)
+}
+
+export function isWheelBlacklisted(login: string | null | undefined, blacklist: string | string[] | null | undefined) {
+  const normalizedLogin = login?.trim().replace(/^@/, '').toLowerCase()
+  return !!normalizedLogin && normalizeWheelBlacklist(blacklist).includes(normalizedLogin)
+}
+
+export function filterWheelSegmentsForActor(
+  segments: WheelSegment[],
+  actorLogin: string | null | undefined,
+  blacklist: string | string[] | null | undefined,
+) {
+  if (!isWheelBlacklisted(actorLogin, blacklist)) {
+    return segments
+  }
+
+  return segments.filter((segment) => segment.outcomeType !== 'timeout' || segment.timeoutTarget !== 'self')
+}
+
 export function pickWheelSegment(segments: WheelSegment[]) {
   const weighted = segments.map((segment) => ({
     segment,

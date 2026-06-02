@@ -335,11 +335,11 @@ export function SettingsPage() {
             <div className="settings-command-notes">
               <div className="settings-mini-note">
                 <strong>Imports</strong>
-                <span>Rules and wheel entries</span>
+                <span>Rules, wheel entries, and timeout blacklist</span>
               </div>
               <div className="settings-mini-note">
                 <strong>Skips</strong>
-                <span>Channel, admins, blacklist, and provider fields</span>
+                <span>Channel, admins, provider, and wheel-enable fields</span>
               </div>
               <div className="settings-mini-note">
                 <strong>Next step</strong>
@@ -355,7 +355,7 @@ export function SettingsPage() {
                   value={importText}
                   onChange={(event) => setImportText(event.target.value)}
                 />
-                <span className="rule-field__hint">Imports timer rules and wheel segments from the legacy config format.</span>
+                <span className="rule-field__hint">Imports timer rules, wheel segments, and timeout blacklist from the legacy config format.</span>
               </label>
               <div className="wheel-config-actions">
                 <button className="btn btn--primary" onClick={handleImport} disabled={!importText.trim()}>Import Legacy Config</button>

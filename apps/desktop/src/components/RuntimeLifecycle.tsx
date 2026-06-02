@@ -4,6 +4,7 @@ import { useEventSubLifecycle } from '../hooks/useEventSubLifecycle'
 import { useNativeSnapshotPersistence } from '../hooks/useNativeSnapshotPersistence'
 import { useOverlayRuntimeSync } from '../hooks/useOverlayRuntimeSync'
 import { useSharedSessionLifecycle } from '../hooks/useSharedSessionLifecycle'
+import { useSharedGoalsSync } from '../hooks/useSharedGoalsSync'
 import { useSharedSessionSync } from '../hooks/useSharedSessionSync'
 import { useTimerRuntimeLifecycle } from '../hooks/useTimerRuntimeLifecycle'
 import { useTipSessionLifecycle } from '../hooks/useTipSessionLifecycle'
@@ -20,6 +21,7 @@ export function RuntimeLifecycle() {
   useOverlayRuntimeSync(nativeStateReady)
   useSharedSessionLifecycle()
   useSharedSessionSync()
+  useSharedGoalsSync()
 
   const checkForUpdate = useUpdateStore((state) => state.checkForUpdate)
   useEffect(() => {

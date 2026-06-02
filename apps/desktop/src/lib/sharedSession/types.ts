@@ -1,5 +1,6 @@
 import type { NormalizedTwitchEvent, TimerRuleConfig } from '../timer/types'
 import type { WheelSegment, WheelSpinState } from '../wheel/types'
+import type { SubathonGoalLadder } from '../goals/types'
 
 export type SharedSessionConnectionStatus = 'connected' | 'disconnected'
 export type SharedSessionRole = 'host' | 'guest'
@@ -156,6 +157,11 @@ export interface SharedSessionEndSessionMessage {
   type: 'session.end'
 }
 
+export interface SharedSessionGoalSnapshotMessage {
+  type: 'goal.snapshot'
+  payload: { ladders: SubathonGoalLadder[] }
+}
+
 export type SharedSessionSocketClientMessage =
   | SharedSessionHelloMessage
   | SharedSessionParticipantStatusMessage
@@ -164,6 +170,7 @@ export type SharedSessionSocketClientMessage =
   | SharedSessionTipEventMessage
   | SharedSessionWheelActionMessage
   | SharedSessionEndSessionMessage
+  | SharedSessionGoalSnapshotMessage
 
 export interface SharedSessionSnapshotMessage {
   type: 'session.snapshot'
@@ -196,3 +203,4 @@ export type SharedSessionSocketServerMessage =
   | SharedSessionWelcomeMessage
   | SharedSessionErrorMessage
   | SharedSessionEndedMessage
+  | SharedSessionGoalSnapshotMessage

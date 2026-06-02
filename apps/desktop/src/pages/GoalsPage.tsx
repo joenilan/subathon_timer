@@ -7,6 +7,7 @@ import type {
   GoalSourceType,
   SubathonGoalLadder,
   SubathonGoalLadderConfig,
+  SubathonGoalMilestone,
 } from '../lib/goals/types'
 import { useGoalsStore } from '../state/useGoalsStore'
 import { selectGoalsPageState } from '../state/selectors'
@@ -16,6 +17,7 @@ type MilestoneDraft = {
   thresholdAmount: string
   rewardTitle: string
   rewardDescription: string
+  milestoneSourceType: GoalSourceType
 }
 
 type LadderDraft = {
@@ -39,7 +41,7 @@ type SourceOption = {
   label: string
   unitLabel: string
   description: string
-  defaultMilestones: Array<{ thresholdAmount: string; rewardTitle: string }>
+  defaultMilestones: Array<{ thresholdAmount: string; rewardTitle: string; milestoneSourceType?: GoalSourceType }>
 }
 
 const sourceOptions: SourceOption[] = [
@@ -83,36 +85,62 @@ const sourceOptions: SourceOption[] = [
     ],
   },
   {
-    sourceMode: 'mixed-source',
-    sourceType: 'mixed-support',
-    label: 'Mixed support ladder',
-    unitLabel: 'support points',
-    description: 'Combine subs, bits, and tips with explicit conversion weights.',
+    sourceMode: 'single-source',
+    sourceType: 'channel-points',
+    label: 'Channel Points ladder',
+    unitLabel: 'redemptions',
+    description: 'Unlock rewards from Twitch channel point redemptions.',
     defaultMilestones: [
-      { thresholdAmount: '10', rewardTitle: 'Stream challenge vote' },
-      { thresholdAmount: '25', rewardTitle: 'Bonus wheel spin' },
-      { thresholdAmount: '50', rewardTitle: 'Chat picks next segment' },
-      { thresholdAmount: '100', rewardTitle: 'Major community unlock' },
+      { thresholdAmount: '10', rewardTitle: 'Play a sound alert' },
+      { thresholdAmount: '25', rewardTitle: 'Chat picks a challenge' },
+      { thresholdAmount: '50', rewardTitle: 'Chat picks next game' },
+      { thresholdAmount: '100', rewardTitle: 'Unlock a bonus stream segment' },
+    ],
+  },
+  {
+    sourceMode: 'single-source',
+    sourceType: 'charity',
+    label: 'Fundraiser / Charity',
+    unitLabel: 'USD',
+    description: 'Track a charity fundraiser manually. Progress is entered by hand — no automatic events.',
+    defaultMilestones: [
+      { thresholdAmount: '50', rewardTitle: 'Shoutout to all donors' },
+      { thresholdAmount: '100', rewardTitle: 'Chat picks a challenge' },
+      { thresholdAmount: '250', rewardTitle: 'Streamer does a dare' },
+      { thresholdAmount: '500', rewardTitle: 'Unlock a bonus charity stream' },
+    ],
+  },
+  {
+    sourceMode: 'custom',
+    sourceType: 'mixed-support',
+    label: 'Custom goals',
+    unitLabel: 'points',
+    description: 'Mix any sources in one list. Each milestone tracks its own source independently.',
+    defaultMilestones: [
+      { thresholdAmount: '500', rewardTitle: 'Play a sound alert', milestoneSourceType: 'bits' },
+      { thresholdAmount: '5', rewardTitle: 'Chat picks a challenge', milestoneSourceType: 'subscriptions' },
+      { thresholdAmount: '25', rewardTitle: 'Unlock a stream challenge', milestoneSourceType: 'tips' },
     ],
   },
 ]
 
-function makeDraftMilestones(milestones: Array<{ thresholdAmount: string; rewardTitle: string }>) {
+function makeDraftMilestones(milestones: Array<{ thresholdAmount: string; rewardTitle: string; milestoneSourceType?: GoalSourceType }>) {
   return milestones.map((m, i) => ({
     id: `draft-${i}`,
     thresholdAmount: m.thresholdAmount,
     rewardTitle: m.rewardTitle,
     rewardDescription: '',
+    milestoneSourceType: m.milestoneSourceType ?? 'bits',
   }))
 }
 
 const defaultDraft: LadderDraft = {
   editingId: null,
-  title: 'Bits ladder',
+  title: sourceOptions[0].label,
   description: '',
-  sourceMode: 'single-source',
-  sourceType: 'bits',
-  unitLabel: 'bits',
+  sourceMode: sourceOptions[0].sourceMode,
+  sourceType: sourceOptions[0].sourceType,
+  unitLabel: sourceOptions[0].unitLabel,
   milestones: makeDraftMilestones(sourceOptions[0].defaultMilestones),
   subscriptionUnitValue: '1',
   bitsAmountUnit: '100',
@@ -133,8 +161,46 @@ function formatHistoryTime(value: number) {
   }).format(value)
 }
 
-function getSourceLabel(sourceType: GoalSourceType) {
-  return sourceOptions.find((option) => option.sourceType === sourceType)?.label ?? 'Reward ladder'
+function getSourceLabel(ladder: SubathonGoalLadder) {
+  if (ladder.sourceMode === 'custom') return 'Custom goals'
+  return sourceOptions.find((option) => option.sourceType === ladder.sourceType)?.label ?? 'Reward ladder'
+}
+
+function getMilestoneUnitLabel(milestoneSourceType: GoalSourceType | undefined, ladderUnitLabel: string) {
+  if (milestoneSourceType === 'bits') return 'bits'
+  if (milestoneSourceType === 'subscriptions') return 'subs'
+  if (milestoneSourceType === 'tips') return '$'
+  if (milestoneSourceType === 'channel-points') return 'pts'
+  return ladderUnitLabel
+}
+
+function getGroupSourceLabel(sourceType: GoalSourceType) {
+  if (sourceType === 'bits') return 'Bits'
+  if (sourceType === 'subscriptions') return 'Subs'
+  if (sourceType === 'tips') return 'Tips'
+  if (sourceType === 'channel-points') return 'Channel Points'
+  return 'Other'
+}
+
+function groupMilestonesBySource(milestones: SubathonGoalMilestone[]) {
+  const order: GoalSourceType[] = ['bits', 'subscriptions', 'tips', 'channel-points', 'mixed-support']
+  const groups = new Map<GoalSourceType, SubathonGoalMilestone[]>()
+  for (const milestone of milestones) {
+    const key = milestone.milestoneSourceType ?? 'bits'
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(milestone)
+  }
+  return order.filter((k) => groups.has(k)).map((k) => ({ sourceType: k, milestones: groups.get(k)! }))
+}
+
+function getGroupProgress(milestones: SubathonGoalMilestone[], unit: string) {
+  const current = milestones.reduce((max, m) => Math.max(max, m.milestoneCurrentAmount ?? 0), 0)
+  const nextLocked = milestones
+    .filter((m) => m.status === 'locked')
+    .sort((a, b) => a.thresholdAmount - b.thresholdAmount)[0] ?? null
+  if (!nextLocked) return { current, next: null, pct: 100, label: `All ${unit} goals done` }
+  const pct = Math.min(100, Math.max(0, (current / nextLocked.thresholdAmount) * 100))
+  return { current, next: nextLocked, pct, label: `${formatGoalAmount(current, unit)} / ${formatGoalAmount(nextLocked.thresholdAmount, unit)}` }
 }
 
 function getNextMilestone(ladder: SubathonGoalLadder) {
@@ -144,6 +210,12 @@ function getNextMilestone(ladder: SubathonGoalLadder) {
 }
 
 function getLadderProgress(ladder: SubathonGoalLadder) {
+  if (ladder.sourceMode === 'custom') {
+    const total = ladder.milestones.length
+    if (total === 0) return 0
+    const completed = ladder.milestones.filter((m) => m.status === 'completed').length
+    return Math.round((completed / total) * 100)
+  }
   const maxThreshold = ladder.milestones.reduce((current, milestone) => Math.max(current, milestone.thresholdAmount), 0)
   if (maxThreshold <= 0) {
     return 0
@@ -164,6 +236,7 @@ function buildDraftFromLadder(ladder: SubathonGoalLadder): LadderDraft {
       thresholdAmount: String(milestone.thresholdAmount),
       rewardTitle: milestone.rewardTitle,
       rewardDescription: milestone.rewardDescription ?? '',
+      milestoneSourceType: milestone.milestoneSourceType ?? 'bits',
     })),
     subscriptionUnitValue: String(ladder.config.mixed.subscriptionUnitValue),
     bitsAmountUnit: String(ladder.config.mixed.bitsAmountUnit),
@@ -194,6 +267,7 @@ function buildCreateInput(draft: LadderDraft): CreateGoalLadderInput | null {
       thresholdAmount: Number.parseFloat(milestone.thresholdAmount),
       rewardTitle: milestone.rewardTitle.trim(),
       rewardDescription: milestone.rewardDescription.trim() || undefined,
+      milestoneSourceType: draft.sourceMode === 'custom' ? milestone.milestoneSourceType : undefined,
     }))
     .filter((milestone) => Number.isFinite(milestone.thresholdAmount) && milestone.thresholdAmount > 0 && milestone.rewardTitle)
 
@@ -268,6 +342,7 @@ export function GoalsPage() {
           thresholdAmount: '',
           rewardTitle: '',
           rewardDescription: '',
+          milestoneSourceType: 'bits' as GoalSourceType,
         },
       ],
     }))
@@ -311,6 +386,8 @@ export function GoalsPage() {
             thresholdAmount: milestone.thresholdAmount,
             rewardTitle: milestone.rewardTitle,
             rewardDescription: milestone.rewardDescription,
+            milestoneSourceType: milestone.milestoneSourceType,
+            milestoneCurrentAmount: previous?.milestoneCurrentAmount ?? 0,
             status: previous?.status ?? 'locked',
             completedAt: previous?.completedAt,
           }
@@ -439,150 +516,91 @@ export function GoalsPage() {
             })}
           </div>
 
-          <div className="goals-form-grid">
+          <div className="goals-form-fields">
             <label className="rule-field">
-              <span className="rule-field__label">Ladder name</span>
+              <span className="rule-field__label">Name <em className="goals-field-optional">(optional)</em></span>
               <input
                 className="rule-field__input"
                 value={draft.title}
                 onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                placeholder={sourceOptions.find((o) => o.sourceType === draft.sourceType)?.label ?? 'Reward ladder'}
               />
-              <span className="rule-field__hint">Use a short name that reads clearly on stream.</span>
             </label>
 
-            <label className="rule-field">
-              <span className="rule-field__label">Unit label</span>
-              <input
-                className="rule-field__input"
-                value={draft.unitLabel}
-                onChange={(event) => setDraft((current) => ({ ...current, unitLabel: event.target.value }))}
-              />
-              <span className="rule-field__hint">Examples: bits, subs, USD, support points.</span>
-            </label>
-
-            <label className="rule-field goals-form-grid__wide">
-              <span className="rule-field__label">Description</span>
-              <input
-                className="rule-field__input"
-                value={draft.description}
-                onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-              />
-              <span className="rule-field__hint">Optional context for the streamer and overlay.</span>
-            </label>
+            {(draft.sourceType === 'tips' || draft.sourceType === 'charity') ? (
+              <label className="rule-field">
+                <span className="rule-field__label">Unit label</span>
+                <input
+                  className="rule-field__input"
+                  value={draft.unitLabel}
+                  onChange={(event) => setDraft((current) => ({ ...current, unitLabel: event.target.value }))}
+                  placeholder="e.g. USD, EUR"
+                />
+              </label>
+            ) : null}
           </div>
 
-          {draft.sourceMode === 'mixed-source' ? (
-            <div className="goals-conversion-grid">
-              <label className="rule-field">
-                <span className="rule-field__label">One sub equals</span>
-                <input
-                  className="rule-field__input"
-                  type="number"
-                  min={0}
-                  step={0.1}
-                  value={draft.subscriptionUnitValue}
-                  onChange={(event) => setDraft((current) => ({ ...current, subscriptionUnitValue: event.target.value }))}
-                />
-                <span className="rule-field__hint">Support points credited for one subscription.</span>
-              </label>
-              <label className="rule-field">
-                <span className="rule-field__label">Bits unit</span>
-                <input
-                  className="rule-field__input"
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={draft.bitsAmountUnit}
-                  onChange={(event) => setDraft((current) => ({ ...current, bitsAmountUnit: event.target.value }))}
-                />
-                <span className="rule-field__hint">Bits needed before the bits value is credited.</span>
-              </label>
-              <label className="rule-field">
-                <span className="rule-field__label">Bits unit value</span>
-                <input
-                  className="rule-field__input"
-                  type="number"
-                  min={0}
-                  step={0.1}
-                  value={draft.bitsUnitValue}
-                  onChange={(event) => setDraft((current) => ({ ...current, bitsUnitValue: event.target.value }))}
-                />
-                <span className="rule-field__hint">Support points credited per bits unit.</span>
-              </label>
-              <label className="rule-field">
-                <span className="rule-field__label">Tip unit</span>
-                <input
-                  className="rule-field__input"
-                  type="number"
-                  min={0.01}
-                  step={0.01}
-                  value={draft.tipAmountUnit}
-                  onChange={(event) => setDraft((current) => ({ ...current, tipAmountUnit: event.target.value }))}
-                />
-                <span className="rule-field__hint">Tip amount needed before the tip value is credited.</span>
-              </label>
-              <label className="rule-field">
-                <span className="rule-field__label">Tip unit value</span>
-                <input
-                  className="rule-field__input"
-                  type="number"
-                  min={0}
-                  step={0.1}
-                  value={draft.tipUnitValue}
-                  onChange={(event) => setDraft((current) => ({ ...current, tipUnitValue: event.target.value }))}
-                />
-                <span className="rule-field__hint">Support points credited per tip unit.</span>
-              </label>
-            </div>
+          {draft.sourceMode === 'custom' ? (
+            <p className="goals-custom-hint">Each milestone below can track a different source independently. Set the amount and pick the source for each one.</p>
           ) : null}
 
           <div className="goals-milestone-editor">
             <div className="goals-section-heading">
               <strong>Milestones</strong>
               <button className="btn btn--ghost" type="button" onClick={handleAddMilestone}>
-                Add Milestone
+                + Add
               </button>
             </div>
 
-            {draft.milestones.map((milestone) => (
-              <div className="goals-milestone-row" key={milestone.id}>
-                <label className="rule-field">
-                  <span className="rule-field__label">Threshold</span>
+            {draft.milestones.map((milestone) => {
+              const isCustom = draft.sourceMode === 'custom'
+              const milestoneUnit = isCustom
+                ? getMilestoneUnitLabel(milestone.milestoneSourceType, draft.unitLabel)
+                : draft.unitLabel
+              const stepSize = (!isCustom && draft.sourceType === 'tips') || (isCustom && milestone.milestoneSourceType === 'tips') ? 0.01 : 1
+              return (
+                <div className="goals-milestone-row" key={milestone.id}>
                   <input
-                    className="rule-field__input"
+                    className="rule-field__input goals-milestone-threshold"
                     type="number"
                     min={0}
-                    step={draft.sourceType === 'tips' ? 0.01 : 1}
+                    step={stepSize}
+                    placeholder="0"
                     value={milestone.thresholdAmount}
                     onChange={(event) => handleMilestoneChange(milestone.id, { thresholdAmount: event.target.value })}
                   />
-                </label>
-                <label className="rule-field">
-                  <span className="rule-field__label">Reward</span>
+                  {isCustom ? (
+                    <select
+                      className="goals-milestone-source-select"
+                      value={milestone.milestoneSourceType}
+                      onChange={(event) => handleMilestoneChange(milestone.id, { milestoneSourceType: event.target.value as GoalSourceType })}
+                    >
+                      <option value="bits">bits</option>
+                      <option value="subscriptions">subs</option>
+                      <option value="tips">tips $</option>
+                      <option value="channel-points">pts</option>
+                    </select>
+                  ) : (
+                    <span className="goals-milestone-unit">{milestoneUnit}</span>
+                  )}
                   <input
-                    className="rule-field__input"
+                    className="rule-field__input goals-milestone-reward"
+                    placeholder="Reward description"
                     value={milestone.rewardTitle}
                     onChange={(event) => handleMilestoneChange(milestone.id, { rewardTitle: event.target.value })}
                   />
-                </label>
-                <label className="rule-field goals-milestone-row__description">
-                  <span className="rule-field__label">Details</span>
-                  <input
-                    className="rule-field__input"
-                    value={milestone.rewardDescription}
-                    onChange={(event) => handleMilestoneChange(milestone.id, { rewardDescription: event.target.value })}
-                  />
-                </label>
-                <button
-                  className="btn btn--ghost goals-milestone-row__remove"
-                  type="button"
-                  onClick={() => handleRemoveMilestone(milestone.id)}
-                  disabled={draft.milestones.length <= 1}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+                  <button
+                    className="goals-milestone-remove"
+                    type="button"
+                    onClick={() => handleRemoveMilestone(milestone.id)}
+                    disabled={draft.milestones.length <= 1}
+                    aria-label="Remove milestone"
+                  >
+                    ×
+                  </button>
+                </div>
+              )
+            })}
           </div>
 
           <div className="goals-composer__actions">
@@ -622,69 +640,101 @@ export function GoalsPage() {
                   <div className="goals-ladder-card__header">
                     <div>
                       <div className="goals-ladder-card__badges">
-                        <span className="mini-chip">{getSourceLabel(ladder.sourceType)}</span>
-                        <span className="mini-chip">{ladder.sourceMode === 'mixed-source' ? 'Mixed' : 'Source-specific'}</span>
+                        <span className="mini-chip">{getSourceLabel(ladder)}</span>
                       </div>
                       <h2>{ladder.title}</h2>
                       {ladder.description ? <p>{ladder.description}</p> : null}
                     </div>
-                    <div className="goals-ladder-card__total">
-                      <span>Current progress</span>
-                      <strong>{formatGoalAmount(ladder.currentAmount, ladder.unitLabel)}</strong>
-                      <em>{nextMilestone ? `Next unlock at ${formatGoalAmount(nextMilestone.thresholdAmount, ladder.unitLabel)}` : 'All rewards unlocked'}</em>
-                    </div>
-                  </div>
-
-                  <div className="goals-progress">
-                    <span style={{ width: `${progress}%` }} />
-                  </div>
-
-                  <div className="goals-milestone-list">
-                    {ladder.milestones.map((milestone) => (
-                      <div key={milestone.id} className={`goals-milestone-item goals-milestone-item--${milestone.status}`}>
-                        <div className="goals-milestone-item__mark">
-                          {milestone.status === 'completed' ? '✓' : milestone.status === 'skipped' ? '–' : ''}
-                        </div>
-                        <div className="goals-milestone-item__copy">
-                          <span>{formatGoalAmount(milestone.thresholdAmount, ladder.unitLabel)}</span>
-                          <strong>{milestone.rewardTitle}</strong>
-                          {milestone.rewardDescription ? <p>{milestone.rewardDescription}</p> : null}
-                        </div>
-                        <div className="goals-milestone-item__actions">
-                          {milestone.status === 'locked' ? (
-                            <button
-                              className="btn btn--ghost"
-                              type="button"
-                              onClick={() => skipMilestone(ladder.id, milestone.id, manual.reason || undefined)}
-                            >
-                              Skip
-                            </button>
-                          ) : (
-                            <button
-                              className="btn btn--ghost"
-                              type="button"
-                              onClick={() => reopenMilestone(ladder.id, milestone.id, manual.reason || undefined)}
-                            >
-                              Reopen
-                            </button>
-                          )}
-                        </div>
+                    {ladder.sourceMode !== 'custom' && (
+                      <div className="goals-ladder-card__total">
+                        <span>Current progress</span>
+                        <strong>{formatGoalAmount(ladder.currentAmount, ladder.unitLabel)}</strong>
+                        <em>{nextMilestone ? `Next unlock at ${formatGoalAmount(nextMilestone.thresholdAmount, ladder.unitLabel)}` : 'All rewards unlocked'}</em>
                       </div>
-                    ))}
+                    )}
                   </div>
+
+                  {ladder.sourceMode !== 'custom' && (
+                    <div className="goals-progress">
+                      <span style={{ width: `${progress}%` }} />
+                    </div>
+                  )}
+
+                  {ladder.sourceMode === 'custom' ? (
+                    <div className="goals-source-groups">
+                      {groupMilestonesBySource(ladder.milestones).map(({ sourceType, milestones: groupMilestones }) => {
+                        const unit = getMilestoneUnitLabel(sourceType, ladder.unitLabel)
+                        const groupProg = getGroupProgress(groupMilestones, unit)
+                        return (
+                          <div key={sourceType} className="goals-source-group">
+                            <div className="goals-source-group__header">
+                              <span className="goals-source-group__label">{getGroupSourceLabel(sourceType)}</span>
+                              <span className="goals-source-group__progress-label">{groupProg.label}</span>
+                            </div>
+                            <div className="goals-progress goals-source-group__bar">
+                              <span style={{ width: `${groupProg.pct}%` }} />
+                            </div>
+                            <div className="goals-milestone-list">
+                              {groupMilestones.map((milestone) => (
+                                <div key={milestone.id} className={`goals-milestone-item goals-milestone-item--${milestone.status}`}>
+                                  <div className="goals-milestone-item__mark">
+                                    {milestone.status === 'completed' ? '✓' : milestone.status === 'skipped' ? '–' : ''}
+                                  </div>
+                                  <div className="goals-milestone-item__copy">
+                                    <strong>{milestone.rewardTitle}</strong>
+                                    <span>{formatGoalAmount(milestone.thresholdAmount, unit)}</span>
+                                  </div>
+                                  <div className="goals-milestone-item__actions">
+                                    {milestone.status === 'locked' ? (
+                                      <button className="btn btn--ghost" type="button" onClick={() => skipMilestone(ladder.id, milestone.id, manual.reason || undefined)}>Skip</button>
+                                    ) : (
+                                      <button className="btn btn--ghost" type="button" onClick={() => reopenMilestone(ladder.id, milestone.id, manual.reason || undefined)}>Reopen</button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="goals-milestone-list">
+                      {ladder.milestones.map((milestone) => (
+                        <div key={milestone.id} className={`goals-milestone-item goals-milestone-item--${milestone.status}`}>
+                          <div className="goals-milestone-item__mark">
+                            {milestone.status === 'completed' ? '✓' : milestone.status === 'skipped' ? '–' : ''}
+                          </div>
+                          <div className="goals-milestone-item__copy">
+                            <strong>{milestone.rewardTitle}</strong>
+                            <span>{formatGoalAmount(milestone.thresholdAmount, ladder.unitLabel)}</span>
+                          </div>
+                          <div className="goals-milestone-item__actions">
+                            {milestone.status === 'locked' ? (
+                              <button className="btn btn--ghost" type="button" onClick={() => skipMilestone(ladder.id, milestone.id, manual.reason || undefined)}>Skip</button>
+                            ) : (
+                              <button className="btn btn--ghost" type="button" onClick={() => reopenMilestone(ladder.id, milestone.id, manual.reason || undefined)}>Reopen</button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="goals-ladder-tools">
-                    <label className="rule-field">
-                      <span className="rule-field__label">Manual amount</span>
-                      <input
-                        className="rule-field__input"
-                        type="number"
-                        step={ladder.sourceType === 'tips' ? 0.01 : 1}
-                        value={manual.amount}
-                        onChange={(event) => handleManualDraftChange(ladder.id, { amount: event.target.value })}
-                      />
-                      <span className="rule-field__hint">Use a negative number to correct progress downward.</span>
-                    </label>
+                    {ladder.sourceMode !== 'custom' && (
+                      <label className="rule-field">
+                        <span className="rule-field__label">Manual amount</span>
+                        <input
+                          className="rule-field__input"
+                          type="number"
+                          step={ladder.sourceType === 'tips' ? 0.01 : 1}
+                          value={manual.amount}
+                          onChange={(event) => handleManualDraftChange(ladder.id, { amount: event.target.value })}
+                        />
+                        <span className="rule-field__hint">Use a negative number to correct progress downward.</span>
+                      </label>
+                    )}
                     <label className="rule-field goals-ladder-tools__reason">
                       <span className="rule-field__label">Reason</span>
                       <input
@@ -692,12 +742,14 @@ export function GoalsPage() {
                         value={manual.reason}
                         onChange={(event) => handleManualDraftChange(ladder.id, { reason: event.target.value })}
                       />
-                      <span className="rule-field__hint">Required for manual adjustments, resets, skips, and reopens.</span>
+                      <span className="rule-field__hint">{ladder.sourceMode === 'custom' ? 'Used for resets, skips, and reopens.' : 'Required for manual adjustments, resets, skips, and reopens.'}</span>
                     </label>
                     <div className="goals-ladder-tools__actions">
-                      <button className="btn btn--primary" type="button" onClick={() => handleApplyManualAdjustment(ladder.id)}>
-                        Apply
-                      </button>
+                      {ladder.sourceMode !== 'custom' && (
+                        <button className="btn btn--primary" type="button" onClick={() => handleApplyManualAdjustment(ladder.id)}>
+                          Apply
+                        </button>
+                      )}
                       <button className="btn btn--ghost" type="button" onClick={() => handleReset(ladder.id)} disabled={!manual.reason.trim()}>
                         Reset
                       </button>

@@ -41,6 +41,7 @@ export function WheelPage() {
   const {
     wheelSegments,
     wheelSpin,
+    wheelBlacklist,
     wheelTextScale,
     spinWheel,
     triggerGiftBombTest,
@@ -49,6 +50,7 @@ export function WheelPage() {
     updateWheelSegment,
     removeWheelSegment,
     setWheelTextScale,
+    setWheelBlacklist,
   } = useAppStore(useShallow(selectWheelPageState))
   const twitchSession = useTwitchSessionStore((state) => state.session)
   const [selectedId, setSelectedId] = useState<string | null>(wheelSegments[0]?.id ?? null)
@@ -75,6 +77,9 @@ export function WheelPage() {
     const missing = new Set<string>()
     if (!twitchSession?.scopes.includes('moderator:manage:banned_users')) {
       missing.add('moderator:manage:banned_users')
+    }
+    if (!twitchSession?.scopes.includes('channel:manage:moderators')) {
+      missing.add('channel:manage:moderators')
     }
 
     if (
@@ -125,6 +130,16 @@ export function WheelPage() {
           <WheelDisplay segments={wheelSegments} spin={wheelSpin} textScale={wheelTextScale} />
 
           <div className="wheel-stage-toolbar">
+            <label className="wheel-scale-control" htmlFor="wheel-blacklist">
+              <span className="wheel-scale-control__label">Timeout blacklist</span>
+              <input
+                id="wheel-blacklist"
+                className="rule-field__input"
+                value={wheelBlacklist}
+                placeholder="login1, login2"
+                onChange={(event) => setWheelBlacklist(event.target.value)}
+              />
+            </label>
             <label className="wheel-scale-control" htmlFor="wheel-text-scale">
               <span className="wheel-scale-control__label">Text scale</span>
               <input

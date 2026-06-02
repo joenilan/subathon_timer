@@ -27,6 +27,7 @@
 - `apps/desktop/docs/persistence-roadmap.md` is the source of truth for the persistence migration phases. Update it whenever a persistence-related phase lands or changes scope.
 - `apps/desktop/docs/shared-subathon-plan.md` is the source of truth for the shared-session / linked-streamer design. Update it whenever shared-session scope, ownership rules, or rollout phases change.
 - `apps/desktop/docs/shared-subathon-plan.md` also contains the shared-session phase tracker. If a shared-session phase starts, is blocked, changes scope, or is completed, update that tracker in the same pass.
+- `apps/desktop/docs/subathon-goals-plan.md` is the source of truth for subathon reward ladders. Goal work must keep milestone progress separate from timer rules and must treat source-specific ladders as the default UX.
 - `apps/shared-session-service/` is the shared-session backend entrypoint. It now covers the Phase 1 create/join/presence scaffold, the Phase 2 server-owned shared timer snapshot, the Phase 3 shared Twitch event ingestion path, the Phase 4 tip-only provider ingestion path, the Phase 5 shared wheel runtime, and the Phase 6 hardening (reconnect, rejoin endpoint, session end, and integration tests). Keep new shared-mode authority there instead of improvising ad hoc endpoints elsewhere.
 - Root `src/` and `public/` are the legacy Node/overlay app. Treat them as behavior reference unless a task explicitly targets the old stack.
 
@@ -97,3 +98,5 @@
 - For persistence work, follow `apps/desktop/docs/persistence-roadmap.md` in order and keep that file updated as part of the same pass. Do not let persistence phases live only in chat context.
 - For shared-subathon work, follow `apps/desktop/docs/shared-subathon-plan.md` in order and keep that file updated as part of the same pass. Do not improvise a peer-to-peer sync model or let shared-session authority rules live only in chat context.
 - For shared-subathon work, do not mark a phase as effectively done only in chat. Update the phase tracker table and the relevant phase section status inside `apps/desktop/docs/shared-subathon-plan.md` in the same commit.
+- For subathon goal work, follow `apps/desktop/docs/subathon-goals-plan.md` in order and keep that file updated when source modes, provider coverage, overlay behavior, milestone behavior, or rollout phases change.
+- Goal tracking must not mutate timer behavior. Use normalized live events as inputs, but keep reward ladder progress, goal dedupe, and goal history independent from timer rule state.

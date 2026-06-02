@@ -195,15 +195,16 @@ export function DashboardPage() {
               <div className="dash-control-block">
                 <span className="ctrl-label ctrl-label--block">Quick Adjust</span>
                 <div className="dash-control-actions">
-                  <button className="btn btn--accent btn--compact" onClick={() => adjustTimer(300, 'Manual add')}>
-                    +5 min
-                  </button>
-                  <button className="btn btn--ghost btn--compact" onClick={() => adjustTimer(60, 'Manual add')}>
-                    +1 min
-                  </button>
-                  <button className="btn btn--ghost btn--compact" onClick={() => adjustTimer(-120, 'Manual remove')}>
-                    -2 min
-                  </button>
+                  <div className="adj-pill">
+                    <button className="adj-pill__btn adj-pill__btn--add" onClick={() => adjustTimer(300, 'Manual add')}>+5 min</button>
+                    <span className="adj-pill__divider" />
+                    <button className="adj-pill__btn adj-pill__btn--sub" onClick={() => adjustTimer(-300, 'Manual remove')}>−5 min</button>
+                  </div>
+                  <div className="adj-pill">
+                    <button className="adj-pill__btn adj-pill__btn--add" onClick={() => adjustTimer(60, 'Manual add')}>+1 min</button>
+                    <span className="adj-pill__divider" />
+                    <button className="adj-pill__btn adj-pill__btn--sub" onClick={() => adjustTimer(-60, 'Manual remove')}>−1 min</button>
+                  </div>
                 </div>
               </div>
 

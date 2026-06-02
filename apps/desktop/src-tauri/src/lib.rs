@@ -126,6 +126,29 @@ struct WheelOverlaySpinState {
     is_test: bool,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GoalOverlayMilestone {
+    id: String,
+    threshold_amount: f64,
+    reward_title: String,
+    status: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GoalOverlayLadder {
+    id: String,
+    title: String,
+    source_type: String,
+    source_mode: String,
+    current_amount: f64,
+    unit_label: String,
+    progress_percent: f64,
+    next_reward_title: Option<String>,
+    milestones: Vec<GoalOverlayMilestone>,
+}
+
 impl Default for WheelOverlaySpinState {
     fn default() -> Self {
         Self {
@@ -150,6 +173,7 @@ struct OverlayState {
     timer_overlay_transform: OverlayTransform,
     reason_overlay_transform: OverlayTransform,
     wheel_overlay_transform: OverlayTransform,
+    goals_overlay_transform: OverlayTransform,
     graph_points: Vec<u64>,
     wheel_segments: Vec<WheelOverlaySegment>,
     wheel_spin: WheelOverlaySpinState,
@@ -157,6 +181,7 @@ struct OverlayState {
     wheel_text_scale: f32,
     incentive_rules: Vec<OverlayRule>,
     overlay_preview: OverlayPreviewState,
+    goals: Vec<GoalOverlayLadder>,
 }
 
 impl Default for OverlayState {
@@ -169,6 +194,7 @@ impl Default for OverlayState {
             timer_overlay_transform: OverlayTransform::default(),
             reason_overlay_transform: OverlayTransform::default(),
             wheel_overlay_transform: OverlayTransform::default(),
+            goals_overlay_transform: OverlayTransform::default(),
             graph_points: vec![6 * 60 * 60],
             wheel_segments: vec![],
             wheel_spin: WheelOverlaySpinState::default(),
@@ -207,6 +233,7 @@ impl Default for OverlayState {
                 delta: "+00:00".into(),
                 tone: "neutral".into(),
             },
+            goals: vec![],
         }
     }
 }
@@ -239,6 +266,7 @@ struct OverlaySyncPayload {
     timer_overlay_transform: OverlayTransform,
     reason_overlay_transform: OverlayTransform,
     wheel_overlay_transform: OverlayTransform,
+    goals_overlay_transform: OverlayTransform,
     graph_points: Vec<u64>,
     wheel_segments: Vec<WheelOverlaySegment>,
     wheel_spin: WheelOverlaySpinState,
@@ -246,6 +274,7 @@ struct OverlaySyncPayload {
     wheel_text_scale: f32,
     incentive_rules: Vec<OverlayRule>,
     overlay_preview: OverlayPreviewState,
+    goals: Vec<GoalOverlayLadder>,
 }
 
 fn portable_storage_dir() -> Result<Option<PathBuf>, String> {
@@ -774,6 +803,7 @@ fn sync_overlay_state(
         timer_overlay_transform: payload.timer_overlay_transform,
         reason_overlay_transform: payload.reason_overlay_transform,
         wheel_overlay_transform: payload.wheel_overlay_transform,
+        goals_overlay_transform: payload.goals_overlay_transform,
         graph_points: payload.graph_points,
         wheel_segments: payload.wheel_segments,
         wheel_spin: payload.wheel_spin,
@@ -781,6 +811,7 @@ fn sync_overlay_state(
         wheel_text_scale: payload.wheel_text_scale,
         incentive_rules: payload.incentive_rules,
         overlay_preview: payload.overlay_preview,
+        goals: payload.goals,
     };
 
     Ok(())
@@ -2246,6 +2277,812 @@ fn wheel_overlay_html() -> &'static str {
 </html>"##
 }
 
+fn goals_overlay_html() -> &'static str {
+    r#"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Subathon Goals Overlay</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        --text: #f8fafc;
+        --muted: #cbd5e1;
+        --accent: #22d3ee;
+        --lime: #bef264;
+        --offset-x: 0px;
+        --offset-y: 0px;
+        --overlay-scale: 1;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        color: var(--text);
+        overflow: hidden;
+      }
+      .canvas {
+        width: min(720px, calc(100vw - 48px));
+        transform: translate(var(--offset-x), var(--offset-y)) scale(var(--overlay-scale));
+        transform-origin: center center;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .card {
+        display: none;
+        width: 100%;
+        padding: clamp(18px, 3vw, 28px);
+        border: 1px solid rgba(34, 211, 238, 0.3);
+        border-radius: 30px;
+        background:
+          radial-gradient(circle at 16% 12%, rgba(34, 211, 238, 0.22), transparent 26%),
+          radial-gradient(circle at 86% 18%, rgba(190, 242, 100, 0.16), transparent 24%),
+          linear-gradient(145deg, rgba(8, 13, 22, 0.86), rgba(4, 7, 12, 0.94));
+        box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42), 0 0 38px rgba(34, 211, 238, 0.1);
+        backdrop-filter: blur(14px);
+      }
+      .card.visible { display: block; }
+      .header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 16px;
+      }
+      .eyebrow {
+        color: #67e8f9;
+        font-size: clamp(0.72rem, 1.4vw, 0.9rem);
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .heading {
+        color: var(--text);
+        font-size: clamp(2rem, 5vw, 4.5rem);
+        font-weight: 950;
+        line-height: 0.9;
+        letter-spacing: -0.08em;
+        text-align: right;
+      }
+      .list { display: grid; gap: 14px; }
+      .ladder {
+        display: grid;
+        gap: 12px;
+        padding: clamp(14px, 2.4vw, 20px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        background: rgba(2, 6, 12, 0.42);
+      }
+      .ladder-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+      }
+      .ladder-kicker {
+        color: #67e8f9;
+        font-size: clamp(0.66rem, 1.2vw, 0.82rem);
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .ladder-title {
+        color: var(--text);
+        font-size: clamp(1.35rem, 3.2vw, 2.7rem);
+        font-weight: 900;
+        line-height: 0.95;
+        letter-spacing: -0.055em;
+      }
+      .amount {
+        color: var(--lime);
+        font-size: clamp(1.2rem, 2.8vw, 2.3rem);
+        font-weight: 950;
+        letter-spacing: -0.055em;
+        white-space: nowrap;
+      }
+      .progress {
+        height: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(103, 232, 249, 0.26);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .progress span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #22d3ee, #bef264);
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.3);
+      }
+      .milestones { display: grid; gap: 8px; }
+      .milestone {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        padding: 9px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+      .milestone.completed {
+        border-color: rgba(190, 242, 100, 0.36);
+        background: rgba(190, 242, 100, 0.11);
+      }
+      .milestone.skipped { opacity: 0.6; }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border: 1px solid rgba(103, 232, 249, 0.26);
+        border-radius: 999px;
+        color: var(--lime);
+        font-weight: 950;
+      }
+      .milestone-copy {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        min-width: 0;
+      }
+      .milestone-title {
+        color: var(--text);
+        font-size: clamp(0.9rem, 1.8vw, 1.25rem);
+        font-weight: 850;
+        letter-spacing: -0.025em;
+      }
+      .threshold {
+        color: var(--muted);
+        font-size: clamp(0.7rem, 1.2vw, 0.86rem);
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      .next {
+        padding: 10px 12px;
+        border: 1px solid rgba(34, 211, 238, 0.18);
+        border-radius: 999px;
+        background: rgba(34, 211, 238, 0.07);
+        color: #cffafe;
+        font-size: clamp(0.74rem, 1.4vw, 0.92rem);
+        font-weight: 850;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <section class="card" id="card">
+        <div class="header">
+          <span class="eyebrow">Subathon goals</span>
+          <strong class="heading">Reward ladder</strong>
+        </div>
+        <div class="list" id="list"></div>
+      </section>
+    </div>
+    <script>
+      const isStudioPreview = new URLSearchParams(window.location.search).get('studio') === '1';
+      const previewGoals = [{
+        id: 'preview-goals',
+        title: 'Bits reward ladder',
+        sourceType: 'bits',
+        currentAmount: 220,
+        unitLabel: 'bits',
+        progressPercent: 44,
+        nextRewardTitle: 'Eat an egg',
+        milestones: [
+          { id: 'preview-1', thresholdAmount: 100, rewardTitle: 'Eat a bean', status: 'completed' },
+          { id: 'preview-2', thresholdAmount: 500, rewardTitle: 'Eat an egg', status: 'locked' },
+          { id: 'preview-3', thresholdAmount: 1000, rewardTitle: 'Add a wheel segment', status: 'locked' },
+        ],
+      }];
+      function sourceLabel(sourceType) {
+        if (sourceType === 'subscriptions') return 'Subs';
+        if (sourceType === 'bits') return 'Bits';
+        if (sourceType === 'tips') return 'Tips';
+        return 'Support';
+      }
+      function formatAmount(value, unitLabel) {
+        const number = Number(value) || 0;
+        return `${Number.isInteger(number) ? number.toString() : number.toFixed(2)} ${unitLabel || 'points'}`;
+      }
+      function escapeText(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        }[char]));
+      }
+      function clamp(value, min, max) {
+        if (min > max) return Math.round((min + max) / 2);
+        return Math.round(Math.max(min, Math.min(max, value)));
+      }
+      function roundScale(value) {
+        return Math.max(0.1, Math.round(value * 100) / 100);
+      }
+      function clampCanvasTransform(transform) {
+        const canvas = document.querySelector('.canvas');
+        if (!canvas) return { x: 0, y: 0, scale: 1 };
+        const width = canvas.offsetWidth || 0;
+        const height = canvas.offsetHeight || 0;
+        const viewportWidth = window.innerWidth || width;
+        const viewportHeight = window.innerHeight || height;
+        if (!width || !height || !viewportWidth || !viewportHeight) {
+          return { x: Math.round(transform.x || 0), y: Math.round(transform.y || 0), scale: roundScale(transform.scale || 1) };
+        }
+        const requestedScale = Math.max(0.1, transform.scale || 1);
+        const scale = roundScale(Math.min(requestedScale, viewportWidth / width, viewportHeight / height));
+        const maxX = Math.max(0, (viewportWidth - width * scale) / 2);
+        const maxY = Math.max(0, (viewportHeight - height * scale) / 2);
+        return { x: clamp(transform.x || 0, -maxX, maxX), y: clamp(transform.y || 0, -maxY, maxY), scale };
+      }
+      function render(ladders) {
+        const card = document.getElementById('card');
+        const list = document.getElementById('list');
+        if (!ladders.length) {
+          card.classList.remove('visible');
+          list.innerHTML = '';
+          return;
+        }
+        card.classList.add('visible');
+        list.innerHTML = ladders.map((ladder) => `
+          <article class="ladder">
+            <div class="ladder-top">
+              <div>
+                <div class="ladder-kicker">${escapeText(sourceLabel(ladder.sourceType))}</div>
+                <div class="ladder-title">${escapeText(ladder.title)}</div>
+              </div>
+              <div class="amount">${escapeText(formatAmount(ladder.currentAmount, ladder.unitLabel))}</div>
+            </div>
+            <div class="progress"><span style="width:${Math.max(0, Math.min(100, Number(ladder.progressPercent) || 0))}%"></span></div>
+            <div class="milestones">
+              ${(Array.isArray(ladder.milestones) ? ladder.milestones : []).map((milestone) => `
+                <div class="milestone ${milestone.status === 'completed' ? 'completed' : milestone.status === 'skipped' ? 'skipped' : ''}">
+                  <span class="mark">${milestone.status === 'completed' ? '✓' : milestone.status === 'skipped' ? '–' : ''}</span>
+                  <div class="milestone-copy">
+                    <strong class="milestone-title">${escapeText(milestone.rewardTitle)}</strong>
+                    <small class="threshold">${escapeText(formatAmount(milestone.thresholdAmount, ladder.unitLabel))}</small>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <div class="next">${escapeText(ladder.nextRewardTitle ? `Next unlock: ${ladder.nextRewardTitle}` : 'All visible rewards unlocked')}</div>
+          </article>
+        `).join('');
+      }
+      async function refresh() {
+        try {
+          const response = await fetch('/api/state', { cache: 'no-store' });
+          if (!response.ok) return;
+          const payload = await response.json();
+          const liveGoals = Array.isArray(payload.goals) ? payload.goals : [];
+          const goals = isStudioPreview && liveGoals.length === 0 ? previewGoals : liveGoals;
+          render(goals);
+          const transform = isStudioPreview ? { x: 0, y: 0, scale: 1 } : (payload.goalsOverlayTransform || { x: 0, y: 0, scale: 1 });
+          const boundedTransform = clampCanvasTransform(transform);
+          document.documentElement.style.setProperty('--offset-x', `${boundedTransform.x}px`);
+          document.documentElement.style.setProperty('--offset-y', `${boundedTransform.y}px`);
+          document.documentElement.style.setProperty('--overlay-scale', String(boundedTransform.scale));
+        } catch (_) {}
+      }
+      refresh();
+      window.setInterval(refresh, 120);
+    </script>
+  </body>
+</html>"#
+}
+
+fn compact_overlay_html() -> &'static str {
+    r##"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Subathon Compact Overlay</title>
+    <style>
+      @font-face {
+        font-family: "Lexend";
+        src: url("/fonts/Lexend-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Lexend";
+        src: url("/fonts/Lexend-Bold.ttf") format("truetype");
+        font-weight: 700;
+        font-style: normal;
+      }
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        --font-display: "Lexend", "Trebuchet MS", "Segoe UI", sans-serif;
+        --font-mono: "JetBrains Mono", "Cascadia Mono", monospace;
+        --panel: rgba(8, 8, 10, 0.94);
+        --border: rgba(255,255,255,0.08);
+        --text: #f5f5f5;
+        --muted: #a1a1aa;
+        --accent: #22d3ee;
+        --panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+        --offset-x: 0px;
+        --offset-y: 0px;
+        --overlay-scale: 1;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        color: var(--text);
+      }
+      .canvas {
+        display: flex;
+        flex-direction: column;
+        width: min(560px, calc(100vw - 48px));
+        transform: translate(var(--offset-x), var(--offset-y)) scale(var(--overlay-scale));
+        transform-origin: center center;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .stage {
+        width: 100%;
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        padding: 18px 20px 16px;
+        border: 1px solid var(--border);
+        background:
+          linear-gradient(180deg, rgba(8, 8, 11, 0.92), rgba(8, 8, 11, 0.84)),
+          radial-gradient(circle at top, rgba(34, 211, 238, 0.08), transparent 52%);
+        box-shadow: var(--panel-shadow);
+        text-align: center;
+        backdrop-filter: blur(12px);
+      }
+      .kicker {
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .clock {
+        font-family: var(--font-mono);
+        font-size: clamp(50px, 8vw, 76px);
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: -0.05em;
+        margin: 4px 0;
+      }
+      .meta {
+        display: flex;
+        gap: 6px 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .rules {
+        width: 100%;
+        margin-top: 10px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 14px;
+      }
+      .rule {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+      }
+      .rule-copy {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .rule-marker {
+        display: inline-block;
+        flex-shrink: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        background: var(--accent);
+        box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+      }
+      .rule-marker--diamond { width: 9px; height: 9px; border-radius: 2px; transform: rotate(45deg); }
+      .rule-marker--pill { width: 14px; height: 8px; border-radius: 999px; }
+      .rule-marker--blue { background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%); box-shadow: 0 0 12px rgba(59,130,246,0.38); }
+      .rule-marker--mint { background: linear-gradient(180deg, #5eead4 0%, #14b8a6 100%); box-shadow: 0 0 12px rgba(45,212,191,0.34); }
+      .rule-marker--green { background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%); box-shadow: 0 0 12px rgba(74,222,128,0.34); }
+      .rule-marker--cyan { background: linear-gradient(180deg, #67e8f9 0%, #06b6d4 100%); box-shadow: 0 0 12px rgba(34,211,238,0.38); }
+      .rule-marker--lime { background: linear-gradient(180deg, #bef264 0%, #22c55e 100%); box-shadow: 0 0 12px rgba(132,204,22,0.34); }
+      .rule strong { color: var(--accent); }
+      .chart {
+        width: 100%;
+        margin-top: 2px;
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        background: rgba(34, 211, 238, 0.035);
+      }
+      .chart-viewport { position: relative; width: 100%; overflow: visible; }
+      .graph-icon {
+        position: absolute;
+        left: 100%;
+        width: 44px;
+        height: auto;
+        pointer-events: none;
+        user-select: none;
+        transform: translate(-46%, -50%);
+      }
+      svg { width: 100%; height: 88px; display: block; }
+      .grid { stroke: rgba(255,255,255,0.06); stroke-width: 1; fill: none; }
+      .area { opacity: 0.95; }
+      .line { stroke: var(--accent); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+      /* App theme */
+      body[data-theme="app"] .canvas { width: min(520px, calc(100vw - 48px)); }
+      body[data-theme="app"] .stage {
+        gap: 14px;
+        padding: 26px 22px 22px;
+        border-color: rgba(84, 130, 255, 0.16);
+        border-radius: 20px;
+        background:
+          linear-gradient(180deg, rgba(6, 14, 32, 0.96) 0%, rgba(3, 8, 24, 0.94) 100%),
+          radial-gradient(circle at top center, rgba(44, 117, 255, 0.22) 0%, rgba(44, 117, 255, 0.04) 54%, transparent 72%);
+        box-shadow: 0 18px 44px rgba(1, 6, 20, 0.52);
+      }
+      body[data-theme="app"] .kicker { font-size: 12px; letter-spacing: 0.16em; color: #dbe7ff; }
+      body[data-theme="app"] .meta { display: none; }
+      body[data-theme="app"] .clock { font-family: var(--font-display); font-size: clamp(68px, 9vw, 96px); color: #f8fbff; text-shadow: 0 0 22px rgba(93,176,255,0.18); }
+      body[data-theme="app"] .rules { width: min(100%, 330px); margin-top: 2px; grid-template-columns: 1fr; gap: 10px; }
+      body[data-theme="app"] .rule { padding-bottom: 0; border-bottom: none; font-size: 18px; color: #d8e5ff; }
+      body[data-theme="app"] .rule strong { color: #f8fbff; font-size: 17px; }
+      body[data-theme="app"] .rule--tone-blue .rule-copy { color: #6eb7ff; }
+      body[data-theme="app"] .rule--tone-mint .rule-copy { color: #65efd4; }
+      body[data-theme="app"] .rule--tone-green .rule-copy { color: #5ce488; }
+      body[data-theme="app"] .rule--tone-cyan .rule-copy { color: #69e6ff; }
+      body[data-theme="app"] .rule--tone-lime .rule-copy { color: #a7f36b; }
+      body[data-theme="app"] .chart { margin-top: 4px; padding: 14px 14px 10px; border-radius: 14px; border-color: rgba(94,125,255,0.2); background: linear-gradient(180deg, rgba(10,24,48,0.88) 0%, rgba(6,14,28,0.92) 100%), radial-gradient(circle at top, rgba(34,211,238,0.08), transparent 70%); }
+      body[data-theme="app"] svg { height: 214px; }
+      body[data-theme="app"] .graph-icon { width: 68px; transform: translate(-38%, -44%); }
+      body[data-theme="app"] .grid { stroke: rgba(173,203,255,0.14); }
+      body[data-theme="app"] .line { stroke: #00c8ff; stroke-width: 3; }
+
+      /* Original theme */
+      body[data-theme="original"] .canvas { width: min(520px, calc(100vw - 40px)); }
+      body[data-theme="original"] .stage { gap: 10px; padding: 22px 20px 18px; border-color: rgba(255,255,255,0.08); border-radius: 20px; background: linear-gradient(180deg, rgba(9,9,12,0.7) 0%, rgba(9,9,12,0.38) 100%), radial-gradient(circle at top center, rgba(255,255,255,0.05), transparent 70%); box-shadow: 0 16px 38px rgba(0,0,0,0.28); backdrop-filter: blur(10px); }
+      body[data-theme="original"] .kicker { display: none; }
+      body[data-theme="original"] .clock { font-family: var(--font-display); font-size: clamp(68px, 9.2vw, 104px); font-weight: 700; color: #ffffff; }
+      body[data-theme="original"] .meta { gap: 0; font-size: clamp(15px, 1.9vw, 22px); color: #cfcfcf; }
+      body[data-theme="original"] .rules { width: 100%; margin-top: 4px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+      body[data-theme="original"] .rule { justify-content: space-between; gap: 6px; padding-bottom: 0; border-bottom: none; font-size: clamp(15px, 1.7vw, 18px); color: #ffffff; }
+      body[data-theme="original"] .rule strong { color: #ffffff; }
+      body[data-theme="original"] .chart { margin-top: 4px; padding: 8px 12px 2px; border: none; background: transparent; }
+      body[data-theme="original"] svg { height: 112px; }
+      body[data-theme="original"] .graph-icon { width: 52px; transform: translate(-48%, -50%); }
+      body[data-theme="original"] .grid { display: none; }
+      body[data-theme="original"] .line { stroke: #ffffff; stroke-width: 5; }
+
+      /* When goals are visible, flatten the stage bottom so it connects to the strip */
+      body.has-goals .stage { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; }
+      body[data-theme="app"].has-goals .stage { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+      body[data-theme="original"].has-goals .stage { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+      /* Goals section */
+      .goals-strip {
+        display: none;
+        flex-direction: column;
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 16px 16px;
+        background: rgba(8, 8, 11, 0.9);
+        backdrop-filter: blur(12px);
+        padding: 14px 16px 16px;
+      }
+      .goals-strip.visible { display: flex; }
+      body[data-theme="app"] .goals-strip { border-color: rgba(84, 130, 255, 0.16); border-radius: 0 0 20px 20px; background: linear-gradient(180deg, rgba(4, 10, 24, 0.98) 0%, rgba(3, 7, 18, 0.98) 100%); }
+      body[data-theme="original"] .goals-strip { border-color: rgba(255,255,255,0.08); border-radius: 0 0 20px 20px; background: rgba(9, 9, 12, 0.7); }
+
+      .goals-section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+      .goals-eyebrow { color: #67e8f9; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
+      .goals-heading { color: #f8fafc; font-size: 1.35rem; font-weight: 950; letter-spacing: -0.04em; line-height: 1; }
+      .goals-list { display: grid; gap: 10px; }
+
+      .goal-ladder {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border: 1px solid rgba(34, 211, 238, 0.2);
+        border-radius: 10px;
+        background: rgba(2, 6, 12, 0.42);
+      }
+      .goal-ladder-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .goal-ladder-top > div { display: grid; gap: 3px; min-width: 0; }
+      .goal-kicker { color: #67e8f9; font-size: 0.68rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+      .goal-ladder-title { color: #f8fafc; font-size: 1.1rem; font-weight: 900; letter-spacing: -0.035em; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .goal-ladder-amount { flex-shrink: 0; color: #bef264; font-size: 1.05rem; font-weight: 950; font-style: normal; letter-spacing: -0.04em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+      .goal-bar { height: 10px; overflow: hidden; border: 1px solid rgba(103,232,249,0.2); border-radius: 6px; background: rgba(255,255,255,0.06); }
+      .goal-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #22d3ee, #67e8f9); box-shadow: 0 0 16px rgba(34,211,238,0.3); transition: width 600ms ease; }
+
+      .goal-milestones { display: grid; gap: 6px; }
+      .goal-milestone {
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        padding: 8px 10px 8px 8px;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 7px;
+        background: rgba(255,255,255,0.035);
+      }
+      .goal-milestone--completed { border-color: rgba(190,242,100,0.36); background: rgba(190,242,100,0.11); }
+      .goal-milestone--skipped { opacity: 0.55; }
+      .goal-milestone-mark {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1px solid rgba(103,232,249,0.3);
+        color: #67e8f9;
+        font-size: 0.72rem;
+        font-weight: 950;
+      }
+      .goal-milestone--completed .goal-milestone-mark { border-color: rgba(190,242,100,0.5); color: #bef264; }
+      .goal-milestone-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+      .goal-milestone-title { color: #f8fafc; font-size: 0.88rem; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .goal-milestone-threshold { flex-shrink: 0; color: #cbd5e1; font-size: 0.76rem; font-weight: 800; white-space: nowrap; }
+
+      .goal-ladder-next {
+        padding: 8px 12px;
+        border: 1px solid rgba(34,211,238,0.18);
+        border-radius: 999px;
+        background: rgba(34,211,238,0.07);
+        color: #cffafe;
+        font-size: 0.8rem;
+        font-weight: 800;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <div class="stage">
+        <div class="kicker">Stream Uptime</div>
+        <div class="clock" id="clock">00:00:00</div>
+        <div class="meta" id="meta">Uptime 00:00:00 · paused</div>
+        <div class="rules" id="rules"></div>
+        <div class="chart">
+          <div class="chart-viewport">
+            <svg viewBox="0 0 520 120" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="area-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#1ac9ff" stop-opacity="0.42"></stop>
+                  <stop offset="100%" stop-color="#1ac9ff" stop-opacity="0.04"></stop>
+                </linearGradient>
+              </defs>
+              <path class="grid" d="M 10 20 L 510 20 M 10 60 L 510 60 M 10 100 L 510 100"></path>
+              <path class="area" id="area" fill="url(#area-fill)"></path>
+              <path class="line" id="line"></path>
+            </svg>
+            <img class="graph-icon" id="graph-icon" src="/assets/graph_icon.gif" alt="" />
+          </div>
+        </div>
+      </div>
+      <div class="goals-strip" id="goals-strip">
+        <div id="goal-list"></div>
+      </div>
+    </div>
+    <script>
+      document.body.dataset.theme = 'app';
+    </script>
+    <script>
+      const isStudioPreview = new URLSearchParams(window.location.search).get('studio') === '1';
+      const previewGoals = [{
+        id: 'preview-compact',
+        title: 'Bits reward ladder',
+        sourceType: 'bits',
+        currentAmount: 420,
+        unitLabel: 'bits',
+        progressPercent: 42,
+        nextRewardTitle: 'Spin the wheel',
+        milestones: [
+          { id: 'p1', thresholdAmount: 100, rewardTitle: 'Eat a bean', status: 'completed' },
+          { id: 'p2', thresholdAmount: 500, rewardTitle: 'Spin the wheel', status: 'locked' },
+          { id: 'p3', thresholdAmount: 1000, rewardTitle: 'Chat picks next game', status: 'locked' },
+        ],
+      }];
+      function formatDuration(totalSeconds) {
+        const safe = Math.max(0, Math.floor(totalSeconds));
+        const hours = Math.floor(safe / 3600);
+        const minutes = Math.floor((safe % 3600) / 60);
+        const seconds = safe % 60;
+        return [hours, minutes, seconds].map((v) => String(v).padStart(2, '0')).join(':');
+      }
+      function buildLinePath(points, width, height, padding) {
+        if (!points.length) return '';
+        const min = Math.min(...points);
+        const max = Math.max(...points);
+        const usableWidth = width - padding * 2;
+        const usableHeight = height - padding * 2;
+        return points.map((point, index) => {
+          const normalized = max === min ? 0.5 : (point - min) / (max - min);
+          const x = padding + (usableWidth * index) / Math.max(points.length - 1, 1);
+          const y = padding + (1 - normalized) * usableHeight;
+          return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+        }).join(' ');
+      }
+      function buildAreaPath(points, width, height, padding) {
+        if (!points.length) return '';
+        const min = Math.min(...points);
+        const max = Math.max(...points);
+        const usableWidth = width - padding * 2;
+        const usableHeight = height - padding * 2;
+        const baselineY = height - padding;
+        const pathPoints = points.map((point, index) => {
+          const normalized = max === min ? 0.5 : (point - min) / (max - min);
+          const x = padding + (usableWidth * index) / Math.max(points.length - 1, 1);
+          const y = padding + (1 - normalized) * usableHeight;
+          return { x, y };
+        });
+        const firstPoint = pathPoints[0];
+        const lastPoint = pathPoints[pathPoints.length - 1];
+        const line = pathPoints.map((point) => `L ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+        return `M ${firstPoint.x.toFixed(2)} ${baselineY.toFixed(2)} ${line} L ${lastPoint.x.toFixed(2)} ${baselineY.toFixed(2)} Z`;
+      }
+      function getLastPointTop(points, height, padding) {
+        if (!points.length) return null;
+        const min = Math.min(...points);
+        const max = Math.max(...points);
+        const usableHeight = height - padding * 2;
+        const normalized = max === min ? 0.5 : (points[points.length - 1] - min) / (max - min);
+        const y = padding + (1 - normalized) * usableHeight;
+        return (y / height) * 100;
+      }
+      function renderRules(rules) {
+        const root = document.getElementById('rules');
+        root.innerHTML = '';
+        rules.slice(0, 6).forEach((rule) => {
+          const row = document.createElement('div');
+          row.className = `rule${rule.markerTone ? ` rule--tone-${rule.markerTone}` : ''}`;
+          const marker = rule.markerShape
+            ? `<span class="rule-marker rule-marker--${rule.markerShape}${rule.markerTone ? ` rule-marker--${rule.markerTone}` : ''}"></span>`
+            : '';
+          row.innerHTML = `<span class="rule-copy">${marker}<span>${rule.label}</span></span><strong>${rule.value}</strong>`;
+          root.appendChild(row);
+        });
+      }
+      function sourceLabel(sourceType) {
+        if (sourceType === 'subscriptions') return 'Subs';
+        if (sourceType === 'bits') return 'Bits';
+        if (sourceType === 'tips') return 'Tips';
+        if (sourceType === 'channel-points') return 'Points';
+        if (sourceType === 'charity') return 'Charity';
+        return 'Goals';
+      }
+      function formatAmount(value, unitLabel) {
+        const number = Number(value) || 0;
+        return `${Number.isInteger(number) ? number.toString() : number.toFixed(2)} ${unitLabel || 'pts'}`;
+      }
+      function escapeText(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+      }
+      function renderMilestoneMark(status) {
+        if (status === 'completed') return '✓';
+        if (status === 'skipped') return '–';
+        return '';
+      }
+      function renderGoals(ladders) {
+        const strip = document.getElementById('goals-strip');
+        const list = document.getElementById('goal-list');
+        if (!ladders.length) {
+          strip.classList.remove('visible');
+          document.body.classList.remove('has-goals');
+          list.innerHTML = '';
+          return;
+        }
+        strip.classList.add('visible');
+        document.body.classList.add('has-goals');
+        list.innerHTML = `
+          <div class="goals-section-header">
+            <span class="goals-eyebrow">Subathon goals</span>
+            <strong class="goals-heading">Reward ladder</strong>
+          </div>
+          <div class="goals-list">${ladders.map((ladder) => `
+            <article class="goal-ladder">
+              <div class="goal-ladder-top">
+                <div>
+                  <span class="goal-kicker">${escapeText(sourceLabel(ladder.sourceType))}</span>
+                  <strong class="goal-ladder-title">${escapeText(ladder.title)}</strong>
+                </div>
+                <em class="goal-ladder-amount">${escapeText(formatAmount(ladder.currentAmount, ladder.unitLabel))}</em>
+              </div>
+              <div class="goal-bar"><span style="width:${Math.max(0, Math.min(100, Number(ladder.progressPercent) || 0))}%"></span></div>
+              <div class="goal-milestones">${(Array.isArray(ladder.milestones) ? ladder.milestones : []).map((m) => {
+                const status = m.status || 'locked';
+                return `<div class="goal-milestone goal-milestone--${escapeText(status)}">
+                  <span class="goal-milestone-mark">${renderMilestoneMark(status)}</span>
+                  <div class="goal-milestone-copy">
+                    <strong class="goal-milestone-title">${escapeText(m.rewardTitle || '')}</strong>
+                    <small class="goal-milestone-threshold">${escapeText(formatAmount(m.thresholdAmount, ladder.unitLabel))}</small>
+                  </div>
+                </div>`;
+              }).join('')}</div>
+              <div class="goal-ladder-next">${escapeText(ladder.nextRewardTitle ? `Next unlock: ${ladder.nextRewardTitle}` : 'All visible rewards unlocked')}</div>
+            </article>
+          `).join('')}</div>
+        `;
+      }
+      function clamp(value, min, max) {
+        if (min > max) return Math.round((min + max) / 2);
+        return Math.round(Math.max(min, Math.min(max, value)));
+      }
+      function roundScale(value) {
+        return Math.max(0.1, Math.round(value * 100) / 100);
+      }
+      function clampCanvasTransform(transform) {
+        const canvas = document.querySelector('.canvas');
+        if (!canvas) return { x: 0, y: 0, scale: 1 };
+        const width = canvas.offsetWidth || 0;
+        const height = canvas.offsetHeight || 0;
+        const viewportWidth = window.innerWidth || width;
+        const viewportHeight = window.innerHeight || height;
+        if (!width || !height || !viewportWidth || !viewportHeight) {
+          return { x: Math.round(transform.x || 0), y: Math.round(transform.y || 0), scale: roundScale(transform.scale || 1) };
+        }
+        const requestedScale = Math.max(0.1, transform.scale || 1);
+        const scale = roundScale(Math.min(requestedScale, viewportWidth / width, viewportHeight / height));
+        const maxX = Math.max(0, (viewportWidth - width * scale) / 2);
+        const maxY = Math.max(0, (viewportHeight - height * scale) / 2);
+        return { x: clamp(transform.x || 0, -maxX, maxX), y: clamp(transform.y || 0, -maxY, maxY), scale };
+      }
+      async function refresh() {
+        try {
+          const response = await fetch('/api/state', { cache: 'no-store' });
+          if (!response.ok) return;
+          const payload = await response.json();
+          const theme = payload.timerTheme || 'app';
+          const points = payload.graphPoints || [];
+          const transform = payload.compactOverlayTransform || { x: 0, y: 0, scale: 1 };
+          const liveGoals = Array.isArray(payload.goals) ? payload.goals : [];
+          const goals = isStudioPreview && liveGoals.length === 0 ? previewGoals : liveGoals;
+          document.body.dataset.theme = theme;
+          document.getElementById('clock').textContent = formatDuration(payload.timerSeconds);
+          document.getElementById('meta').textContent =
+            theme === 'original'
+              ? `Uptime ${formatDuration(payload.uptimeSeconds)}`
+              : `Uptime ${formatDuration(payload.uptimeSeconds)} · ${payload.timerStatus}`;
+          renderRules(payload.incentiveRules || []);
+          renderGoals(goals);
+          document.getElementById('line').setAttribute('d', buildLinePath(points, 520, 120, 10));
+          document.getElementById('area').setAttribute('d', theme === 'app' ? buildAreaPath(points, 520, 120, 10) : '');
+          const graphIcon = document.getElementById('graph-icon');
+          const iconTop = getLastPointTop(points, 120, 10);
+          graphIcon.style.display = iconTop == null ? 'none' : 'block';
+          if (iconTop != null) graphIcon.style.top = `${iconTop}%`;
+          const boundedTransform = isStudioPreview ? { x: 0, y: 0, scale: 1 } : clampCanvasTransform(transform);
+          document.documentElement.style.setProperty('--offset-x', `${boundedTransform.x}px`);
+          document.documentElement.style.setProperty('--offset-y', `${boundedTransform.y}px`);
+          document.documentElement.style.setProperty('--overlay-scale', String(boundedTransform.scale));
+        } catch (_) {}
+      }
+      refresh();
+      window.setInterval(refresh, 80);
+    </script>
+  </body>
+</html>"##
+}
+
 fn handle_streamlabs_auth_callback(
     query: &str,
     streamlabs_auth: Arc<Mutex<StreamlabsAuthRuntime>>,
@@ -2383,6 +3220,16 @@ fn try_handle_connection(
             "HTTP/1.1 200 OK",
             "text/html; charset=utf-8",
             wheel_overlay_html(),
+        ),
+        "/overlay/goals" => format_http_response(
+            "HTTP/1.1 200 OK",
+            "text/html; charset=utf-8",
+            goals_overlay_html(),
+        ),
+        "/overlay/compact" => format_http_response(
+            "HTTP/1.1 200 OK",
+            "text/html; charset=utf-8",
+            compact_overlay_html(),
         ),
         "/auth/streamlabs/callback" => handle_streamlabs_auth_callback(query, streamlabs_auth),
         _ => format_http_response(

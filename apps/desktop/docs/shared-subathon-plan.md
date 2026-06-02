@@ -750,6 +750,7 @@ Completion notes:
 - connected desktops receive the same shared wheel spin and reveal state through the shared-session socket
 - non-timeout shared wheel results auto-complete on the service after the reveal window
 - timeout outcomes are finalized by the participant whose broadcaster session triggered the wheel, which keeps moderation calls on the correct channel context
+- timeout outcomes now respect the desktop wheel timeout blacklist, exclude blacklisted logins from random targeting, and temporarily de-mod moderator targets before timing them out; moderator restore is scheduled in-process and is lost if the desktop app exits mid-timeout
 - the `Shared Session` page now renders the shared wheel surface and exposes the timeout apply action only on the owning participant desktop
 
 ### Phase 6: Hardening

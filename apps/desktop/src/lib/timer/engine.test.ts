@@ -138,7 +138,7 @@ describe('timer runtime helpers', () => {
   it('rehydrates a running timer session from the persisted anchor', () => {
     const now = 20_000
     const snapshot: NativeAppSnapshot = {
-      version: 6 as const,
+      version: 7 as const,
       settings: {
         defaultTimerSeconds: 21_600,
         commandPermissions: {
@@ -162,6 +162,10 @@ describe('timer runtime helpers', () => {
         runningSince: 10_000,
         lastAppliedDeltaSeconds: 0,
         events: [],
+      },
+      goals: {
+        ladders: [],
+        history: [],
       },
     }
 

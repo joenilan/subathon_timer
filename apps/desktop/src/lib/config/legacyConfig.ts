@@ -4,6 +4,7 @@ import type { WheelSegment } from '../wheel/types'
 export interface LegacyConfigImportResult {
   rules: ReturnType<typeof normalizeTimerRuleConfig>
   wheelSegments: WheelSegment[]
+  wheelBlacklist: string
 }
 
 function asRecord(value: unknown) {
@@ -20,6 +21,14 @@ function asString(value: unknown, fallback = '') {
 
 function asNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function normalizeBlacklist(value: unknown) {
+  const entries = Array.isArray(value) ? value : asString(value).split(',')
+  return entries
+    .map((entry) => asString(entry).trim().replace(/^@/, '').toLowerCase())
+    .filter((entry, index, all) => entry.length > 0 && all.indexOf(entry) === index)
+    .join(', ')
 }
 
 function percentString(value: number) {
@@ -62,6 +71,8 @@ export function importLegacyConfig(raw: string): LegacyConfigImportResult {
     raidUnitSeconds: 60,
   })
 
+  const wheelConfig = asRecord(root.wheel)
+  const wheelBlacklist = normalizeBlacklist(wheelConfig?.blacklist ?? root.blacklist)
   const wheel = Array.isArray(root.wheel) ? root.wheel : []
   const wheelSegments: WheelSegment[] = []
 
@@ -122,5 +133,6 @@ export function importLegacyConfig(raw: string): LegacyConfigImportResult {
   return {
     rules,
     wheelSegments,
+    wheelBlacklist,
   }
 }

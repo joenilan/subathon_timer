@@ -5,6 +5,7 @@ import type { TimerRuleConfig, TimerWidgetTheme } from '../timer/types'
 import type { TimerActivityEntry, TimerStatus } from '../../state/useAppStore'
 import type { OverlayTransform } from './overlayTransform'
 import type { WheelSegment, WheelSpinState } from '../wheel/types'
+import type { GoalOverlayLadder } from '../goals/overlay'
 
 interface BootstrapState {
   overlayBaseUrl: string | null
@@ -22,6 +23,8 @@ interface SyncOverlayPayload {
   timerOverlayTransform: OverlayTransform
   reasonOverlayTransform: OverlayTransform
   wheelOverlayTransform: OverlayTransform
+  goalsOverlayTransform: OverlayTransform
+  compactOverlayTransform: OverlayTransform
   wheelSegments: WheelSegment[]
   wheelSpin: WheelSpinState
   wheelResultDisplaySeconds: number
@@ -39,6 +42,7 @@ interface SyncOverlayPayload {
     delta: string
     tone: string
   }
+  goals: GoalOverlayLadder[]
 }
 
 export async function getOverlayBootstrapState() {

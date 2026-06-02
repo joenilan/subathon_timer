@@ -6,6 +6,7 @@ describe('importLegacyConfig', () => {
     const result = importLegacyConfig(JSON.stringify({
       channel: 'old_channel',
       admins: ['mod1'],
+      blacklist: ['Alice', '@bob', 'alice'],
       time: {
         base_value: 90,
         multipliers: {
@@ -45,5 +46,6 @@ describe('importLegacyConfig', () => {
     expect(result.wheelSegments).toHaveLength(2)
     expect(result.wheelSegments[0].timeDeltaSeconds).toBe(120)
     expect(result.wheelSegments[1].timeoutTarget).toBe('random')
+    expect(result.wheelBlacklist).toBe('alice, bob')
   })
 })

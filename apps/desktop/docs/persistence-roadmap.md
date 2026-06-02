@@ -125,11 +125,13 @@ Delivered:
 - Legacy config import now keeps the parts that still drive the desktop app:
   - timer rules
   - wheel segments
-- Legacy channel, admin, blacklist, provider, and wheel-enable fields are intentionally ignored.
+  - wheel timeout blacklist
+- Legacy channel, admin, provider, and wheel-enable fields are intentionally ignored.
 
 Post-phase schema updates:
 - Native snapshot settings now also persist chat timer command permissions.
 - Native snapshot settings now also persist the overlay LAN-access toggle used for dual-PC OBS setups.
+- Native snapshot settings now also persist the comma-separated wheel timeout blacklist as normalized login entries.
 - Browser dev and Tauri/native snapshot loading both normalize missing command-permission settings back to safe defaults.
 
 ## Current Order Of Work

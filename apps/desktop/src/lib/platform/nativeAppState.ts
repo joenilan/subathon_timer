@@ -3,6 +3,7 @@ import type { TimerRuleConfig } from '../timer/types'
 import type { WheelSegment } from '../wheel/types'
 import type { TimerCommandPermissionConfig } from '../timer/types'
 import { normalizeTimerCommandPermissionConfig } from '../twitch/timerCommandPermissions'
+import type { GoalsSnapshot } from '../goals/types'
 
 const BROWSER_NATIVE_SNAPSHOT_KEY = 'fdgt.app.native.state'
 const FALLBACK_DEFAULT_TIMER_SECONDS = 6 * 60 * 60
@@ -26,6 +27,7 @@ export interface NativeAppSettingsSnapshot {
   defaultTimerSeconds: number
   commandPermissions: TimerCommandPermissionConfig
   overlayLanAccessEnabled: boolean
+  wheelBlacklist?: string[]
 }
 
 export interface NativeTimerSessionSnapshot {
@@ -38,11 +40,12 @@ export interface NativeTimerSessionSnapshot {
 }
 
 export interface NativeAppSnapshot {
-  version: 6
+  version: 7
   settings: NativeAppSettingsSnapshot
   ruleConfig: TimerRuleConfig
   wheelSegments: WheelSegment[]
   timerSession: NativeTimerSessionSnapshot
+  goals: GoalsSnapshot
 }
 
 export interface NativeAppSnapshotInput {
@@ -51,12 +54,14 @@ export interface NativeAppSnapshotInput {
   overlayLanAccessEnabled: boolean
   ruleConfig: TimerRuleConfig
   wheelSegments: WheelSegment[]
+  wheelBlacklist: string
   timerStatus: NativeTimerStatus
   timerSessionBaseRemainingSeconds: number
   timerSessionBaseUptimeSeconds: number
   timerSessionRunningSince: number | null
   lastAppliedDeltaSeconds: number
   timerEvents: NativeTimerEventEntry[]
+  goals: GoalsSnapshot
 }
 
 interface LegacyNativeTimerSessionSnapshot {
@@ -128,6 +133,22 @@ interface LegacyNativeAppSnapshotV5 {
   timerSession: NativeTimerSessionSnapshot
 }
 
+interface LegacyNativeAppSnapshotV6 {
+  version: 6
+  settings: NativeAppSettingsSnapshot
+  ruleConfig: TimerRuleConfig
+  wheelSegments: WheelSegment[]
+  timerSession: NativeTimerSessionSnapshot
+}
+
+function getEmptyGoalsSnapshot(): GoalsSnapshot {
+  return {
+    ladders: [],
+    history: [],
+    announceGoalCompletionsInChat: false,
+  }
+}
+
 function isNativeRuntime() {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
@@ -145,6 +166,7 @@ function parseBrowserSnapshot(raw: string | null) {
       | LegacyNativeAppSnapshotV3
       | LegacyNativeAppSnapshotV4
       | LegacyNativeAppSnapshotV5
+      | LegacyNativeAppSnapshotV6
     return normalizeLoadedSnapshot(parsed)
   } catch {
     return null
@@ -184,6 +206,13 @@ function normalizeDefaultTimerSeconds(
 
 function normalizeOverlayLanAccessEnabled(value: boolean | undefined) {
   return value === true
+}
+
+function normalizeWheelBlacklist(value: string | string[] | undefined) {
+  const entries = Array.isArray(value) ? value : String(value ?? '').split(',')
+  return entries
+    .map((entry) => entry.trim().replace(/^@/, '').toLowerCase())
+    .filter((entry, index, all) => entry.length > 0 && all.indexOf(entry) === index)
 }
 
 function shouldRepairLegacySyncedDefault(
@@ -236,6 +265,7 @@ function normalizeLoadedSnapshot(
     | LegacyNativeAppSnapshotV3
     | LegacyNativeAppSnapshotV4
     | LegacyNativeAppSnapshotV5
+    | LegacyNativeAppSnapshotV6
     | null
     | undefined,
 ) {
@@ -243,7 +273,7 @@ function normalizeLoadedSnapshot(
     return null
   }
 
-  if (snapshot.version === 6) {
+  if (snapshot.version === 7 || snapshot.version === 6) {
     const timerSession = {
       timerStatus: snapshot.timerSession.timerStatus,
       baseRemainingSeconds: Math.max(0, Math.round(snapshot.timerSession.baseRemainingSeconds)),
@@ -258,29 +288,32 @@ function normalizeLoadedSnapshot(
     const defaultTimerSeconds = normalizeDefaultTimerSeconds(snapshot.settings.defaultTimerSeconds)
 
     return {
-      version: 6,
+      version: 7,
       settings: {
         defaultTimerSeconds: shouldRepairLegacySyncedDefault(defaultTimerSeconds, timerSession)
           ? FALLBACK_DEFAULT_TIMER_SECONDS
           : defaultTimerSeconds,
         commandPermissions: normalizeTimerCommandPermissionConfig(snapshot.settings.commandPermissions),
         overlayLanAccessEnabled: normalizeOverlayLanAccessEnabled(snapshot.settings.overlayLanAccessEnabled),
+        wheelBlacklist: normalizeWheelBlacklist(snapshot.settings.wheelBlacklist),
       },
       ruleConfig: snapshot.ruleConfig,
       wheelSegments: snapshot.wheelSegments,
       timerSession,
+      goals: snapshot.version === 7 ? snapshot.goals : getEmptyGoalsSnapshot(),
     } satisfies NativeAppSnapshot
   }
 
   if (snapshot.version === 3) {
     return {
-      version: 6,
+      version: 7,
       settings: {
         defaultTimerSeconds: normalizeDefaultTimerSeconds(snapshot.settings.defaultTimerSeconds, {
           repairLegacyOddSeconds: true,
         }),
         commandPermissions: normalizeTimerCommandPermissionConfig(undefined),
         overlayLanAccessEnabled: false,
+        wheelBlacklist: normalizeWheelBlacklist(undefined),
       },
       ruleConfig: snapshot.ruleConfig,
       wheelSegments: snapshot.wheelSegments,
@@ -295,18 +328,20 @@ function normalizeLoadedSnapshot(
         lastAppliedDeltaSeconds: Math.round(snapshot.timerSession.lastAppliedDeltaSeconds),
         events: normalizeTimerEventHistory(snapshot.timerSession.events),
       },
+      goals: getEmptyGoalsSnapshot(),
     } satisfies NativeAppSnapshot
   }
 
   if (snapshot.version === 2) {
     return {
-      version: 6,
+      version: 7,
       settings: {
         defaultTimerSeconds: normalizeDefaultTimerSeconds(snapshot.settings.defaultTimerSeconds, {
           repairLegacyOddSeconds: true,
         }),
         commandPermissions: normalizeTimerCommandPermissionConfig(undefined),
         overlayLanAccessEnabled: false,
+        wheelBlacklist: normalizeWheelBlacklist(snapshot.settings.wheelBlacklist),
       },
       ruleConfig: snapshot.ruleConfig,
       wheelSegments: snapshot.wheelSegments,
@@ -321,18 +356,20 @@ function normalizeLoadedSnapshot(
         lastAppliedDeltaSeconds: Math.round(snapshot.timerSession.lastAppliedDeltaSeconds),
         events: normalizeTimerEventHistory(snapshot.timerSession.events),
       },
+      goals: getEmptyGoalsSnapshot(),
     } satisfies NativeAppSnapshot
   }
 
   if (snapshot.version === 4) {
     return {
-      version: 6,
+      version: 7,
       settings: {
         defaultTimerSeconds: normalizeDefaultTimerSeconds(snapshot.settings.defaultTimerSeconds, {
           repairLegacyOddSeconds: true,
         }),
         commandPermissions: normalizeTimerCommandPermissionConfig(undefined),
         overlayLanAccessEnabled: false,
+        wheelBlacklist: normalizeWheelBlacklist(undefined),
       },
       ruleConfig: snapshot.ruleConfig,
       wheelSegments: snapshot.wheelSegments,
@@ -347,18 +384,20 @@ function normalizeLoadedSnapshot(
         lastAppliedDeltaSeconds: Math.round(snapshot.timerSession.lastAppliedDeltaSeconds),
         events: normalizeTimerEventHistory(snapshot.timerSession.events),
       },
+      goals: getEmptyGoalsSnapshot(),
     } satisfies NativeAppSnapshot
   }
 
   if (snapshot.version === 5) {
     return {
-      version: 6,
+      version: 7,
       settings: {
         defaultTimerSeconds: normalizeDefaultTimerSeconds(snapshot.settings.defaultTimerSeconds, {
           repairLegacyOddSeconds: true,
         }),
         commandPermissions: normalizeTimerCommandPermissionConfig(snapshot.settings.commandPermissions),
         overlayLanAccessEnabled: false,
+        wheelBlacklist: normalizeWheelBlacklist(undefined),
       },
       ruleConfig: snapshot.ruleConfig,
       wheelSegments: snapshot.wheelSegments,
@@ -373,6 +412,7 @@ function normalizeLoadedSnapshot(
         lastAppliedDeltaSeconds: Math.round(snapshot.timerSession.lastAppliedDeltaSeconds),
         events: normalizeTimerEventHistory(snapshot.timerSession.events),
       },
+      goals: getEmptyGoalsSnapshot(),
     } satisfies NativeAppSnapshot
   }
 
@@ -381,11 +421,12 @@ function normalizeLoadedSnapshot(
   })
 
   return {
-    version: 6,
+    version: 7,
     settings: {
       defaultTimerSeconds,
       commandPermissions: normalizeTimerCommandPermissionConfig(undefined),
       overlayLanAccessEnabled: false,
+      wheelBlacklist: normalizeWheelBlacklist(snapshot.settings.wheelBlacklist),
     },
     ruleConfig: snapshot.ruleConfig,
     wheelSegments: snapshot.wheelSegments,
@@ -400,6 +441,7 @@ function normalizeLoadedSnapshot(
       lastAppliedDeltaSeconds: Math.round(snapshot.timerSession.lastAppliedDeltaSeconds),
       events: migrateLegacyActivityToEvents(defaultTimerSeconds, snapshot.timerSession.activity),
     },
+    goals: getEmptyGoalsSnapshot(),
   } satisfies NativeAppSnapshot
 }
 
@@ -415,6 +457,7 @@ export async function loadNativeAppSnapshot() {
       | LegacyNativeAppSnapshotV3
       | LegacyNativeAppSnapshotV4
       | LegacyNativeAppSnapshotV5
+      | LegacyNativeAppSnapshotV6
       | null
   >(
     'load_native_app_state',
@@ -433,11 +476,12 @@ export async function saveNativeAppSnapshot(snapshot: NativeAppSnapshot) {
 
 export function buildNativeAppSnapshot(input: NativeAppSnapshotInput): NativeAppSnapshot {
   return {
-    version: 6,
+    version: 7,
     settings: {
       defaultTimerSeconds: input.defaultTimerSeconds,
       commandPermissions: normalizeTimerCommandPermissionConfig(input.commandPermissions),
       overlayLanAccessEnabled: normalizeOverlayLanAccessEnabled(input.overlayLanAccessEnabled),
+      wheelBlacklist: normalizeWheelBlacklist(input.wheelBlacklist),
     },
     ruleConfig: input.ruleConfig,
     wheelSegments: input.wheelSegments,
@@ -449,5 +493,6 @@ export function buildNativeAppSnapshot(input: NativeAppSnapshotInput): NativeApp
       lastAppliedDeltaSeconds: input.lastAppliedDeltaSeconds,
       events: input.timerEvents,
     },
+    goals: input.goals,
   }
 }

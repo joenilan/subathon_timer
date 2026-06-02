@@ -3,7 +3,10 @@ import {
   buildWheelSpinSummary,
   clampWheelTextScale,
   createDefaultWheelSegments,
+  filterWheelSegmentsForActor,
   getEligibleWheelSegmentsForGiftCount,
+  isWheelBlacklisted,
+  normalizeWheelBlacklist,
   pickWheelSegment,
 } from './outcomes'
 
@@ -51,5 +54,19 @@ describe('wheel helpers', () => {
     const timeoutSegment = createDefaultWheelSegments().find((segment) => segment.outcomeType === 'timeout')
 
     expect(buildWheelSpinSummary(timeoutSegment!)).toContain('requires moderation flow')
+  })
+
+  it('normalizes comma-separated timeout blacklist logins', () => {
+    expect(normalizeWheelBlacklist(' @Alice, bob, ALICE ,, ')).toEqual(['alice', 'bob'])
+    expect(isWheelBlacklisted('@alice', ['Alice'])).toBe(true)
+  })
+
+  it('removes self-timeout segments for blacklisted gifters only', () => {
+    const segments = createDefaultWheelSegments()
+    const filtered = filterWheelSegmentsForActor(segments, 'alice', 'alice')
+
+    expect(filtered.some((segment) => segment.outcomeType === 'timeout' && segment.timeoutTarget === 'self')).toBe(false)
+    expect(filtered.some((segment) => segment.outcomeType === 'timeout' && segment.timeoutTarget === 'random')).toBe(true)
+    expect(filterWheelSegmentsForActor(segments, 'bob', 'alice')).toEqual(segments)
   })
 })

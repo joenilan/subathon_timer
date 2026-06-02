@@ -6,7 +6,9 @@ import {
   setOverlayNetworkMode,
   syncOverlayRuntime,
 } from '../lib/platform/overlayRuntime'
+import { buildGoalOverlayLadders } from '../lib/goals/overlay'
 import { useAppStore } from '../state/useAppStore'
+import { useGoalsStore } from '../state/useGoalsStore'
 import { selectOverlayRuntimeState } from '../state/selectors'
 
 export function useOverlayRuntimeSync(nativeStateReady: boolean) {
@@ -14,6 +16,8 @@ export function useOverlayRuntimeSync(nativeStateReady: boolean) {
     activity,
     overlayLanAccessEnabled,
     reasonOverlayTransform,
+    goalsOverlayTransform,
+    compactOverlayTransform,
     ruleConfig,
     setOverlayBootstrapState,
     wheelOverlayTransform,
@@ -28,6 +32,7 @@ export function useOverlayRuntimeSync(nativeStateReady: boolean) {
     trendPoints,
     uptimeSeconds,
   } = useAppStore(useShallow(selectOverlayRuntimeState))
+  const goalLadders = useGoalsStore((state) => state.ladders)
 
   useEffect(() => {
     if (!nativeStateReady) {
@@ -65,15 +70,21 @@ export function useOverlayRuntimeSync(nativeStateReady: boolean) {
       timerOverlayTransform,
       reasonOverlayTransform,
       wheelOverlayTransform,
+      goalsOverlayTransform,
+      compactOverlayTransform,
       wheelSegments,
       wheelSpin,
       wheelResultDisplaySeconds,
       wheelTextScale,
       incentiveRules: buildOverlayRules(ruleConfig),
       overlayPreview: buildOverlayPreview(activity[0] ?? null),
+      goals: buildGoalOverlayLadders(goalLadders),
     })
   }, [
     activity,
+    goalLadders,
+    goalsOverlayTransform,
+    compactOverlayTransform,
     nativeStateReady,
     reasonOverlayTransform,
     ruleConfig,

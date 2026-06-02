@@ -67,6 +67,8 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
         thresholdAmount: milestone.thresholdAmount,
         rewardTitle: milestone.rewardTitle,
         rewardDescription: milestone.rewardDescription,
+        milestoneSourceType: milestone.milestoneSourceType,
+        milestoneCurrentAmount: 0,
         status: 'locked',
       })),
       createdAt: new Date(now).toISOString(),
@@ -165,6 +167,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
                   ...milestone,
                   status: 'locked',
                   completedAt: undefined,
+                  milestoneCurrentAmount: 0,
                 })),
                 processedEventIds: [],
               }
@@ -284,6 +287,10 @@ function mergeGoalConfig(config: Partial<SubathonGoalLadderConfig> | undefined):
       bitsAmountUnit: Math.max(1, config?.mixed?.bitsAmountUnit ?? defaults.mixed.bitsAmountUnit),
       tipAmountUnit: Math.max(0.01, config?.mixed?.tipAmountUnit ?? defaults.mixed.tipAmountUnit),
     },
+    channelPoints: {
+      ...defaults.channelPoints,
+      ...config?.channelPoints,
+    },
   }
 }
 
@@ -305,7 +312,7 @@ function normalizeGoalLadder(ladder: SubathonGoalLadder): SubathonGoalLadder {
     title: ladder.title.trim().length > 0 ? ladder.title.trim() : 'Subathon rewards',
     description: ladder.description?.trim() || undefined,
     status: ladder.status === 'paused' || ladder.status === 'archived' ? ladder.status : 'active',
-    sourceMode: ladder.sourceMode === 'mixed-source' ? 'mixed-source' : 'single-source',
+    sourceMode: ladder.sourceMode === 'mixed-source' ? 'mixed-source' : ladder.sourceMode === 'custom' ? 'custom' : 'single-source',
     sourceType: ladder.sourceType,
     currentAmount: Math.max(0, Number.isFinite(ladder.currentAmount) ? ladder.currentAmount : 0),
     unitLabel: ladder.unitLabel.trim().length > 0 ? ladder.unitLabel.trim() : 'points',
@@ -326,6 +333,8 @@ function normalizeMilestone(milestone: SubathonGoalMilestone): SubathonGoalMiles
         ? milestone.status
         : 'locked',
     completedAt: milestone.status === 'completed' ? milestone.completedAt : undefined,
+    milestoneSourceType: milestone.milestoneSourceType,
+    milestoneCurrentAmount: Number.isFinite(milestone.milestoneCurrentAmount) ? Math.max(0, milestone.milestoneCurrentAmount!) : 0,
   }
 }
 

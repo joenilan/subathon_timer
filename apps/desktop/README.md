@@ -40,6 +40,12 @@ bun run tauri:dev
 - `bun run release:publish`: Run `release:windows`, generate `latest.json` + `notes.md`, then upload the release files to the Raspberry Pi target from `.env.raspi`
 - `cargo check --manifest-path src-tauri/Cargo.toml`: Validate the native layer
 
+## Planning Docs
+
+- [docs/persistence-roadmap.md](/E:/git/subathon_timer/apps/desktop/docs/persistence-roadmap.md): native persistence migration phases
+- [docs/shared-subathon-plan.md](/E:/git/subathon_timer/apps/desktop/docs/shared-subathon-plan.md): linked-streamer shared session phases and authority rules
+- [docs/subathon-goals-plan.md](/E:/git/subathon_timer/apps/desktop/docs/subathon-goals-plan.md): subathon reward ladder plan, source modes, milestone behavior, rollout phases, and test coverage
+
 ## Twitch Setup
 
 The desktop app uses Twitch device auth from the `Connections` page.
